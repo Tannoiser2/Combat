@@ -84,6 +84,8 @@ var cell := Vector2(1.5 * HEX_SIZE, SQRT3 * HEX_SIZE)
 var first_col := 0                  # prima colonna etichettata (1 sulle mappe vere)
 var selected: Character = null      # personaggio evidenziato
 var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
+var cue_hexes: Array[Vector2i] = []  # hex suggeriti (bersagli/mosse)
+var cue_color := Color(0.95, 0.85, 0.2, 0.9)
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
 # Segnalino "retro"/dummy generico per team nemico (non identificato).
@@ -167,6 +169,12 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Hex suggeriti (bersagli di fuoco in rosso, mosse in verde)
+	for h in cue_hexes:
+		var cc := hex_center(h.x, h.y)
+		var pts := _hex_points(cc, radius * 0.9)
+		draw_colored_polygon(pts, Color(cue_color.r, cue_color.g, cue_color.b, 0.22))
+		draw_polyline(_closed(pts), cue_color, radius * 0.07)
 	# Evidenziazione dell'hex selezionato
 	if highlight_hex.x > -99:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)

@@ -117,24 +117,34 @@ static func action_phase(state: GameState) -> void:
 		run_impulse(state, imp)
 
 
-# Un singolo impulse: i Team agiscono in ordine di iniziativa.
+# Un singolo impulse, tutto automatico (modalita' headless/demo).
 static func run_impulse(state: GameState, imp: int) -> void:
 	state.impulse = imp
+	for c in impulse_order(state):
+		activate(state, c)
+
+
+# Ordine di attivazione dell'impulse: i Team in ordine di iniziativa.
+# E' la coda che la UI interattiva percorre un personaggio alla volta.
+static func impulse_order(state: GameState) -> Array[Character]:
+	var list: Array[Character] = []
 	for team in state.initiative_order:
-		_activate_team(state, team)
+		for c in state.characters_of_team(team):
+			list.append(c)
+	return list
 
 
-static func _activate_team(state: GameState, team: String) -> void:
-	# Rule 10.0: i nemici si attivano dall'alto della mappa al basso;
-	# i friendly nell'ordine scelto dal giocatore. Ordine base per ora.
-	for c in state.characters_of_team(team):
-		_activate_character(state, c)
+# Attivazione completa automatica: parte passiva + azione.
+static func activate(state: GameState, c: Character) -> void:
+	if c.is_dead():
+		return
+	activate_passive(state, c)
+	resolve_action(state, c)
 
 
-static func _activate_character(state: GameState, c: Character) -> void:
-	# TODO: eseguire l'azione dell'impulse corrente secondo l'Order del
-	#       personaggio (move/fire/melee...), gestire Duck Back.
-	#       A strati: per ora Rally e Spotting (SOP 4a-ii).
+# Parte NON discrezionale dell'attivazione: Rally (impulse 1) e Spotting.
+# Vale per entrambi i lati; la UI la esegue sempre, anche per i Friendly.
+static func activate_passive(state: GameState, c: Character) -> void:
 	if c.is_dead():
 		return
 	if c.has_order and c.order == Domain.Order.RALLY and state.impulse == 1:
@@ -147,21 +157,42 @@ static func _activate_character(state: GameState, c: Character) -> void:
 	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
 	# movimento, quindi LOS e gittata vanno ricontrollate ogni impulse).
 	_spotting_checks(state, c)
-	# Azione dell'impulse secondo l'ordine (Orders.IMPULSES).
-	# NOTA: per ora si risolve automaticamente per entrambi i lati (fuoco
-	# sul bersaglio piu' vicino, movimento verso/lontano dal nemico). La
-	# scelta del giocatore per i propri uomini (bersaglio, percorso) sara'
-	# il prossimo strato di UI.
-	if c.has_order and not c.is_dead():
-		match Orders.impulse_action(c.order, state.impulse):
-			Domain.ImpulseAction.MAY_FIRE:
-				_try_fire(state, c)
-			Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
-				_do_move(state, c, 1)
-			Domain.ImpulseAction.MUST_MOVE_2:
-				_do_move(state, c, 2)
-			Domain.ImpulseAction.MELEE:
-				pass  # TODO: risoluzione della mischia (fine Charge)
+
+
+# Azione dell'impulse risolta automaticamente (nemici, e Friendly in
+# modalita' demo). Per i Friendly interattivi la UI chiama invece
+# Fire.fire_action / Move.step_to col bersaglio/percorso scelti.
+static func resolve_action(state: GameState, c: Character) -> void:
+	if c.is_dead() or not c.has_order:
+		return
+	match Orders.impulse_action(c.order, state.impulse):
+		Domain.ImpulseAction.MAY_FIRE:
+			_try_fire(state, c)
+		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
+			_do_move(state, c, 1)
+		Domain.ImpulseAction.MUST_MOVE_2:
+			_do_move(state, c, 2)
+		Domain.ImpulseAction.MELEE:
+			pass  # TODO: risoluzione della mischia (fine Charge)
+
+
+# Azione discrezionale del personaggio in questo impulse: FIRE, MOVE_n
+# o NOTHING. La UI la usa per decidere se mettere in pausa sui Friendly.
+enum Act { NONE, FIRE, MOVE }
+
+
+static func discretionary_action(c: Character, impulse: int) -> Dictionary:
+	if not c.has_order:
+		return {"kind": Act.NONE, "hexes": 0}
+	match Orders.impulse_action(c.order, impulse):
+		Domain.ImpulseAction.MAY_FIRE:
+			return {"kind": Act.FIRE, "hexes": 0}
+		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
+			return {"kind": Act.MOVE, "hexes": 1}
+		Domain.ImpulseAction.MUST_MOVE_2:
+			return {"kind": Act.MOVE, "hexes": 2}
+		_:
+			return {"kind": Act.NONE, "hexes": 0}
 
 
 # Movimento nell'impulse: verso il nemico (Sneak/Sprint/Run&Gun/Charge)
@@ -175,14 +206,12 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 			c.display_name, verso, from.x, from.y, c.position.x, c.position.y])
 
 
-# Fuoco nell'impulse: bersaglio piu' vicino visibile e ingaggiabile.
-# TODO: per i Friendly il bersaglio andra' scelto dal giocatore (UI).
-static func _try_fire(state: GameState, firer: Character) -> void:
+# Bersagli che il tiratore puo' ingaggiare ora (visti, in gittata, LOS).
+static func valid_fire_targets(state: GameState, firer: Character) -> Array[Character]:
+	var out: Array[Character] = []
 	if firer.weapon_skills.is_empty():
-		return
+		return out
 	var weapon: String = firer.weapon_skills.keys()[0]
-	var best: Character = null
-	var best_dist := 9999
 	for target in state.characters:
 		if target.side == firer.side or target.is_dead():
 			continue
@@ -191,14 +220,23 @@ static func _try_fire(state: GameState, firer: Character) -> void:
 			continue
 		if target.side == Domain.Side.FRIENDLY and not target.spotted:
 			continue
-		if not Fire.can_fire(state, firer, target, weapon):
-			continue
+		if Fire.can_fire(state, firer, target, weapon):
+			out.append(target)
+	return out
+
+
+# Fuoco automatico (nemici / demo): bersaglio valido piu' vicino.
+static func _try_fire(state: GameState, firer: Character) -> void:
+	var targets := valid_fire_targets(state, firer)
+	var best: Character = null
+	var best_dist := 9999
+	for target in targets:
 		var dist := Spotting.hex_distance(firer.position, target.position)
 		if dist < best_dist:
 			best_dist = dist
 			best = target
 	if best != null:
-		Fire.fire_action(state, firer, best, weapon)
+		Fire.fire_action(state, firer, best, firer.weapon_skills.keys()[0])
 
 
 # Spotting check dello spotter contro ogni avversario non ancora
@@ -238,7 +276,8 @@ static func end_phase(state: GameState) -> void:
 		state.friendly_card_played = -1
 	state.impulse = 1
 	state.turn += 1
-	if state.turn > state.max_turns:
+	# Fine partita: turni esauriti o un lato annientato.
+	if state.turn > state.max_turns or Scenario.side_eliminated(state):
 		state.game_over = true
 
 

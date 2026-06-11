@@ -34,6 +34,13 @@ var order_menu: PopupMenu
 var order_target: Character
 var enemy_card_rect: TextureRect
 
+# Action Phase interattiva: coda di attivazione e personaggio in attesa
+# di una scelta del giocatore (fuoco/movimento).
+var action_queue: Array = []
+var acting: Character = null
+var action_kind: int = 0   # TurnSequence.Act
+var moves_left: int = 0
+
 
 func _ready() -> void:
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
@@ -72,6 +79,8 @@ func _ready() -> void:
 
 func _start_turn() -> void:
 	phase = Phase.CARD
+	acting = null
+	map_view.cue_hexes = []
 	TurnSequence.friendly_card_phase_prepare(state)
 	_show_hand()
 	next_button.disabled = true
@@ -93,42 +102,124 @@ func _on_card_chosen(index: int) -> void:
 
 
 func _on_next_pressed() -> void:
+	# Durante l'attesa di un'azione friendly, il pulsante = "passa/fine".
+	if acting != null:
+		_finish_friendly_action()
+		return
 	match phase:
 		Phase.ORDERS:
 			phase = Phase.ENEMY
 			TurnSequence.friendly_order_phase(state)
 			TurnSequence.enemy_order_phase(state)
 			hint_label.text = "Enemy Card Phase: ordini del nemico assegnati"
-			next_button.text = "Impulse 1"
+			next_button.text = "Inizia azione"
+			_refresh()
 		Phase.ENEMY:
 			phase = Phase.ACTION
 			impulse_next = 1
-			_run_next_impulse()
-		Phase.ACTION:
-			_run_next_impulse()
+			state.impulse = 1
+			state.log_event("--- Impulse 1 ---")
+			action_queue = TurnSequence.impulse_order(state)
+			_advance_action()
 		Phase.END_TURN:
 			_start_turn()
+
+
+# Percorre la coda dell'impulse: i nemici (e i friendly in demo) agiscono
+# da soli; sui friendly con un'azione discrezionale si ferma e passa la
+# scelta al giocatore (fuoco/movimento).
+func _advance_action() -> void:
+	while true:
+		if action_queue.is_empty():
+			impulse_next += 1
+			if impulse_next > 4:
+				_end_action_phase()
+				return
+			state.impulse = impulse_next
+			state.log_event("--- Impulse %d ---" % impulse_next)
+			action_queue = TurnSequence.impulse_order(state)
+			continue
+		var c: Character = action_queue.pop_front()
+		if c.is_dead():
+			continue
+		TurnSequence.activate_passive(state, c)
+		var act := TurnSequence.discretionary_action(c, state.impulse)
+		if c.side == Domain.Side.FRIENDLY and not auto_play and not c.is_dead() \
+				and _has_options(c, act):
+			_begin_friendly_action(c, act)
+			_refresh()
 			return
+		TurnSequence.resolve_action(state, c)
+	# (non raggiunto)
+
+
+func _begin_friendly_action(c: Character, act: Dictionary) -> void:
+	acting = c
+	action_kind = act["kind"]
+	moves_left = act["hexes"]
+	map_view.selected = c
+	if action_kind == TurnSequence.Act.FIRE:
+		var targets := TurnSequence.valid_fire_targets(state, c)
+		map_view.cue_hexes = _hexes_of(targets)
+		map_view.cue_color = Color(0.95, 0.2, 0.2, 0.9)
+		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
+		next_button.text = "Passa"
+	else:
+		map_view.cue_hexes = _passable_neighbors(c)
+		map_view.cue_color = Color(0.3, 0.9, 0.3, 0.9)
+		hint_label.text = "%s: muovi (%d) su un hex verde o premi Fine" % [
+			c.display_name, moves_left]
+		next_button.text = "Fine mossa"
+	next_button.disabled = false
+
+
+func _finish_friendly_action() -> void:
+	acting = null
+	map_view.cue_hexes = []
+	_advance_action()
+
+
+func _end_action_phase() -> void:
+	TurnSequence.end_phase(state)
+	if state.game_over:
+		phase = Phase.GAME_OVER
+		var v := Scenario.victory(state, "intro1")
+		hint_label.text = "Fine partita: %s" % v["outcome"]
+		state.log_event("=== %s === %s" % [v["outcome"], v["detail"]])
+		next_button.text = "Partita finita"
+		next_button.disabled = true
+	else:
+		phase = Phase.END_TURN
+		hint_label.text = "End Phase: ordini rimossi"
+		next_button.text = "Turno %d" % state.turn
+		next_button.disabled = false
 	_refresh()
 
 
-func _run_next_impulse() -> void:
-	state.log_event("--- Impulse %d ---" % impulse_next)
-	TurnSequence.run_impulse(state, impulse_next)
-	impulse_next += 1
-	if impulse_next <= 4:
-		hint_label.text = "Action Phase: impulse %d di 4" % (impulse_next - 1)
-		next_button.text = "Impulse %d" % impulse_next
-	else:
-		TurnSequence.end_phase(state)
-		if state.game_over:
-			phase = Phase.GAME_OVER
-			hint_label.text = "Partita finita al turno %d" % state.turn
-			next_button.disabled = true
-		else:
-			phase = Phase.END_TURN
-			hint_label.text = "End Phase: ordini rimossi"
-			next_button.text = "Turno %d" % state.turn
+func _hexes_of(chars: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for c in chars:
+		out.append(c.position)
+	return out
+
+
+func _passable_neighbors(c: Character) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for n in Move.neighbors(state, c.position):
+		if Move.is_passable(state, n):
+			out.append(n)
+	return out
+
+
+# C'e' davvero una scelta da fare (bersagli o hex liberi)?
+func _has_options(c: Character, act: Dictionary) -> bool:
+	match act["kind"]:
+		TurnSequence.Act.FIRE:
+			return not TurnSequence.valid_fire_targets(state, c).is_empty()
+		TurnSequence.Act.MOVE:
+			return not _passable_neighbors(c).is_empty()
+		_:
+			return false
 
 
 func _all_friendly_ordered() -> bool:
@@ -163,6 +254,10 @@ func _on_map_clicked() -> void:
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
 		return
+	# Durante l'azione di un proprio uomo, il click esegue fuoco/movimento.
+	if acting != null:
+		_handle_action_click(hex)
+		return
 	var c := map_view.character_at_hex(hex)
 	map_view.selected = c
 	map_view.highlight_hex = hex
@@ -174,6 +269,27 @@ func _on_map_clicked() -> void:
 		order_menu.position = Vector2i(get_viewport().get_mouse_position()) \
 			+ Vector2i(8, 8)
 		order_menu.popup()
+
+
+func _handle_action_click(hex: Vector2i) -> void:
+	if action_kind == TurnSequence.Act.FIRE:
+		var target := map_view.character_at_hex(hex)
+		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
+			return  # click non valido: si ignora
+		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		_finish_friendly_action()
+	else:  # MOVE
+		if not Move.step_to(state, acting, hex):
+			return
+		moves_left -= 1
+		if moves_left <= 0:
+			_finish_friendly_action()
+		else:
+			# aggiorna evidenziazione e prompt per il passo successivo
+			map_view.cue_hexes = _passable_neighbors(acting)
+			hint_label.text = "%s: muovi ancora (%d) o premi Fine" % [
+				acting.display_name, moves_left]
+			_refresh()
 
 
 func _on_order_selected(id: int) -> void:

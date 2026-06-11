@@ -122,6 +122,49 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	return c
 
 
+# Conteggio forze: vivi/morti per lato, nemici identificati.
+static func tally(state: GameState) -> Dictionary:
+	var t := {"f_alive": 0, "f_dead": 0, "e_alive": 0, "e_dead": 0, "e_known": 0}
+	for c in state.characters:
+		if c.side == D.Side.FRIENDLY:
+			t["f_dead" if c.is_dead() else "f_alive"] += 1
+		else:
+			if c.is_dead():
+				t["e_dead"] += 1
+			else:
+				t["e_alive"] += 1
+				if c.known:
+					t["e_known"] += 1
+	return t
+
+
+# Esito dello scenario. PROVVISORIO: il libro non da' VP formali per gli
+# scenari introduttivi, quindi per "A Meeting of Patrols" (ricognizione)
+# si valuta quanto la pattuglia e' rientrata intatta e quanti nemici ha
+# individuato o eliminato. {outcome, detail}.
+static func victory(state: GameState, scenario_id: String) -> Dictionary:
+	var t := tally(state)
+	var recon: int = t["e_known"] + t["e_dead"]
+	var outcome := "Pareggio"
+	if t["f_alive"] == 0:
+		outcome = "Sconfitta"
+	elif t["f_dead"] <= 2 and recon >= 6:
+		outcome = "Vittoria"
+	elif t["f_dead"] <= 3 and recon >= 4:
+		outcome = "Vittoria parziale"
+	elif t["f_dead"] >= 4:
+		outcome = "Sconfitta"
+	var detail := "Pattuglia: %d vivi, %d caduti - Nemici: %d individuati, %d eliminati" % [
+		t["f_alive"], t["f_dead"], t["e_known"], t["e_dead"]]
+	return {"outcome": outcome, "detail": detail}
+
+
+# Un lato e' stato annientato? (per la fine anticipata della partita)
+static func side_eliminated(state: GameState) -> bool:
+	var t := tally(state)
+	return t["f_alive"] == 0 or t["e_alive"] == 0
+
+
 static func _shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
 	for i in range(arr.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)

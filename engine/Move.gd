@@ -74,6 +74,15 @@ static func nearest_enemy(state: GameState, mover: Character) -> Character:
 	return best
 
 
+# Passo verso un hex scelto (deve essere adiacente e libero). Per il
+# movimento guidato dal giocatore. Ritorna true se si e' mosso.
+static func step_to(state: GameState, mover: Character, dest: Vector2i) -> bool:
+	if dest in neighbors(state, mover.position) and is_passable(state, dest):
+		mover.position = dest
+		return true
+	return false
+
+
 # Un passo verso (o lontano da) target_pos. Ritorna true se si e' mosso.
 static func step(state: GameState, mover: Character, target_pos: Vector2i, away: bool) -> bool:
 	var cur := Spotting.hex_distance(mover.position, target_pos)
