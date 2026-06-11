@@ -4,9 +4,14 @@
 # build web gira sulla mini-mappa procedurale di fallback.
 name: Deploy su GitHub Pages
 
+# GitHub Pages pubblica solo dal branch di DEFAULT del repo (regola
+# dell'ambiente github-pages). Finche' il default e' il branch di
+# sviluppo, il deploy parte da li'; per pubblicare da main basta
+# impostare main come default branch (Settings -> General) e aggiungere
+# "main" qui sotto.
 on:
   push:
-    branches: [main]
+    branches: [main, claude/vibrant-noether-ncsw3j]
   workflow_dispatch:
 
 permissions:
