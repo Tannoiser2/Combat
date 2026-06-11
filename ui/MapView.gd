@@ -102,6 +102,8 @@ var los_lines: Array = []
 # Overlay di verifica del terreno (tasto T): tinte + hexside sopra la
 # scansione, per confrontare la classificazione con la mappa vera.
 var debug_terrain := false
+# Strumento LOS: {from: Vector2, to: Vector2, clear: bool} oppure {}.
+var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
 # Animazioni: posizione "visiva" dei segnalini (insegue quella logica)
@@ -297,6 +299,18 @@ func _draw() -> void:
 				draw_arc(ac, radius * 0.55, 0, TAU, 20, Color(0.9, 0.2, 0.1, 0.9), radius * 0.06)
 				draw_string(font, ac + Vector2(-radius * 0.2, radius * 0.12),
 					"!", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.5), Color.WHITE)
+	# Strumento LOS: linea spessa tra i due hex scelti.
+	if not los_tool.is_empty():
+		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \
+			else Color(0.95, 0.2, 0.15, 0.95)
+		_draw_dashed(los_tool["from"], los_tool["to"], lt_col,
+			radius * 0.12, radius * 0.5)
+		draw_circle(los_tool["from"], radius * 0.2, lt_col)
+		draw_circle(los_tool["to"], radius * 0.2, lt_col)
+		if not los_tool["clear"]:
+			var mid: Vector2 = (los_tool["from"] + los_tool["to"]) * 0.5
+			draw_line(mid + Vector2(-1, -1) * radius * 0.3, mid + Vector2(1, 1) * radius * 0.3, lt_col, radius * 0.1)
+			draw_line(mid + Vector2(-1, 1) * radius * 0.3, mid + Vector2(1, -1) * radius * 0.3, lt_col, radius * 0.1)
 	# Linee di vista dall'unita' selezionata: verde tratteggiata = LOS
 	# libera, rossa = bloccata (con una x sul punto di arrivo).
 	if selected != null and not los_lines.is_empty():
@@ -556,6 +570,20 @@ func _draw_hexsides(radius: float) -> void:
 			col, radius * 0.18)
 
 
+# Tinte dell'overlay di verifica (tasto T), usate anche per la legenda.
+const OVERLAY_TINTS := {
+	D.Terrain.TREES: Color(0.0, 0.85, 0.1, 0.40),
+	D.Terrain.FIELD: Color(1.0, 0.85, 0.0, 0.40),
+	D.Terrain.ROCKS: Color(0.7, 0.7, 0.7, 0.45),
+	D.Terrain.BUILDING: Color(1.0, 0.1, 0.1, 0.50),
+	D.Terrain.STREAM: Color(0.1, 0.4, 1.0, 0.50),
+	D.Terrain.MARSH: Color(0.0, 0.9, 0.9, 0.45),
+	D.Terrain.LOGS: Color(0.55, 0.35, 0.1, 0.45),
+	D.Terrain.OPEN_LEVEL_1: Color(0.95, 0.95, 0.4, 0.35),
+	D.Terrain.OPEN_LEVEL_2: Color(1.0, 0.5, 0.0, 0.40),
+}
+
+
 # Overlay di verifica (tasto T): tinte di classificazione sopra la
 # scansione. Confronta i colori con la mappa vera per trovare errori,
 # poi si correggono a mano in Boards.gd.
@@ -566,17 +594,8 @@ func _draw_terrain_overlay(radius: float) -> void:
 			continue
 		var c := _key_to_cell(key)
 		var base: Color = BASE_COLORS.get(hex.terrain, Color.MAGENTA)
-		# tinte forti per il confronto
-		var tint := Color(base.r, base.g, base.b, 0.45)
-		match hex.terrain:
-			D.Terrain.TREES: tint = Color(0.0, 0.85, 0.1, 0.40)
-			D.Terrain.FIELD: tint = Color(1.0, 0.85, 0.0, 0.40)
-			D.Terrain.ROCKS: tint = Color(0.7, 0.7, 0.7, 0.45)
-			D.Terrain.BUILDING: tint = Color(1.0, 0.1, 0.1, 0.50)
-			D.Terrain.STREAM: tint = Color(0.1, 0.4, 1.0, 0.50)
-			D.Terrain.MARSH: tint = Color(0.0, 0.9, 0.9, 0.45)
-			D.Terrain.OPEN_LEVEL_1: tint = Color(0.95, 0.95, 0.4, 0.35)
-			D.Terrain.OPEN_LEVEL_2: tint = Color(1.0, 0.5, 0.0, 0.40)
+		var tint: Color = OVERLAY_TINTS.get(hex.terrain,
+			Color(base.r, base.g, base.b, 0.45))
 		draw_colored_polygon(_hex_points(hex_center(c.x, c.y), radius * 0.92), tint)
 
 

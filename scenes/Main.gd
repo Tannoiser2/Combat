@@ -37,6 +37,13 @@ var order_target: Character
 var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
 var roster_box: VBoxContainer   # elenco della squadra a sinistra
+var overlay_legend: PanelContainer  # legenda dell'overlay terreno (tasto T)
+
+# Strumento LOS: il gioco si congela e due click tracciano una linea
+# di vista tra hex qualsiasi (verde libera / rossa bloccata).
+var los_button: Button
+var los_mode := false
+var los_first := Vector2i(-99, -99)
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -407,6 +414,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			and map_view != null:
 		map_view.debug_terrain = not map_view.debug_terrain
 		map_view.queue_redraw()
+		overlay_legend.visible = map_view.debug_terrain
 		hint_label.text = "Overlay terreno: %s (T per cambiare)" % \
 			("ON - confronta i colori con la mappa" if map_view.debug_terrain else "off")
 		return
@@ -428,9 +436,51 @@ func _zoom(factor: float) -> void:
 	camera.zoom = Vector2(z, z)
 
 
+# Strumento LOS: ON congela il gioco (i click servono solo alla verifica).
+func _on_los_toggled(on: bool) -> void:
+	los_mode = on
+	los_first = Vector2i(-99, -99)
+	map_view.los_tool = {}
+	next_button.disabled = on
+	hint_label.text = "Strumento LOS: clicca il PRIMO hex" if on \
+		else "Strumento LOS chiuso"
+	map_view.queue_redraw()
+
+
+func _handle_los_click(hex: Vector2i) -> void:
+	if los_first.x <= -99:
+		los_first = hex
+		map_view.los_tool = {}
+		map_view.highlight_hex = hex
+		hint_label.text = "Strumento LOS: %02d.%02d -> clicca il SECONDO hex" % [hex.x, hex.y]
+		map_view.queue_redraw()
+		return
+	# Se ci sono unita' sui due hex usa la LOS vera (ordini inclusi).
+	var ca := state.character_at(los_first.x, los_first.y)
+	var cb := state.character_at(hex.x, hex.y)
+	var free: bool
+	if ca != null and cb != null and not ca.is_dead() and not cb.is_dead():
+		free = LOS.clear(state, ca, cb)
+	else:
+		free = LOS.clear_hexes(state, los_first, hex)
+	map_view.los_tool = {
+		"from": map_view.hex_center(los_first.x, los_first.y),
+		"to": map_view.hex_center(hex.x, hex.y),
+		"clear": free,
+	}
+	hint_label.text = "LOS %02d.%02d -> %02d.%02d: %s   (clicca per un'altra verifica)" % [
+		los_first.x, los_first.y, hex.x, hex.y,
+		"LIBERA" if free else "BLOCCATA"]
+	los_first = Vector2i(-99, -99)
+	map_view.queue_redraw()
+
+
 func _on_map_clicked() -> void:
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
+		return
+	if los_mode:
+		_handle_los_click(hex)
 		return
 	if phase == Phase.DEPLOY:
 		_handle_deploy_click(hex)
@@ -626,6 +676,13 @@ func _build_hud() -> void:
 	hint_label.add_theme_font_size_override("font_size", 17)
 	hint_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
 	top_box.add_child(hint_label)
+	los_button = Button.new()
+	los_button.text = "LOS"
+	los_button.toggle_mode = true
+	los_button.tooltip_text = "Strumento linea di vista: congela il gioco,\nclicca due hex per verificare se si vedono."
+	los_button.custom_minimum_size = Vector2(70, 40)
+	los_button.toggled.connect(_on_los_toggled)
+	top_box.add_child(los_button)
 	next_button = Button.new()
 	next_button.text = "Avanti"
 	next_button.custom_minimum_size = Vector2(180, 40)
@@ -716,6 +773,34 @@ func _build_hud() -> void:
 	card_preview.hide()
 	root.add_child(card_preview)
 
+	# Legenda dell'overlay terreno (compare col tasto T), in basso a sinistra.
+	overlay_legend = PanelContainer.new()
+	overlay_legend.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	overlay_legend.offset_left = 8
+	overlay_legend.offset_bottom = -8
+	overlay_legend.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	overlay_legend.hide()
+	root.add_child(overlay_legend)
+	var leg := RichTextLabel.new()
+	leg.bbcode_enabled = true
+	leg.fit_content = true
+	leg.custom_minimum_size = Vector2(240, 0)
+	leg.add_theme_font_size_override("normal_font_size", 13)
+	var rows: Array[String] = []
+	rows.append("[b]OVERLAY TERRENO[/b] (T per chiudere)")
+	rows.append("[i]Riempimenti (hex):[/i]")
+	for t in MapView.OVERLAY_TINTS:
+		var c: Color = MapView.OVERLAY_TINTS[t]
+		rows.append("[color=#%s]⬢[/color] %s" % [
+			Color(c.r, c.g, c.b).to_html(false), Domain.TERRAIN_NAMES[t]])
+	rows.append("[i]Hexside (bordi):[/i]")
+	for t in MapView.HEXSIDE_COLORS:
+		rows.append("[color=#%s]▬[/color] %s" % [
+			MapView.HEXSIDE_COLORS[t].to_html(false), Domain.TERRAIN_NAMES[t]])
+	rows.append("[i]Hex senza tinta = Open L0[/i]")
+	leg.text = "\n".join(rows)
+	overlay_legend.add_child(leg)
+
 	# Pannello ordini con spiegazioni (al posto del vecchio PopupMenu):
 	# bottoni a sinistra, descrizione al passaggio del mouse a destra.
 	order_panel = PanelContainer.new()
@@ -798,10 +883,13 @@ func _update_los_lines(c: Character) -> void:
 		# verso i nemici noti (o, per un nemico selezionato, i tuoi uomini)
 		if other.side == Domain.Side.ENEMY and not other.known:
 			continue
-		map_view.los_lines.append({
-			"to": map_view.hex_center(other.position.x, other.position.y),
-			"clear": LOS.clear(state, c, other),
-		})
+		# solo le LOS LIBERE (le rosse affollavano la mappa); per un
+		# controllo puntuale c'e' lo strumento LOS.
+		if LOS.clear(state, c, other):
+			map_view.los_lines.append({
+				"to": map_view.hex_center(other.position.x, other.position.y),
+				"clear": true,
+			})
 	map_view.queue_redraw()
 
 

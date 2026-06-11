@@ -117,14 +117,23 @@ static func _has_low_order(c: Character) -> bool:
 
 # La LOS tra i due personaggi e' libera?
 static func clear(state: GameState, ca: Character, cb: Character) -> bool:
-	var a := ca.position
-	var b := cb.position
 	var low_active := _has_low_order(ca) or _has_low_order(cb)
 	# Nota Depression del flowchart, per ciascun soldato.
 	if _depression_blocked(state, ca, cb) or _depression_blocked(state, cb, ca):
 		return false
-	var l1 := _unit_level2(state, ca)
-	var l2 := _unit_level2(state, cb)
+	return clear_positions(state, ca.position, cb.position,
+		_unit_level2(state, ca), _unit_level2(state, cb), low_active)
+
+
+# LOS tra due HEX arbitrari (per lo strumento di verifica): livelli dal
+# suolo, senza la regola della Depression che dipende dagli ordini.
+static func clear_hexes(state: GameState, a: Vector2i, b: Vector2i) -> bool:
+	return clear_positions(state, a, b,
+		_hex_level2_at(state, a), _hex_level2_at(state, b), false)
+
+
+static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
+		l1: int, l2: int, low_active: bool) -> bool:
 	var between := hexes_between(a, b)
 	# H: ostacolo piu' alto; a parita', l'hex piu' lontano dal piu' alto.
 	var t2 := maxi(l1, l2)
