@@ -9,14 +9,15 @@ build/
 riferimenti/
 *.pdf
 *.vmod
-# Scansioni delle mappe (copyright Compass Games): solo in locale.
-# Copiare qui i jpg estratti dal modulo Vassal con questi nomi:
-#   assets/maps/farmhouse.jpg, hill.jpg, village.jpg, hedgerows.jpg
-assets/maps/
-# Segnalini estratti dal modulo Vassal (copyright Compass Games): solo
-# in locale. Copiare i PNG <id>-f.png in assets/counters/ (vedi
-# Character.counter); senza, la UI usa i cerchietti colorati di ripiego.
-assets/counters/
+# Mappe: per ora si pubblica solo quella usata dallo scenario corrente
+# (hedgerows). Le altre restano fuori finche' i loro scenari non servono,
+# per non gonfiare il download della build web.
+assets/maps/farmhouse.jpg
+assets/maps/farmhouse.jpg.import
+assets/maps/hill.jpg
+assets/maps/hill.jpg.import
+assets/maps/village.jpg
+assets/maps/village.jpg.import
 
 # Sistema
 .DS_Store

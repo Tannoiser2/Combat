@@ -86,10 +86,12 @@ var selected: Character = null      # personaggio evidenziato
 var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
-# Segnalino "retro"/dummy per lato: nemico non ancora identificato.
-const DUMMY_COUNTER := {
-	D.Side.ENEMY: "GE-RedTeam-Dummy-1",
-	D.Side.FRIENDLY: "",
+# Segnalino "retro"/dummy generico per team nemico (non identificato).
+const DUMMY_BY_TEAM := {
+	"Blue": "GE-BlueTeam-Dummy-1",
+	"Red": "GE-RedTeam-Dummy-1",
+	"White": "GE-WhiteTeam-Dummy-1",
+	"Yellow": "GE-YellowTeam-Dummy-1",
 }
 
 
@@ -181,7 +183,7 @@ func _draw() -> void:
 			draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
 		# Segnalino vero se disponibile (dummy se nemico non identificato),
 		# altrimenti cerchietto di ripiego (build web senza i PNG).
-		var counter_id: String = DUMMY_COUNTER[c.side] if hidden else c.counter
+		var counter_id: String = DUMMY_BY_TEAM.get(c.team, "GE-RedTeam-Dummy-1") if hidden else c.counter
 		var tex := _counter_tex(counter_id)
 		if tex != null:
 			var s := radius * 1.5
