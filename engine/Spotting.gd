@@ -79,13 +79,20 @@ static func range_modifier(dist: int) -> int:
 	return -1 - int((dist - 11) / 10.0)
 
 
-# Modificatore del bersaglio: terreno x gruppo di ordini.
-static func target_modifier(state: GameState, target: Character) -> int:
+# Modificatore del bersaglio: terreno x gruppo di ordini. Se l'osservatore
+# guarda attraverso un hexside (siepe/muro) sul bordo del bersaglio, vale
+# il modificatore piu' protettivo.
+static func target_modifier(state: GameState, target: Character, spotter: Character = null) -> int:
 	var hex := state.hex_at(target.position.x, target.position.y)
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
 	var group: int = ORDER_GROUP.get(target.order, NO_ORDER_GROUP) \
 		if target.has_order else NO_ORDER_GROUP
-	return TERRAIN_MOD[terrain][group]
+	var mod: int = TERRAIN_MOD[terrain][group]
+	if spotter != null:
+		var side := Fire._entry_hexside(state, spotter.position, target.position)
+		if side >= 0:
+			mod = mini(mod, TERRAIN_MOD[side][group])
+	return mod
 
 
 # Tentativo di spotting. Applica l'esito (Known/Spotted) e ritorna
@@ -95,7 +102,7 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
 	var dist := hex_distance(spotter.position, target.position)
 	var threshold := Checks.effective_tq(spotter) \
-		+ target_modifier(state, target) + range_modifier(dist)
+		+ target_modifier(state, target, spotter) + range_modifier(dist)
 	var roll := Checks.roll_d10(state.rng)
 	var success := roll <= threshold
 	if success:

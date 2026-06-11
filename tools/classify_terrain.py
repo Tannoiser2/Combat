@@ -87,8 +87,8 @@ class Classifier:
             return "ROCKS"
         if dfc >= 0.40:
             return "TREES" if dgbc >= 25 else "FIELD"
-        if dfr >= 0.25 and dgbr >= 25:
-            return "HEDGEROW"
+        # (niente piu' classe HEDGEROW sul riempimento: le siepi sono
+        # rilevate sui BORDI degli hex da edge_features)
         if sd >= 55:
             return "FIELD"
         if gr >= 30 and sd < 30 and g < 152:
@@ -105,6 +105,82 @@ class Classifier:
                 result["%d,%d" % (col, row)] = self.classify(col, row)
         return result
 
+    # ----------------------------------------------------- hexside
+
+    def _pixel_to_hex(self, x, y):
+        col = round((x - self.x0) / DX) + 1
+        row = round((y - self.y0) / DY - (0.5 if col % 2 == 0 else 0.0))
+        return col, row
+
+    def _band(self, ax, ay, bx, by, off_lo, off_hi, n=9):
+        """Campiona una banda lungo il segmento a-b, a offset perpendicolari
+        [off_lo, off_hi] da ENTRAMBI i lati."""
+        import math as m
+        dx, dy = bx - ax, by - ay
+        ln = m.hypot(dx, dy)
+        px_, py_ = -dy / ln, dx / ln  # perpendicolare
+        vals = []
+        for i in range(n):
+            t = 0.15 + 0.7 * i / (n - 1)
+            sx, sy = ax + dx * t, ay + dy * t
+            for off in (off_lo, (off_lo + off_hi) / 2, off_hi):
+                for sgn in (1, -1):
+                    qx, qy = int(sx + px_ * off * sgn), int(sy + py_ * off * sgn)
+                    if 0 <= qx < self.W and 0 <= qy < self.H:
+                        vals.append(self.px[qx, qy])
+        return vals
+
+    @staticmethod
+    def _frac(vals, pred):
+        if not vals:
+            return 0.0
+        return sum(1 for v in vals if pred(v)) / len(vals)
+
+    def edge_features(self):
+        """Siepi/bocage/muri sui BORDI degli hex.
+        Ritorna {"c1,r1|c2,r2": "HEDGEROW"|"BOCAGE"|"WALL"}.
+        Ogni bordo e' esaminato una sola volta (direzioni 30/90/150 gradi)."""
+        import math as m
+        feats = {}
+        hedge = lambda v: v[1] > v[0] + 8 and v[1] - v[2] > 16 and v[1] < 115
+        dark_hedge = lambda v: hedge(v) and v[1] < 85
+        wall = lambda v: abs(int(v[0]) - int(v[1])) < 14 and \
+            abs(int(v[1]) - int(v[2])) < 18 and 88 < v[1] < 175 and v[1] - v[2] < 16
+        for col in range(1, COLS + 1):
+            for row in range(0, last_row(col) + 1):
+                cx, cy = hex_center(self.x0, self.y0, col, row)
+                for k in range(3):  # bordi verso il basso: 30, 90, 150 gradi
+                    ang = m.radians(30 + 60 * k)
+                    ncx = cx + DY * m.cos(ang)
+                    ncy = cy + DY * m.sin(ang)
+                    ncol, nrow = self._pixel_to_hex(ncx, ncy)
+                    if not (1 <= ncol <= COLS and 0 <= nrow <= last_row(ncol)):
+                        continue
+                    # vertici del bordo condiviso (a 30 gradi dal centro-bordo)
+                    v1 = (cx + R * m.cos(ang - m.radians(30)),
+                          cy + R * m.sin(ang - m.radians(30)))
+                    v2 = (cx + R * m.cos(ang + m.radians(30)),
+                          cy + R * m.sin(ang + m.radians(30)))
+                    band = self._band(v1[0], v1[1], v2[0], v2[1], 4, 14)
+                    h = self._frac(band, hedge)
+                    w = self._frac(band, wall)
+                    if h < 0.45 and w < 0.55:
+                        continue
+                    # guardia anti-chioma: se anche BEN DENTRO entrambi gli
+                    # hex e' quasi tutto scuro, e' un bosco che sborda (le
+                    # siepi, anche grasse, lasciano l'interno piu' chiaro).
+                    inner = self._band(v1[0], v1[1], v2[0], v2[1], 30, 46)
+                    if h >= 0.45 and self._frac(inner, hedge) > 0.75:
+                        continue
+                    key = "%d,%d|%d,%d" % ((col, row, ncol, nrow)
+                        if (col, row) <= (ncol, nrow) else (ncol, nrow, col, row))
+                    if h >= 0.45:
+                        feats[key] = "BOCAGE" if self._frac(band, dark_hedge) > 0.5 \
+                            else "HEDGEROW"
+                    else:
+                        feats[key] = "WALL"
+        return feats
+
 
 OVERLAY_COLORS = {
     "OPEN": None, "TREES": (0, 200, 0), "FIELD": (255, 200, 0),
@@ -114,7 +190,11 @@ OVERLAY_COLORS = {
 }
 
 
-def save_overlay(clf, result, path):
+EDGE_COLORS = {"HEDGEROW": (0, 230, 60), "BOCAGE": (170, 0, 230),
+               "WALL": (255, 255, 255)}
+
+
+def save_overlay(clf, result, path, feats=None):
     ov = clf.img.copy()
     d = ImageDraw.Draw(ov, "RGBA")
     for key, t in result.items():
@@ -125,6 +205,21 @@ def save_overlay(clf, result, path):
         pts = [(cx + math.cos(a * math.pi / 3) * R * 0.92,
                 cy + math.sin(a * math.pi / 3) * R * 0.92) for a in range(6)]
         d.polygon(pts, fill=OVERLAY_COLORS[t] + (110,))
+    # hexside rilevati: segmento spesso sul bordo condiviso
+    for key, t in (feats or {}).items():
+        a, b = key.split("|")
+        c1, r1 = map(int, a.split(","))
+        c2, r2 = map(int, b.split(","))
+        x1, y1 = hex_center(clf.x0, clf.y0, c1, r1)
+        x2, y2 = hex_center(clf.x0, clf.y0, c2, r2)
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        # bordo perpendicolare alla congiungente, lungo R
+        dx, dy = x2 - x1, y2 - y1
+        ln = math.hypot(dx, dy)
+        px_, py_ = -dy / ln, dx / ln
+        d.line([(mx - px_ * R / 2, my - py_ * R / 2),
+                (mx + px_ * R / 2, my + py_ * R / 2)],
+               fill=EDGE_COLORS[t] + (230,), width=10)
     ov.resize((clf.W // 4, clf.H // 4)).save(path)
 
 

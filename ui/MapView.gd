@@ -99,6 +99,9 @@ var cue_hexes: Array[Vector2i] = []  # hex suggeriti (bersagli/mosse)
 var cue_color := Color(0.95, 0.85, 0.2, 0.9)
 # Linee di vista dall'unita' selezionata: [{to: Vector2, clear: bool}]
 var los_lines: Array = []
+# Overlay di verifica del terreno (tasto T): tinte + hexside sopra la
+# scansione, per confrontare la classificazione con la mappa vera.
+var debug_terrain := false
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
 # Animazioni: posizione "visiva" dei segnalini (insegue quella logica)
@@ -244,8 +247,14 @@ func _draw() -> void:
 	var radius := cell.x / 1.5  # raggio centro-vertice
 	if board != null:
 		draw_texture(board, Vector2.ZERO)
+		if debug_terrain:
+			_draw_terrain_overlay(radius)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Hexside (siepi/bocage/muri): sempre in procedurale, col debug sulla
+	# scansione (la scansione li ha gia' disegnati).
+	if board == null or debug_terrain:
+		_draw_hexsides(radius)
 	# Cannoni obiettivo (intro3/s9): cerchio scuro, X rossa se distrutti.
 	if not state.scenario_id.is_empty():
 		for gun in Scenario.SCENARIOS[state.scenario_id].get("gun_hexes", []):
@@ -522,6 +531,53 @@ func _draw_grass(center: Vector2, radius: float, rng: RandomNumberGenerator) -> 
 static func _key_to_cell(key: String) -> Vector2i:
 	var p := key.split(",")
 	return Vector2i(int(p[0]), int(p[1]))
+
+
+# Hexside: segmento spesso sul bordo condiviso tra i due hex.
+const HEXSIDE_COLORS := {
+	D.Terrain.HEDGEROW: Color(0.10, 0.45, 0.12),
+	D.Terrain.BOCAGE: Color(0.06, 0.28, 0.08),
+	D.Terrain.WALL: Color(0.55, 0.53, 0.48),
+}
+
+
+func _draw_hexsides(radius: float) -> void:
+	for key in state.hexsides:
+		var parts: PackedStringArray = String(key).split("|")
+		var p1: PackedStringArray = parts[0].split(",")
+		var p2: PackedStringArray = parts[1].split(",")
+		var c1 := hex_center(int(p1[0]), int(p1[1]))
+		var c2 := hex_center(int(p2[0]), int(p2[1]))
+		var mid := (c1 + c2) * 0.5
+		var dir := (c2 - c1).normalized()
+		var perp := Vector2(-dir.y, dir.x)
+		var col: Color = HEXSIDE_COLORS.get(state.hexsides[key], Color.MAGENTA)
+		draw_line(mid - perp * radius * 0.5, mid + perp * radius * 0.5,
+			col, radius * 0.18)
+
+
+# Overlay di verifica (tasto T): tinte di classificazione sopra la
+# scansione. Confronta i colori con la mappa vera per trovare errori,
+# poi si correggono a mano in Boards.gd.
+func _draw_terrain_overlay(radius: float) -> void:
+	for key in state.map:
+		var hex: GameState.MapHex = state.map[key]
+		if hex.terrain == D.Terrain.OPEN_LEVEL_0:
+			continue
+		var c := _key_to_cell(key)
+		var base: Color = BASE_COLORS.get(hex.terrain, Color.MAGENTA)
+		# tinte forti per il confronto
+		var tint := Color(base.r, base.g, base.b, 0.45)
+		match hex.terrain:
+			D.Terrain.TREES: tint = Color(0.0, 0.85, 0.1, 0.40)
+			D.Terrain.FIELD: tint = Color(1.0, 0.85, 0.0, 0.40)
+			D.Terrain.ROCKS: tint = Color(0.7, 0.7, 0.7, 0.45)
+			D.Terrain.BUILDING: tint = Color(1.0, 0.1, 0.1, 0.50)
+			D.Terrain.STREAM: tint = Color(0.1, 0.4, 1.0, 0.50)
+			D.Terrain.MARSH: tint = Color(0.0, 0.9, 0.9, 0.45)
+			D.Terrain.OPEN_LEVEL_1: tint = Color(0.95, 0.95, 0.4, 0.35)
+			D.Terrain.OPEN_LEVEL_2: tint = Color(1.0, 0.5, 0.0, 0.40)
+		draw_colored_polygon(_hex_points(hex_center(c.x, c.y), radius * 0.92), tint)
 
 
 # I sei vertici di un esagono flat-top attorno a un centro.

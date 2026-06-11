@@ -44,15 +44,29 @@ def emit_table(lines, result):
         lines.append("\t\t],")
 
 
+def emit_hexsides(lines, feats):
+    # stringhe compatte "c1,r1|c2,r2|X" (H=siepe, B=bocage, W=muro)
+    letter = {"HEDGEROW": "H", "BOCAGE": "B", "WALL": "W"}
+    keys = sorted(feats)
+    line = "\t\t"
+    for k in keys:
+        q = '"%s|%s",' % (k, letter[feats[k]])
+        if len(line) + len(q) > 76:
+            lines.append(line.rstrip())
+            line = "\t\t"
+        line += q + " "
+    lines.append(line.rstrip())
+
+
 def main():
     lines = []
     lines.append("## Terreno per hex delle 4 mappe, GENERATO da tools/generate_boards.py")
     lines.append("## (classificazione automatica dei colori delle scansioni; rifinibile")
     lines.append("## a mano: e' solo una tabella). Gli hex non elencati sono Open Level 0.")
-    lines.append("## Limiti noti: siepi/muri trattati come terreno dell'hex (non hexside);")
-    lines.append("## sulla Hill i livelli di quota valgono solo dove il colore li mostra")
-    lines.append("## (tan=L1, arancio=L2): le zone erbose in quota risultano L0;")
-    lines.append("## le Depression non si distinguono dallo sterrato: marcarle a mano.")
+    lines.append("## HEXSIDES: siepi/bocage/muri sui BORDI (\"c1,r1|c2,r2|H/B/W\").")
+    lines.append("## Limiti noti: sulla Hill i livelli di quota valgono solo dove il")
+    lines.append("## colore li mostra (tan=L1, arancio=L2), le zone erbose in quota")
+    lines.append("## risultano L0; le Depression vanno marcate a mano.")
     lines.append("class_name Boards")
     lines.append("extends RefCounted")
     lines.append("")
@@ -63,15 +77,25 @@ def main():
     lines.append("const LAST_ROW_ODD := 19")
     lines.append("const LAST_ROW_EVEN := 18")
     lines.append("")
+    all_feats = {}
     lines.append("const TERRAIN := {")
     for name, (path, x0, y0, tan_l1) in MAPS.items():
         clf = Classifier(path, x0, y0, tan_l1)
         result = clf.classify_all()
-        print(name, Counter(result.values()))
-        save_overlay(clf, result, "/tmp/overlay_%s.png" % name)
+        feats = clf.edge_features()
+        all_feats[name] = feats
+        print(name, Counter(result.values()), "| hexsides:", Counter(feats.values()))
+        save_overlay(clf, result, "/tmp/overlay_%s.png" % name, feats)
         lines.append('\t"%s": {' % name)
         emit_table(lines, result)
         lines.append("\t},")
+    lines.append("}")
+    lines.append("")
+    lines.append("const HEXSIDES := {")
+    for name in MAPS:
+        lines.append('\t"%s": [' % name)
+        emit_hexsides(lines, all_feats[name])
+        lines.append("\t],")
     lines.append("}")
     lines.append("")
     lines.append("")
@@ -90,6 +114,15 @@ def main():
     lines.append("\t\t\tmatch terrain:")
     lines.append("\t\t\t\tD.Terrain.OPEN_LEVEL_1: hex.level = 1")
     lines.append("\t\t\t\tD.Terrain.OPEN_LEVEL_2: hex.level = 2")
+    lines.append("\t# Hexside: siepi/bocage/muri sui bordi.")
+    lines.append('\t_fill_hexsides(state, HEXSIDES[board_name])')
+    lines.append("")
+    lines.append("")
+    lines.append("static func _fill_hexsides(state: GameState, entries: Array) -> void:")
+    lines.append('\tvar types := {"H": D.Terrain.HEDGEROW, "B": D.Terrain.BOCAGE, "W": D.Terrain.WALL}')
+    lines.append("\tfor e in entries:")
+    lines.append('\t\tvar parts: PackedStringArray = String(e).split("|")')
+    lines.append('\t\tstate.hexsides["%s|%s" % [parts[0], parts[1]]] = types[parts[2]]')
     out = os.path.join(os.path.dirname(__file__), "..", "engine", "Boards.gd")
     open(out, "w").write("\n".join(lines) + "\n")
     print("scritto", os.path.normpath(out))

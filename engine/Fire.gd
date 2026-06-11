@@ -130,7 +130,13 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	var ws: int = firer.weapon_skills[weapon]
 	ws += int(Weapons.range_ws_modifier(weapon, dist))
 	if not suppressive:
-		ws += WS_MOD[terrain][group]
+		var tmod: int = WS_MOD[terrain][group]
+		# Hexside sul bordo d'ingresso del tiro (siepe/bocage/muro davanti
+		# al bersaglio): vale il modificatore piu' protettivo.
+		var side := _entry_hexside(state, firer.position, target.position)
+		if side >= 0:
+			tmod = mini(tmod, WS_MOD[side][group])
+		ws += tmod
 	if firer.has_order:
 		ws += int(Orders.FIRE_WS_MOD.get(firer.order, 0))
 	for w in firer.wounds:
@@ -249,6 +255,21 @@ static func _spend_ammo(state: GameState, firer: Character, weapon: String) -> v
 	else:
 		firer.low_ammo = true
 		_log(state, "  %s e' a corto di munizioni" % firer.display_name)
+
+
+# Hexside attraversato entrando nell'hex del bersaglio (l'ultimo bordo
+# del percorso di tiro), o -1.
+static func _entry_hexside(state: GameState, from: Vector2i, to: Vector2i) -> int:
+	var between := LOS.hexes_between(from, to)
+	var prev := from
+	if not between.is_empty():
+		# hexes_between e' canonicalizzato: l'estremo adiacente a `to`
+		# e' la fine o l'inizio a seconda della direzione.
+		prev = between.back() if Spotting.hex_distance(between.back(), to) == 1 \
+			else between[0]
+	if Spotting.hex_distance(prev, to) != 1:
+		return -1
+	return state.hexside_between(prev, to)
 
 
 # Penalita' del fumo lungo la linea di tiro (-4 pieno / -2 fading per hex).

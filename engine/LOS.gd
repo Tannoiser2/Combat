@@ -92,6 +92,12 @@ static func _unit_level2(state: GameState, c: Character) -> int:
 	return (hex.level if hex != null else 0) * 2
 
 
+# Livello del suolo di un hex, in mezzi livelli.
+static func _hex_level2_at(state: GameState, pos: Vector2i) -> int:
+	var hex := state.hex_at(pos.x, pos.y)
+	return (hex.level if hex != null else 0) * 2
+
+
 # Altezza efficace di un hex interposto, in mezzi livelli.
 static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool) -> int:
 	var hex := state.hex_at(pos.x, pos.y)
@@ -134,8 +140,32 @@ static func clear(state: GameState, ca: Character, cb: Character) -> bool:
 		if hh > h2 or (hh == h2 and farther):
 			h2 = hh
 			h_pos = pos
+	# Hexside (siepi/bocage/muri) attraversati dal tiro: bloccano solo se
+	# INTERNI al percorso; quelli a contatto col tiratore o col bersaglio
+	# non bloccano (danno copertura, gestita dal fuoco/spotting).
+	# NB: hexes_between e' canonicalizzato, va riorientato da a verso b.
+	var seq := between.duplicate()
+	if not seq.is_empty() and Spotting.hex_distance(a, seq[0]) > 1:
+		seq.reverse()
+	var path: Array[Vector2i] = [a]
+	path.append_array(seq)
+	path.append(b)
+	for i in range(path.size() - 1):
+		var side := state.hexside_between(path[i], path[i + 1])
+		if side < 0:
+			continue
+		if i == 0 or i == path.size() - 2:
+			continue  # bordo del tiratore/bersaglio: copertura, non blocco
+		var hh := maxi(_hex_level2_at(state, path[i]), _hex_level2_at(state, path[i + 1])) \
+			+ int(HEIGHT2.get(side, 1))
+		var spos := path[i + 1]
+		var farther := Spotting.hex_distance(taller_pos, spos) \
+			>= Spotting.hex_distance(taller_pos, h_pos)
+		if hh > h2 or (hh == h2 and farther):
+			h2 = hh
+			h_pos = spos
 	if between.is_empty():
-		return true
+		return true  # adiacenti: il bordo condiviso da' copertura, non blocco
 	if l1 == l2:
 		return l1 >= h2
 	if h2 >= t2:

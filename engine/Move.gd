@@ -114,7 +114,11 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 		# Charge/Sprint si fermano accanto al bersaglio (per la melee).
 		if not away and Spotting.hex_distance(mover.position, target.position) <= 1:
 			break
+		var from := mover.position
 		if not step(state, mover, target.position, away):
 			break
 		moved += 1
+		# Scavalcare un BOCAGE (argine alto) esaurisce il movimento.
+		if state.hexside_between(from, mover.position) == D.Terrain.BOCAGE:
+			break
 	return moved

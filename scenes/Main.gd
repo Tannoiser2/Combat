@@ -402,6 +402,14 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 # ---------------------------------------------------------------- input
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Tasto T: overlay di verifica del terreno (confronto con la scansione).
+	if event is InputEventKey and event.pressed and event.keycode == KEY_T \
+			and map_view != null:
+		map_view.debug_terrain = not map_view.debug_terrain
+		map_view.queue_redraw()
+		hint_label.text = "Overlay terreno: %s (T per cambiare)" % \
+			("ON - confronta i colori con la mappa" if map_view.debug_terrain else "off")
+		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
@@ -517,9 +525,14 @@ func _handle_action_click(hex: Vector2i) -> void:
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
 		_finish_friendly_action()
 	else:  # MOVE
+		var from := acting.position
 		if not Move.step_to(state, acting, hex):
 			return
 		moves_left -= 1
+		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
+		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:
+			moves_left = 0
+			state.log_event("%s scavalca il bocage e si ferma" % acting.display_name)
 		if moves_left <= 0:
 			_finish_friendly_action()
 		else:
