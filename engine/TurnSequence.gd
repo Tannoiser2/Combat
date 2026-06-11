@@ -29,16 +29,30 @@ static func friendly_card_play(state: GameState, index: int) -> void:
 		state.friendly_card_played,
 		FriendlyCards.title_of(state.friendly_card_played),
 	])
-	# SOP 1e: se la carta giocata e' un Event, si risolve e si rimpiazza.
+	# Effetto meccanico della carta (modificatori di turno).
+	FriendlyCards.apply(state, state.friendly_card_played)
+	# Carta che innesca un Event (es. "They're Up to Something").
+	if state.turn_fx.has("event"):
+		Events.resolve(state, state.turn_fx["event"])
+		state.turn_fx.erase("event")
+	# SOP 1e: se la carta giocata e' una carta Event (FLASH), salvo
+	# scenari "no events" si tira sulla tabella, poi si rimpiazza e si
+	# rimescola (la carta Event torna nel giro).
 	while FriendlyCards.kind_of(state.friendly_card_played) == FriendlyCards.Kind.EVENT:
-		# TODO: tirare 1D10 sulla Event Table dello scenario (gli eventi
-		#       non sono ancora implementati).
-		# La carta stessa dice: pesca un rimpiazzo, poi rimescola mazzo
-		# e scarti insieme (la carta Event torna nel giro).
-		state.log_event("Carta Event! Pesco un rimpiazzo e rimescolo (evento TODO)")
+		if not _no_events(state):
+			Events.resolve(state, "friendly" if state.friendly_card_played == 51 else "enemy")
+		else:
+			state.log_event("Carta Event (no-events): rimescolo")
 		state.friendly_discard.append(state.friendly_card_played)
 		state.friendly_card_played = state.draw_friendly_card()
 		state.reshuffle_friendly_deck()
+		FriendlyCards.apply(state, state.friendly_card_played)
+
+
+static func _no_events(state: GameState) -> bool:
+	if state.scenario_id.is_empty():
+		return false
+	return bool(Scenario.SCENARIOS[state.scenario_id].get("no_events", false))
 
 
 # Fase completa senza UI (banco di prova): gioca la prima carta.
@@ -195,6 +209,10 @@ static func activate_passive(state: GameState, c: Character) -> void:
 static func resolve_action(state: GameState, c: Character) -> void:
 	if c.is_dead() or not c.has_order:
 		return
+	# "Slow To Start": niente azione Friendly all'impulse 1.
+	if state.impulse == 1 and c.side == Domain.Side.FRIENDLY \
+			and state.turn_fx.get("no_impulse1", false):
+		return
 	match Orders.impulse_action(c.order, state.impulse):
 		Domain.ImpulseAction.MAY_FIRE:
 			_try_fire(state, c)
@@ -211,8 +229,12 @@ static func resolve_action(state: GameState, c: Character) -> void:
 enum Act { NONE, FIRE, MOVE }
 
 
-static func discretionary_action(c: Character, impulse: int) -> Dictionary:
+static func discretionary_action(c: Character, impulse: int, state: GameState = null) -> Dictionary:
 	if not c.has_order:
+		return {"kind": Act.NONE, "hexes": 0}
+	# "Slow To Start": i Friendly non agiscono all'impulse 1.
+	if impulse == 1 and c.side == Domain.Side.FRIENDLY and state != null \
+			and state.turn_fx.get("no_impulse1", false):
 		return {"kind": Act.NONE, "hexes": 0}
 	match Orders.impulse_action(c.order, impulse):
 		Domain.ImpulseAction.MAY_FIRE:
@@ -305,6 +327,7 @@ static func end_phase(state: GameState) -> void:
 	for c in state.characters:
 		c.clear_order()
 	state.enemy_cards_in_play.clear()
+	state.turn_fx.clear()  # i modificatori della carta valgono un turno
 	# La Friendly Card giocata va negli scarti.
 	if state.friendly_card_played >= 0:
 		state.friendly_discard.append(state.friendly_card_played)

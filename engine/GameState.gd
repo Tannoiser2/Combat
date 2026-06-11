@@ -54,6 +54,11 @@ var scenario_id: String = ""
 var enemy_reserve: Array = []
 var reinforced: bool = false
 
+# Modificatori della carta giocata, validi per il turno (azzerati in End
+# Phase). Es. ws_all, ws_team{team:mod}, ws_cover_self, no_impulse1,
+# restrict (limitazione ordini), event.
+var turn_fx: Dictionary = {}
+
 # Fine partita
 var max_turns: int = 10
 var game_over: bool = false

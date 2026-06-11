@@ -123,7 +123,18 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	for w in firer.wounds:
 		ws += WOUND_MOD[w]
 	ws += int(MORALE_WS_MOD.get(firer.morale, 0))
-	# TODO: fumo, notte, meteo, filo spinato, effetti delle carte.
+	# Modificatori della carta di turno (solo per i Friendly).
+	if firer.side == D.Side.FRIENDLY:
+		ws += int(state.turn_fx.get("ws_all", 0))
+		var tmods: Dictionary = state.turn_fx.get("ws_team", {})
+		ws += int(tmods.get(firer.team, 0))
+		if state.turn_fx.has("ws_cover_self"):
+			var fhex := state.hex_at(firer.position.x, firer.position.y)
+			if fhex != null and Domain.terrain_gives_cover(fhex.terrain):
+				ws += int(state.turn_fx["ws_cover_self"])
+	# Condizioni ambientali (default spente; attivate da scenario/eventi).
+	ws += int(state.turn_fx.get("fire_env_mod", 0))
+	# TODO: fumo localizzato, filo spinato per-hex.
 
 	var roll := Checks.roll_d10(state.rng)
 	if roll == 9:

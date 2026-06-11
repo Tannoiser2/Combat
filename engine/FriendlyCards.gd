@@ -163,6 +163,41 @@ static func wound_of(serial: int) -> int:
 	return CARDS[serial]["wound"]
 
 
+# Effetti meccanici applicati quando la carta e' giocata (sottoinsieme
+# automatizzato: modificatori di fuoco, limitazioni d'ordine, eventi).
+# Le carte non elencate restano informative (testo nel log).
+const FX := {
+	6: {"ws_all": -1},                       # Bad Shooting
+	19: {"ws_all": 1},                       # Good Shooting
+	27: {"ws_team": {"Able": 1}},            # Pour It On (A)
+	33: {"ws_team": {"Baker": 1}},           # Pour It On (B)
+	38: {"ws_team": {"Charlie": 1}},         # Pour It On (C)
+	34: {"ws_team": {"Able": -1}},           # Poor Shooting (A)
+	35: {"ws_team": {"Baker": -1}},          # Poor Shooting (B)
+	39: {"ws_team": {"Charlie": -1}},        # Poor Shooting (C)
+	30: {"ws_cover_self": -2},               # Blind Shooting
+	13: {"no_impulse1": true},               # Slow To Start
+	36: {"nothing": true},                   # Nothing Happens
+	22: {"restrict": "worried"},             # Worried
+	49: {"restrict": "worried"},
+	20: {"restrict": "confusion"},           # Confusion
+	31: {"restrict": "no_leader_plan"},      # Can't Think Straight
+	48: {"restrict": "no_leader_plan"},
+	5: {"event": "enemy"},                   # They're Up to Something
+	46: {"event": "enemy"},
+	16: {"event": "friendly"},               # Event
+	26: {"event": "friendly"},
+}
+
+
+# Applica l'effetto della carta giocata ai modificatori di turno.
+static func apply(state, serial: int) -> void:
+	if not FX.has(serial):
+		return
+	for k in FX[serial]:
+		state.turn_fx[k] = FX[serial][k]
+
+
 # Percorso dell'immagine della carta (grafica originale), o "" se assente.
 static func image(serial: int) -> String:
 	var path := "res://assets/cards/US-%02d.jpg" % serial

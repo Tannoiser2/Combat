@@ -146,7 +146,7 @@ func _advance_action() -> void:
 		if c.is_dead():
 			continue
 		TurnSequence.activate_passive(state, c)
-		var act := TurnSequence.discretionary_action(c, state.impulse)
+		var act := TurnSequence.discretionary_action(c, state.impulse, state)
 		if c.side == Domain.Side.FRIENDLY and not auto_play and not c.is_dead() \
 				and _has_options(c, act):
 			_begin_friendly_action(c, act)
