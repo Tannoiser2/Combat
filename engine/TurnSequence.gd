@@ -10,11 +10,30 @@ extends RefCounted
 
 
 # Step 1 - Friendly Card Phase (Rule 5.0)
-static func friendly_card_phase(state: GameState) -> void:
-	# TODO: pescare carta se mano vuota; aggiungere carte da Plan;
-	#       scartare oltre 5; giocare una carta sull'Initiative Track;
-	#       risolvere eventuali Event.
-	pass
+# play_index: quale carta della mano giocare sull'Initiative Track
+# (scelta del giocatore; -1 = la prima, policy provvisoria del banco
+# di prova finche' non c'e' la UI).
+static func friendly_card_phase(state: GameState, play_index: int = -1) -> void:
+	# SOP 1a: se non ha carte in mano, ne pesca una.
+	if state.friendly_hand.is_empty():
+		state.friendly_hand.append(state.draw_friendly_card())
+	# TODO SOP 1b: aggiungere le carte messe da parte da un Plan riuscito.
+	# SOP 1c: scartare oltre il limite di 5 (scelta del giocatore;
+	# policy provvisoria: si scartano le prime).
+	while state.friendly_hand.size() > GameState.HAND_LIMIT:
+		state.friendly_discard.append(state.friendly_hand.pop_front())
+	# SOP 1d: DEVE giocare una carta sull'Initiative Track.
+	var index := play_index if play_index >= 0 else 0
+	state.friendly_card_played = state.friendly_hand.pop_at(index)
+	# SOP 1e: se la carta giocata e' un Event, si risolve e si rimpiazza.
+	while FriendlyCards.kind_of(state.friendly_card_played) == FriendlyCards.Kind.EVENT:
+		# TODO: tirare 1D10 sulla Event Table dello scenario (gli eventi
+		#       non sono ancora implementati).
+		# La carta stessa dice: pesca un rimpiazzo, poi rimescola mazzo
+		# e scarti insieme (la carta Event torna nel giro).
+		state.friendly_discard.append(state.friendly_card_played)
+		state.friendly_card_played = state.draw_friendly_card()
+		state.reshuffle_friendly_deck()
 
 
 # Step 2 - Friendly Order Phase (Rule 7.0)
@@ -35,9 +54,25 @@ static func enemy_order_phase(state: GameState) -> void:
 		for c in state.characters_of_team(team):
 			if c.alerted and not c.is_dead():
 				_assign_enemy_order(state, c, serial)
-	# TODO SOP step 3c: completare l'Initiative Order Track con i valori
-	#      di iniziativa delle carte (il sistema di iniziativa non c'e'
-	#      ancora; i seriali pescati restano in state.enemy_cards_in_play).
+	# SOP step 3c: completare l'Initiative Order Track.
+	_update_initiative_order(state)
+
+
+# L'Initiative Track: ogni Team friendly prende il valore della Friendly
+# Card giocata, ogni Team nemico attivo quello della sua Enemy Card.
+# Si agisce dal valore piu' basso al piu' alto (friendly pari, enemy
+# dispari: mai pareggi).
+static func _update_initiative_order(state: GameState) -> void:
+	var entries: Array = []  # coppie [iniziativa, team]
+	if state.friendly_card_played >= 0:
+		for team in state.friendly_teams():
+			entries.append([FriendlyCards.initiative_for(state.friendly_card_played, team), team])
+	for team in state.enemy_cards_in_play:
+		entries.append([EnemyCards.initiative_of(state.enemy_cards_in_play[team]), team])
+	entries.sort()
+	state.initiative_order.clear()
+	for e in entries:
+		state.initiative_order.append(e[1])
 
 
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
@@ -83,6 +118,10 @@ static func end_phase(state: GameState) -> void:
 	for c in state.characters:
 		c.clear_order()
 	state.enemy_cards_in_play.clear()
+	# La Friendly Card giocata va negli scarti.
+	if state.friendly_card_played >= 0:
+		state.friendly_discard.append(state.friendly_card_played)
+		state.friendly_card_played = -1
 	state.impulse = 1
 	state.turn += 1
 	if state.turn > state.max_turns:

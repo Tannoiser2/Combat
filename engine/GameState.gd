@@ -38,6 +38,14 @@ var enemy_discard: Array[int] = []
 # Carte pescate in questa Enemy Card Phase: team -> seriale (SOP step 3a)
 var enemy_cards_in_play: Dictionary = {}
 
+# Mazzo delle Friendly Card (Rule 5.0): mano, mazzo, scarti e la carta
+# giocata sull'Initiative Track in questo turno (-1 = nessuna).
+const HAND_LIMIT := 5
+var friendly_deck: Array[int] = []
+var friendly_discard: Array[int] = []
+var friendly_hand: Array[int] = []
+var friendly_card_played: int = -1
+
 # Fine partita
 var max_turns: int = 10
 var game_over: bool = false
@@ -92,10 +100,43 @@ func draw_enemy_card() -> int:
 func _refill_enemy_deck() -> void:
 	enemy_deck.assign(EnemyCards.all_serials())
 	enemy_discard.clear()
-	# Fisher-Yates con l'rng dello stato (non Array.shuffle, che usa
-	# l'rng globale e romperebbe la riproducibilita' col seed).
-	for i in range(enemy_deck.size() - 1, 0, -1):
+	_shuffle(enemy_deck)
+
+
+# Pesca una Friendly Card; quando il mazzo finisce rimescola gli scarti.
+func draw_friendly_card() -> int:
+	if friendly_deck.is_empty():
+		reshuffle_friendly_deck()
+	return friendly_deck.pop_back()
+
+
+# Rimescola mazzo e scarti friendly insieme (richiesto anche dalle carte
+# Event). Le carte in mano e quella giocata restano fuori.
+func reshuffle_friendly_deck() -> void:
+	for s in friendly_discard:
+		friendly_deck.append(s)
+	friendly_discard.clear()
+	if friendly_deck.is_empty():
+		# Primo uso: mazzo completo.
+		friendly_deck.assign(FriendlyCards.all_serials())
+	_shuffle(friendly_deck)
+
+
+# Fisher-Yates con l'rng dello stato (non Array.shuffle, che usa
+# l'rng globale e romperebbe la riproducibilita' col seed).
+func _shuffle(deck: Array[int]) -> void:
+	for i in range(deck.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
-		var tmp := enemy_deck[i]
-		enemy_deck[i] = enemy_deck[j]
-		enemy_deck[j] = tmp
+		var tmp := deck[i]
+		deck[i] = deck[j]
+		deck[j] = tmp
+
+
+# Team friendly con almeno un personaggio vivo (vanno sull'Initiative Track).
+func friendly_teams() -> Array[String]:
+	var teams: Array[String] = []
+	for c in characters:
+		if c.side == Domain.Side.FRIENDLY and not c.is_dead() \
+				and not teams.has(c.team):
+			teams.append(c.team)
+	return teams

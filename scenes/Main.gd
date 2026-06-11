@@ -19,9 +19,11 @@ func _ready() -> void:
 		# Step espliciti invece di run_turn: cosi' possiamo stampare gli
 		# ordini nemici prima che la End Phase li rimuova.
 		TurnSequence.friendly_card_phase(state)
+		_print_friendly_card(state)
 		TurnSequence.friendly_order_phase(state)
 		TurnSequence.enemy_order_phase(state)
 		_print_enemy_orders(state)
+		print("    Initiative Track: %s" % " -> ".join(state.initiative_order))
 		TurnSequence.action_phase(state)
 		TurnSequence.end_phase(state)
 		print("  fine turno -> turno %d, game_over: %s" % [state.turn, state.game_over])
@@ -70,6 +72,17 @@ func _make_tiny_state() -> GameState:
 
 	state.initiative_order = ["Able", "Red"]
 	return state
+
+
+# Stampa la Friendly Card giocata sull'Initiative Track.
+func _print_friendly_card(state: GameState) -> void:
+	var serial := state.friendly_card_played
+	print("  [T%d] Friendly gioca la carta %d: \"%s\" (Able %d, Baker %d, Charlie %d)" % [
+		state.turn, serial, FriendlyCards.title_of(serial),
+		FriendlyCards.initiative_for(serial, "Able"),
+		FriendlyCards.initiative_for(serial, "Baker"),
+		FriendlyCards.initiative_for(serial, "Charlie"),
+	])
 
 
 # Stampa la carta pescata e gli ordini assegnati nella Enemy Order Phase.
