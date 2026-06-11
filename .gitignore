@@ -17,3 +17,7 @@ assets/maps/
 # Sistema
 .DS_Store
 *.log
+
+# Python (tools/)
+__pycache__/
+*.pyc
