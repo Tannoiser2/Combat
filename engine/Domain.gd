@@ -61,6 +61,31 @@ enum Order {
 	GUARD,
 }
 
+# Nomi leggibili degli ordini per debug/UI
+const ORDER_NAMES := {
+	Order.AIMED_FIRE: "Aimed Fire",
+	Order.RAPID_FIRE: "Rapid Fire",
+	Order.SUPPRESSIVE_FIRE: "Suppressive Fire",
+	Order.RUN_AND_GUN: "Run & Gun",
+	Order.SNEAK: "Sneak",
+	Order.EVADE: "Evade",
+	Order.SPRINT: "Sprint",
+	Order.CHARGE: "Charge",
+	Order.GRENADE: "Grenade",
+	Order.SMOKE_GRENADE: "Smoke Grenade",
+	Order.RIFLE_GRENADE: "Rifle Grenade",
+	Order.PLAN: "Plan",
+	Order.RELOAD: "Reload",
+	Order.MEDICAL_AID: "Medical Aid",
+	Order.SEARCH: "Search",
+	Order.HIDE: "Hide",
+	Order.RALLY: "Rally",
+	Order.CARRY_DRAG: "Carry/Drag",
+	Order.DUCK_BACK: "Duck Back",
+	Order.MELEE: "Melee",
+	Order.GUARD: "Guard",
+}
+
 # Cosa puo' fare un personaggio in ciascuno dei 4 impulsi (Rule 6.0).
 enum ImpulseAction {
 	NOTHING,    # 0  - non muove ne' spara
@@ -78,6 +103,20 @@ enum Terrain {
 	LONG_GRASS, DEPRESSION, STREAM, ORCHARD, LOGS,
 	FIELD, FOXHOLE, RUBBLE, CRATER,
 }
+
+# Terreni che contano come "In Cover" per le tabelle delle Enemy Card.
+# PROVVISORIO: classificazione di buon senso (protezione fisica si',
+# semplice occultamento no). Da verificare contro il regolamento (Rule 9/11).
+const COVER_TERRAINS := [
+	Terrain.ROCKS, Terrain.BUILDING, Terrain.TREES, Terrain.HEDGEROW,
+	Terrain.WALL, Terrain.DEPRESSION, Terrain.STREAM, Terrain.LOGS,
+	Terrain.FOXHOLE, Terrain.RUBBLE, Terrain.CRATER,
+]
+
+
+func terrain_gives_cover(terrain: int) -> bool:
+	return terrain in COVER_TERRAINS
+
 
 # --- Tipi di check (Rule 19.0) ---
 enum Check { MC, RC, TQC, WMC }

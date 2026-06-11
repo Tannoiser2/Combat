@@ -27,6 +27,17 @@ var initiative_order: Array[String] = []
 # Bussola direzionale del nemico (Rule 9.3): rotazione applicata alle direzioni
 var compass_rotation: int = 0
 
+# Generatore di casualita' della partita: un solo rng, cosi' col seed
+# la partita e' riproducibile (utile per i test).
+var rng := RandomNumberGenerator.new()
+
+# Mazzo delle Enemy Card (seriali): si pesca dal fondo, si rimescola
+# automaticamente quando e' esaurito.
+var enemy_deck: Array[int] = []
+var enemy_discard: Array[int] = []
+# Carte pescate in questa Enemy Card Phase: team -> seriale (SOP step 3a)
+var enemy_cards_in_play: Dictionary = {}
+
 # Fine partita
 var max_turns: int = 10
 var game_over: bool = false
@@ -57,3 +68,34 @@ func character_at(col: int, row: int) -> Character:
 		if c.position.x == col and c.position.y == row:
 			return c
 	return null
+
+
+# Team nemici con almeno un personaggio Alerted vivo (SOP step 3a).
+func enemy_teams_with_alerted() -> Array[String]:
+	var teams: Array[String] = []
+	for c in characters:
+		if c.side == Domain.Side.ENEMY and c.alerted and not c.is_dead() \
+				and not teams.has(c.team):
+			teams.append(c.team)
+	return teams
+
+
+# Pesca una Enemy Card; rimescola gli scarti quando il mazzo finisce.
+func draw_enemy_card() -> int:
+	if enemy_deck.is_empty():
+		_refill_enemy_deck()
+	var serial: int = enemy_deck.pop_back()
+	enemy_discard.append(serial)
+	return serial
+
+
+func _refill_enemy_deck() -> void:
+	enemy_deck.assign(EnemyCards.all_serials())
+	enemy_discard.clear()
+	# Fisher-Yates con l'rng dello stato (non Array.shuffle, che usa
+	# l'rng globale e romperebbe la riproducibilita' col seed).
+	for i in range(enemy_deck.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp := enemy_deck[i]
+		enemy_deck[i] = enemy_deck[j]
+		enemy_deck[j] = tmp

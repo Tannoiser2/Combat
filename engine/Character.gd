@@ -23,6 +23,10 @@ var facing: int = 1             # direzione 1..6
 var morale: int = Domain.Morale.NORMAL  # Domain.Morale
 var order: int = -1             # Domain.Order, -1 = nessun ordine
 var has_order: bool = false
+# Estensioni dell'ordine stampate sulle Enemy Card (Rule 9.0)
+var order_move: String = ""     # valore di movimento, es. "5/6" ("" = nessuno)
+var order_grenade: bool = false # G: lancia una granata se possibile
+var order_charge: bool = false  # C: carica se possibile
 var wounds: Array[int] = []     # Domain.Wound
 
 # Stato di conoscenza/allerta
@@ -40,6 +44,22 @@ func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
 	display_name = p_name
 	side = p_side
 	team = p_team
+
+
+func set_order(p_order: int, p_move: String = "", p_grenade: bool = false, p_charge: bool = false) -> void:
+	order = p_order
+	order_move = p_move
+	order_grenade = p_grenade
+	order_charge = p_charge
+	has_order = true
+
+
+func clear_order() -> void:
+	order = -1
+	order_move = ""
+	order_grenade = false
+	order_charge = false
+	has_order = false
 
 
 # Somma dei modificatori TQ dovuti alle ferite (Rule 16.2).
