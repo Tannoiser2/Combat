@@ -32,6 +32,7 @@ var log_text: RichTextLabel
 var info_text: RichTextLabel
 var order_menu: PopupMenu
 var order_target: Character
+var enemy_card_rect: TextureRect
 
 
 func _ready() -> void:
@@ -244,6 +245,17 @@ func _build_hud() -> void:
 	hand_box = HBoxContainer.new()
 	hand_panel.add_child(hand_box)
 
+	# Carta nemica pescata (grafica originale), in alto a sinistra.
+	enemy_card_rect = TextureRect.new()
+	enemy_card_rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	enemy_card_rect.offset_left = 8
+	enemy_card_rect.offset_top = 44
+	enemy_card_rect.custom_minimum_size = Vector2(120, 167)
+	enemy_card_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	enemy_card_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	enemy_card_rect.hide()
+	hud.add_child(enemy_card_rect)
+
 	# Menu degli ordini
 	order_menu = PopupMenu.new()
 	for order in Domain.ORDER_NAMES:
@@ -257,20 +269,31 @@ func _show_hand() -> void:
 		child.queue_free()
 	for i in range(state.friendly_hand.size()):
 		var serial: int = state.friendly_hand[i]
-		var button := Button.new()
-		button.custom_minimum_size = Vector2(190, 185)
-		var kind: int = FriendlyCards.kind_of(serial)
-		var kind_name: String = FriendlyCards.Kind.keys()[kind]
-		button.text = "Carta %d\n%s\n\nAble %d  Baker %d\nCharlie %d\n[%s]" % [
+		var tip := "Carta %d - %s\nAble %d  Baker %d  Charlie %d\n%s" % [
 			serial, FriendlyCards.title_of(serial),
 			FriendlyCards.initiative_for(serial, "Able"),
 			FriendlyCards.initiative_for(serial, "Baker"),
 			FriendlyCards.initiative_for(serial, "Charlie"),
-			kind_name,
+			FriendlyCards.text_of(serial),
 		]
-		button.tooltip_text = FriendlyCards.text_of(serial)
-		button.pressed.connect(_on_card_chosen.bind(i))
-		hand_box.add_child(button)
+		var img := FriendlyCards.image(serial)
+		if not img.is_empty():
+			# Grafica originale della carta, cliccabile.
+			var tb := TextureButton.new()
+			tb.texture_normal = load(img)
+			tb.ignore_texture_size = true
+			tb.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+			tb.custom_minimum_size = Vector2(140, 195)
+			tb.tooltip_text = tip
+			tb.pressed.connect(_on_card_chosen.bind(i))
+			hand_box.add_child(tb)
+		else:
+			var button := Button.new()  # ripiego testuale
+			button.custom_minimum_size = Vector2(150, 195)
+			button.text = "Carta %d\n%s" % [serial, FriendlyCards.title_of(serial)]
+			button.tooltip_text = tip
+			button.pressed.connect(_on_card_chosen.bind(i))
+			hand_box.add_child(button)
 	hand_panel.show()
 
 
@@ -304,6 +327,7 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 
 func _refresh() -> void:
 	turn_label.text = "  Turno %d/%d  " % [mini(state.turn, state.max_turns), state.max_turns]
+	_update_enemy_card()
 	for line in state.drain_log():
 		log_text.append_text(line + "\n")
 		print(line)
@@ -327,6 +351,21 @@ func _auto_step() -> void:
 			pass
 		_:
 			_on_next_pressed()
+
+
+# Mostra l'ultima Enemy Card pescata (grafica originale) durante gli
+# impulsi; nascosta finche' non se ne pesca una.
+func _update_enemy_card() -> void:
+	if state.enemy_cards_in_play.is_empty():
+		enemy_card_rect.hide()
+		return
+	var serial: int = state.enemy_cards_in_play.values().back()
+	var img := EnemyCards.image(serial)
+	if img.is_empty():
+		enemy_card_rect.hide()
+		return
+	enemy_card_rect.texture = load(img)
+	enemy_card_rect.show()
 
 
 # Hook di debug per verifiche senza monitor (CI/cloud).

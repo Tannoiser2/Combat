@@ -230,6 +230,16 @@ static func berserk_move(serial: int) -> String:
 	return CARDS[serial]["berserk"]
 
 
+# Percorso dell'immagine della carta (grafica originale), o "" se assente.
+static func image(serial: int) -> String:
+	var path := "res://assets/cards/GE-%02d.jpg" % serial
+	return path if ResourceLoader.exists(path) else ""
+
+
+static func back_image() -> String:
+	return "res://assets/cards/GE-back.jpg"
+
+
 # Tutti i seriali, ordinati: e' il mazzo completo da mescolare.
 static func all_serials() -> Array[int]:
 	var result: Array[int] = []
