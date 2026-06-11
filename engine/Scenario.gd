@@ -73,18 +73,62 @@ const ORDER_BY_NAME := {
 	"RUN_AND_GUN": D.Order.RUN_AND_GUN, "SPRINT": D.Order.SPRINT,
 }
 
-# Pool di segnalini per team (assegnati in sequenza alla coppa generata).
+# Roster completi dei 4 team tedeschi (pedine del modulo Vassal),
+# ufficiali e graduati in testa. make_cup abbina pedina e grado al ruolo
+# e ricava il nome del personaggio dalla pedina stessa.
 const TEAM_COUNTERS := {
-	"Blue": ["GE-BlueTeam-Obfr-Sauer", "GE-BlueTeam-Soldat-Hahn",
-		"GE-BlueTeam-Soldat-Horn", "GE-BlueTeam-Soldat-Pfeiffer",
+	"Blue": [
+		"GE-BlueTeam-Lt-Brandt", "GE-BlueTeam-Obfr-Gottschied",
+		"GE-BlueTeam-Obfr-Sauer", "GE-BlueTeam-Obfr-Simon",
 		"GE-BlueTeam-Soldat-Abbas", "GE-BlueTeam-Soldat-Abend",
-		"GE-BlueTeam-Soldat-Arnold", "GE-BlueTeam-Soldat-Bach"],
-	"Red": ["GE-RedTeam-Obfr-Franke", "GE-RedTeam-Obfr-Gunther",
-		"GE-RedTeam-Soldat-Jung", "GE-RedTeam-Soldat-Roth",
-		"GE-RedTeam-Soldat-Berger", "GE-RedTeam-Soldat-Engel",
-		"GE-RedTeam-Soldat-Friedrich", "GE-RedTeam-Soldat-Graf",
-		"GE-RedTeam-Soldat-Haas"],
-	"Yellow": [], "White": [],
+		"GE-BlueTeam-Soldat-Arnold", "GE-BlueTeam-Soldat-Bach",
+		"GE-BlueTeam-Soldat-Bahlow", "GE-BlueTeam-Soldat-Hahn",
+		"GE-BlueTeam-Soldat-Horn", "GE-BlueTeam-Soldat-Pfeiffer",
+		"GE-BlueTeam-Soldat-Pohl", "GE-BlueTeam-Soldat-Scholz",
+		"GE-BlueTeam-Soldat-Schreiber", "GE-BlueTeam-Soldat-Schulte",
+		"GE-BlueTeam-Soldat-Seidel", "GE-BlueTeam-Soldat-Sommer",
+		"GE-BlueTeam-Soldat-Voight", "GE-BlueTeam-Soldat-Wolf",
+		"GE-BlueTeam-Soldat-Ziegler",
+	],
+	"Red": [
+		"GE-RedTeam-Lt-Martin", "GE-RedTeam-Obfr-Franke",
+		"GE-RedTeam-Obfr-Gunther", "GE-RedTeam-Soldat-Berger",
+		"GE-RedTeam-Soldat-Engel", "GE-RedTeam-Soldat-Friedrich",
+		"GE-RedTeam-Soldat-Graf", "GE-RedTeam-Soldat-Haas",
+		"GE-RedTeam-Soldat-Hahn", "GE-RedTeam-Soldat-Jager",
+		"GE-RedTeam-Soldat-Jung", "GE-RedTeam-Soldat-Keller",
+		"GE-RedTeam-Soldat-Kraus", "GE-RedTeam-Soldat-Lorenz",
+		"GE-RedTeam-Soldat-Moller", "GE-RedTeam-Soldat-Otto",
+		"GE-RedTeam-Soldat-Roth", "GE-RedTeam-Soldat-Schubert",
+		"GE-RedTeam-Soldat-Vogel", "GE-RedTeam-Soldat-Winkler",
+		"GE-RedTeam-Soldat-Winter",
+	],
+	"Yellow": [
+		"GE-YellowTeam-Hptm-Weber", "GE-YellowTeam-Obfr-Klein",
+		"GE-YellowTeam-Obfr-Wagner", "GE-YellowTeam-Obfr-Werner",
+		"GE-YellowTeam-Soldat-Bauer", "GE-YellowTeam-Soldat-Becker",
+		"GE-YellowTeam-Soldat-Braun", "GE-YellowTeam-Soldat-Fischer",
+		"GE-YellowTeam-Soldat-Hoffmann", "GE-YellowTeam-Soldat-Koch",
+		"GE-YellowTeam-Soldat-Meyer", "GE-YellowTeam-Soldat-Muller",
+		"GE-YellowTeam-Soldat-Neumann", "GE-YellowTeam-Soldat-Richter",
+		"GE-YellowTeam-Soldat-Schafer", "GE-YellowTeam-Soldat-Scheider",
+		"GE-YellowTeam-Soldat-Schmidt", "GE-YellowTeam-Soldat-Schroder",
+		"GE-YellowTeam-Soldat-Schulz", "GE-YellowTeam-Soldat-Schwarz",
+		"GE-YellowTeam-Soldat-Wolf",
+	],
+	"White": [
+		"GE-WhiteTeam-Hptm-Wess", "GE-WhiteTeam-Obfr-Hermann",
+		"GE-WhiteTeam-Obfr-Kohler", "GE-WhiteTeam-Obfr-Thomas",
+		"GE-WhiteTeam-Soldat-Becker", "GE-WhiteTeam-Soldat-Frank",
+		"GE-WhiteTeam-Soldat-Fuchs", "GE-WhiteTeam-Soldat-Hoffman",
+		"GE-WhiteTeam-Soldat-Huber", "GE-WhiteTeam-Soldat-Kaiser",
+		"GE-WhiteTeam-Soldat-Konig", "GE-WhiteTeam-Soldat-Krause",
+		"GE-WhiteTeam-Soldat-Kruger", "GE-WhiteTeam-Soldat-Lang",
+		"GE-WhiteTeam-Soldat-Lange", "GE-WhiteTeam-Soldat-Meier",
+		"GE-WhiteTeam-Soldat-Schmid", "GE-WhiteTeam-Soldat-Schmitz",
+		"GE-WhiteTeam-Soldat-Stein-", "GE-WhiteTeam-Soldat-Walter",
+		"GE-WhiteTeam-Soldat-Zimmer",
+	],
 }
 const GERMAN_NAMES := ["Becker", "Fuchs", "Hoffmann", "Kaiser", "Krause",
 	"Lange", "Maier", "Neumann", "Richter", "Schafer", "Schmidt", "Vogt",
@@ -108,25 +152,58 @@ const FULL_SQUAD := [
 
 
 # Genera la coppa nemica da una specifica per team: {"Blue": {"Recruit": 4,
-# "NCO": 1, ...}, "Red": {...}}. Nomi dai roster, segnalini dai pool.
+# "NCO": 1, ...}, "Red": {...}}. Ogni ruolo pesca una pedina del grado
+# giusto (Officer -> Lt/Hptm, NCO/Veteran -> Obfr, truppa -> Soldat) e il
+# NOME del personaggio viene dalla pedina, cosi' segnalino e nome
+# coincidono sempre.
 static func make_cup(spec: Dictionary) -> Array:
 	var cup: Array = []
 	var name_i := 0
 	for team in spec:
-		var pool: Array = TEAM_COUNTERS.get(team, [])
-		var pool_i := 0
+		# pool divisi per grado
+		var officers: Array = []
+		var ncos: Array = []
+		var troops: Array = []
+		for id in TEAM_COUNTERS.get(team, []):
+			if "-Lt-" in id or "-Hptm-" in id:
+				officers.append(id)
+			elif "-Obfr-" in id:
+				ncos.append(id)
+			else:
+				troops.append(id)
 		for role in spec[team]:
 			for i in range(int(spec[team][role])):
-				var rank := "Obfr" if role in ["NCO", "Veteran"] else \
-					("Lt" if role == "Officer" else "Soldat")
-				var nm := "%s %s" % [rank, GERMAN_NAMES[name_i % GERMAN_NAMES.size()]]
-				name_i += 1
-				var entry := {"name": nm, "role": role, "team": team}
-				if pool_i < pool.size():
-					entry["counter"] = pool[pool_i]
-					pool_i += 1
+				var pool: Array
+				match role:
+					"Officer":
+						pool = officers if not officers.is_empty() else ncos
+					"NCO", "Veteran":
+						pool = ncos if not ncos.is_empty() else troops
+					_:
+						pool = troops
+				var entry := {"role": role, "team": team}
+				if not pool.is_empty():
+					var id: String = pool.pop_front()
+					entry["counter"] = id
+					entry["name"] = _name_from_counter(id)
+				else:
+					# pool esaurito: nome generico, pedina di ripiego
+					var rank := "Obfr" if role in ["NCO", "Veteran"] else \
+						("Lt" if role == "Officer" else "Soldat")
+					entry["name"] = "%s %s" % [rank,
+						GERMAN_NAMES[name_i % GERMAN_NAMES.size()]]
+					name_i += 1
 				cup.append(entry)
 	return cup
+
+
+# "GE-BlueTeam-Lt-Brandt" -> "Lt Brandt"
+static func _name_from_counter(id: String) -> String:
+	var parts := id.split("-")
+	# [GE, XxxTeam, Grado, Nome(, ...)] - il nome puo' contenere trattini
+	var rank := parts[2]
+	var name := "-".join(parts.slice(3)).trim_suffix("-")
+	return "%s %s" % [rank, name]
 
 const SCENARIOS := {
 	"intro1": {
@@ -218,7 +295,7 @@ const SCENARIOS := {
 			{"name": "Soldat Arnold", "role": "Recruit", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Arnold"},
 			{"name": "Soldat Bach", "role": "Recruit", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Bach"},
 			{"name": "Soldat Hahn", "role": "Recruit", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Hahn"},
-			{"name": "Cecchino Blue", "role": "Sniper", "team": "Blue"},
+			{"name": "Soldat Wolf", "role": "Sniper", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Wolf"},
 			{"name": "Soldat Engel", "role": "Recruit", "team": "Red", "counter": "GE-RedTeam-Soldat-Engel"},
 			{"name": "Soldat Friedrich", "role": "Recruit", "team": "Red", "counter": "GE-RedTeam-Soldat-Friedrich"},
 			{"name": "Soldat Graf", "role": "Recruit", "team": "Red", "counter": "GE-RedTeam-Soldat-Graf"},
@@ -578,8 +655,8 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.characters.append(fc)
 	# Il Maquis da salvare (s8): friendly senza ordini, nel casolare.
 	if sc.has("maquis_hex"):
-		var mq := _make({"name": "Maquis", "role": "Maquis", "team": "Charlie"},
-			D.Side.FRIENDLY)
+		var mq := _make({"name": "Maquis", "role": "Maquis", "team": "Charlie",
+			"counter": "CIV-Alex"}, D.Side.FRIENDLY)
 		var mp: PackedStringArray = String(sc["maquis_hex"]).split(",")
 		mq.position = Vector2i(int(mp[0]), int(mp[1]))
 		state.characters.append(mq)
