@@ -86,6 +86,24 @@ static func track_text(order: int) -> String:
 	return "  ".join(parts)
 
 
+# La track come righe estese, una per impulse: "1 - muove 1 esagono".
+static func track_lines(order: int) -> Array[String]:
+	var out: Array[String] = []
+	if not IMPULSES.has(order):
+		return out
+	var names := {
+		I.NOTHING: "nessuna azione",
+		I.MAY_MOVE_1: "puo' muovere 1 esagono",
+		I.MUST_MOVE_1: "DEVE muovere 1 esagono",
+		I.MAY_FIRE: "puo' sparare",
+		I.MUST_MOVE_2: "DEVE muovere 2 esagoni",
+		I.MELEE: "mischia",
+	}
+	for i in range(4):
+		out.append("%d - %s" % [i + 1, names[IMPULSES[order][i]]])
+	return out
+
+
 # Azione dell'ordine in un dato impulse (1..4).
 static func impulse_action(order: int, impulse: int) -> int:
 	if not IMPULSES.has(order):

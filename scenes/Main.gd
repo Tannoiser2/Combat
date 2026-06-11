@@ -474,11 +474,20 @@ func _describe_order(o: int) -> void:
 	var ws_mod: int = Orders.FIRE_WS_MOD.get(o, 0)
 	var lines: Array[String] = []
 	lines.append("[b][color=#f3e88a]%s[/color][/b]" % Domain.ORDER_NAMES[o])
+	# Il segnalino dell'ordine sotto il nome (se disponibile).
+	var marker := "res://assets/counters/ord-US-%s.png" % Domain.Order.keys()[o]
+	if ResourceLoader.exists(marker):
+		lines.append("[img=72]%s[/img]" % marker)
 	lines.append("")
 	lines.append(Orders.DESC.get(o, ""))
 	lines.append("")
-	lines.append("[b]Impulsi:[/b]  %s" % Orders.track_text(o))
+	lines.append("[b]Impulsi:[/b]")
+	for row in Orders.track_lines(o):
+		# evidenzia il numero d'impulso; il resto in chiaro
+		lines.append("  [b][color=#f3e88a]%s[/color][/b] - %s" % [
+			row.substr(0, 1), row.substr(4)])
 	if ws_mod != 0:
+		lines.append("")
 		lines.append("[b]Mod. al fuoco:[/b] %+d WS" % ws_mod)
 	order_desc.text = "\n".join(lines)
 
