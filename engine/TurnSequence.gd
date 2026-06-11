@@ -147,12 +147,31 @@ static func _activate_character(state: GameState, c: Character) -> void:
 	if state.impulse == 1:
 		_spotting_checks(state, c)
 	# Azione dell'impulse secondo l'ordine (Orders.IMPULSES).
+	# NOTA: per ora si risolve automaticamente per entrambi i lati (fuoco
+	# sul bersaglio piu' vicino, movimento verso/lontano dal nemico). La
+	# scelta del giocatore per i propri uomini (bersaglio, percorso) sara'
+	# il prossimo strato di UI.
 	if c.has_order and not c.is_dead():
 		match Orders.impulse_action(c.order, state.impulse):
 			Domain.ImpulseAction.MAY_FIRE:
 				_try_fire(state, c)
-			# TODO: MAY_MOVE_1 / MUST_MOVE_1 / MUST_MOVE_2 / MELEE
-			#       quando ci sara' il movimento.
+			Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
+				_do_move(state, c, 1)
+			Domain.ImpulseAction.MUST_MOVE_2:
+				_do_move(state, c, 2)
+			Domain.ImpulseAction.MELEE:
+				pass  # TODO: risoluzione della mischia (fine Charge)
+
+
+# Movimento nell'impulse: verso il nemico (Sneak/Sprint/Run&Gun/Charge)
+# o lontano (Evade/Carry-Drag), del numero di hex consentito.
+static func _do_move(state: GameState, c: Character, hexes: int) -> void:
+	var from := c.position
+	var n := Move.move_character(state, c, hexes)
+	if n > 0:
+		var verso := "verso" if Move.advances(c.order) else "via dal"
+		state.log_event("%s si sposta %s nemico: %02d.%02d -> %02d.%02d" % [
+			c.display_name, verso, from.x, from.y, c.position.x, c.position.y])
 
 
 # Fuoco nell'impulse: bersaglio piu' vicino visibile e ingaggiabile.
