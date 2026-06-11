@@ -25,6 +25,22 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
+      - name: Installa gli export template
+        # Il runner imposta HOME=/github/home, ma l'immagine tiene i
+        # template in /root; serve anche la variante web "nothreads".
+        run: |
+          DEST=~/.local/share/godot/export_templates
+          mkdir -p "$DEST"
+          if [ -d /root/.local/share/godot/export_templates/4.3.stable ]; then
+            cp -r /root/.local/share/godot/export_templates/4.3.stable "$DEST/"
+          fi
+          if [ ! -f "$DEST/4.3.stable/web_nothreads_release.zip" ]; then
+            curl -sL -o /tmp/templates.tpz https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+            unzip -q -o /tmp/templates.tpz -d /tmp
+            mkdir -p "$DEST/4.3.stable"
+            cp -r /tmp/templates/* "$DEST/4.3.stable/"
+          fi
+          ls "$DEST/4.3.stable" | grep web
       - name: Import risorse
         run: godot --headless --import || true
       - name: Export Web
