@@ -37,19 +37,22 @@ var order_target: Character
 func _ready() -> void:
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 
+	state = GameState.new()
+	state.rng.seed = hash("combat-test")
+	Scenario.build(state, "intro1")
+
 	map_view = MapView.new()
 	# Con la scansione in assets/maps si gioca sull'artwork vero; senza
 	# (es. build web: le scansioni non sono nel repo) la stessa mappa
 	# viene disegnata proceduralmente dal terreno di Boards.gd.
-	if not map_view.load_board("hedgerows"):
-		print("Scansione non trovata: Hedgerows in modalita' procedurale")
-	state = _make_hedgerows_state()
+	if not map_view.load_board(Scenario.SCENARIOS["intro1"]["map"]):
+		print("Scansione non trovata: mappa in modalita' procedurale")
 	map_view.state = state
 	add_child(map_view)
 
 	camera = Camera2D.new()
-	camera.position = map_view.hex_center(11, 10)
-	var z := 75.0 / map_view.cell.x
+	camera.position = map_view.hex_center(24, 12)  # centro dell'azione
+	var z := 60.0 / map_view.cell.x
 	camera.zoom = Vector2(z, z)
 	add_child(camera)
 
@@ -333,53 +336,5 @@ func _maybe_screenshot() -> void:
 		return
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(path)
-
-
-# ------------------------------------------------------- stati di prova
-
-# Partita di prova sulla mappa The Hedgerows, terreno da engine/Boards.gd.
-func _make_hedgerows_state() -> GameState:
-	var state_ := GameState.new()
-	state_.max_turns = 5
-	state_.rng.seed = hash("combat-test")
-	Boards.fill(state_, "hedgerows")
-
-	var taylor := Character.new("taylor", "Sgt Taylor", Domain.Side.FRIENDLY, "Able")
-	taylor.troop_quality = 6
-	taylor.leadership = 3
-	taylor.weapon_skills = {"SMG": 7}
-	taylor.position = Vector2i(9, 10)
-	taylor.counter = "US-Able-Sgt-Taylor"
-	state_.characters.append(taylor)
-
-	var miller := Character.new("miller", "Pvt Miller", Domain.Side.FRIENDLY, "Able")
-	miller.troop_quality = 5
-	miller.weapon_skills = {"Rifle": 5}
-	miller.position = Vector2i(9, 11)
-	miller.counter = "US-Baker-Pvt-Miller"
-	state_.characters.append(miller)
-
-	# Jung nel bosco di 11.10 (In Cover), Roth allo scoperto in 13.10.
-	# Nemici Alerted (ricevono ordini) ma non Known: il giocatore vede
-	# solo il retro generico finche' i suoi uomini non li individuano.
-	var jung := Character.new("jung", "Soldat Jung", Domain.Side.ENEMY, "Red")
-	jung.troop_quality = 4
-	jung.weapon_skills = {"Rifle": 3}
-	jung.position = Vector2i(11, 10)
-	jung.counter = "GE-RedTeam-Soldat-Jung"
-	jung.alerted = true
-	state_.characters.append(jung)
-
-	var roth := Character.new("roth", "Soldat Roth", Domain.Side.ENEMY, "Red")
-	roth.troop_quality = 5
-	roth.weapon_skills = {"Rifle": 4}
-	roth.position = Vector2i(13, 10)
-	roth.morale = Domain.Morale.SHAKEN
-	roth.counter = "GE-RedTeam-Soldat-Roth"
-	roth.alerted = true
-	state_.characters.append(roth)
-
-	state_.initiative_order = ["Able", "Red"]
-	return state_
 
 

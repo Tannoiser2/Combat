@@ -18,7 +18,7 @@ static func friendly_card_phase_prepare(state: GameState) -> void:
 		state.friendly_hand.append(state.draw_friendly_card())
 	# TODO SOP 1b: aggiungere le carte messe da parte da un Plan riuscito.
 	# SOP 1c: scelta del giocatore; policy provvisoria: si scartano le prime.
-	while state.friendly_hand.size() > GameState.HAND_LIMIT:
+	while state.friendly_hand.size() > state.hand_limit:
 		state.friendly_discard.append(state.friendly_hand.pop_front())
 
 

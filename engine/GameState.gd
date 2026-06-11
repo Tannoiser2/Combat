@@ -40,7 +40,9 @@ var enemy_cards_in_play: Dictionary = {}
 
 # Mazzo delle Friendly Card (Rule 5.0): mano, mazzo, scarti e la carta
 # giocata sull'Initiative Track in questo turno (-1 = nessuna).
+# Il limite della mano dipende dallo scenario (Starting Hand Size).
 const HAND_LIMIT := 5
+var hand_limit: int = HAND_LIMIT
 var friendly_deck: Array[int] = []
 var friendly_discard: Array[int] = []
 var friendly_hand: Array[int] = []
