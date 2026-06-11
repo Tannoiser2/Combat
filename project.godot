@@ -17,3 +17,8 @@ Domain="*res://engine/Domain.gd"
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900

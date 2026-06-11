@@ -60,6 +60,8 @@ var board: Texture2D = null
 var origin := Vector2.ZERO          # centro dell'hex con etichetta (first_col, 0)
 var cell := Vector2(1.5 * HEX_SIZE, SQRT3 * HEX_SIZE)
 var first_col := 0                  # prima colonna etichettata (1 sulle mappe vere)
+var selected: Character = null      # personaggio evidenziato
+var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
 
 
 # Carica una delle 4 mappe (se la scansione e' presente in assets/maps).
@@ -83,6 +85,32 @@ func hex_center(col: int, row: int) -> Vector2:
 	return Vector2(x, y)
 
 
+# Hex piu' vicino a un punto in coordinate locali della mappa.
+# Ritorna Vector2i(col, row), o (-99,-99) se il punto e' fuori griglia.
+func pick_hex(pos: Vector2) -> Vector2i:
+	var best := Vector2i(-99, -99)
+	var best_d := INF
+	var col_guess := int(round((pos.x - origin.x) / cell.x)) + first_col
+	for col in range(col_guess - 1, col_guess + 2):
+		var row_guess := int(round((pos.y - origin.y) / cell.y - (0.5 if col % 2 == 0 else 0.0)))
+		for row in range(row_guess - 1, row_guess + 2):
+			if state == null or not state.map.has(GameState.hex_key(col, row)):
+				continue
+			var d := hex_center(col, row).distance_to(pos)
+			if d < best_d:
+				best_d = d
+				best = Vector2i(col, row)
+	return best if best_d <= cell.x / 1.5 * 1.05 else Vector2i(-99, -99)
+
+
+# Personaggio vivo in un dato hex, o null.
+func character_at_hex(hex: Vector2i) -> Character:
+	if state == null:
+		return null
+	var c := state.character_at(hex.x, hex.y)
+	return null if c == null or c.is_dead() else c
+
+
 func _draw() -> void:
 	if state == null:
 		return
@@ -92,11 +120,18 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Evidenziazione dell'hex selezionato
+	if highlight_hex.x > -99:
+		var hc := hex_center(highlight_hex.x, highlight_hex.y)
+		draw_polyline(_closed(_hex_points(hc, radius * 0.96)),
+			Color(1.0, 1.0, 0.3, 0.9), radius * 0.06)
 	# Segnalini
 	for c in state.characters:
 		if c.is_dead():
 			continue
 		var center := hex_center(c.position.x, c.position.y)
+		if c == selected:
+			draw_circle(center, radius * 0.58, Color(1.0, 1.0, 0.3, 0.85))
 		draw_circle(center, radius * 0.45, SIDE_COLORS[c.side])
 		draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
 		draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
@@ -133,3 +168,7 @@ static func _hex_points(center: Vector2, radius: float) -> PackedVector2Array:
 		var angle := PI / 3.0 * i  # 0, 60, 120... gradi: vertice a destra
 		points.append(center + Vector2(cos(angle), sin(angle)) * radius)
 	return points
+
+
+static func _closed(points: PackedVector2Array) -> PackedVector2Array:
+	return points + PackedVector2Array([points[0]])

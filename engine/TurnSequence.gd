@@ -9,31 +9,42 @@ class_name TurnSequence
 extends RefCounted
 
 
-# Step 1 - Friendly Card Phase (Rule 5.0)
-# play_index: quale carta della mano giocare sull'Initiative Track
-# (scelta del giocatore; -1 = la prima, policy provvisoria del banco
-# di prova finche' non c'e' la UI).
-static func friendly_card_phase(state: GameState, play_index: int = -1) -> void:
-	# SOP 1a: se non ha carte in mano, ne pesca una.
+# Step 1 - Friendly Card Phase (Rule 5.0), in due meta' cosi' la UI puo'
+# mostrare la mano e far scegliere il giocatore tra prepare e play.
+
+# SOP 1a-1c: pesca se la mano e' vuota, scarta oltre il limite.
+static func friendly_card_phase_prepare(state: GameState) -> void:
 	if state.friendly_hand.is_empty():
 		state.friendly_hand.append(state.draw_friendly_card())
 	# TODO SOP 1b: aggiungere le carte messe da parte da un Plan riuscito.
-	# SOP 1c: scartare oltre il limite di 5 (scelta del giocatore;
-	# policy provvisoria: si scartano le prime).
+	# SOP 1c: scelta del giocatore; policy provvisoria: si scartano le prime.
 	while state.friendly_hand.size() > GameState.HAND_LIMIT:
 		state.friendly_discard.append(state.friendly_hand.pop_front())
-	# SOP 1d: DEVE giocare una carta sull'Initiative Track.
-	var index := play_index if play_index >= 0 else 0
+
+
+# SOP 1d-1e: gioca la carta scelta sull'Initiative Track.
+static func friendly_card_play(state: GameState, index: int) -> void:
 	state.friendly_card_played = state.friendly_hand.pop_at(index)
+	state.log_event('Friendly gioca la carta %d: "%s"' % [
+		state.friendly_card_played,
+		FriendlyCards.title_of(state.friendly_card_played),
+	])
 	# SOP 1e: se la carta giocata e' un Event, si risolve e si rimpiazza.
 	while FriendlyCards.kind_of(state.friendly_card_played) == FriendlyCards.Kind.EVENT:
 		# TODO: tirare 1D10 sulla Event Table dello scenario (gli eventi
 		#       non sono ancora implementati).
 		# La carta stessa dice: pesca un rimpiazzo, poi rimescola mazzo
 		# e scarti insieme (la carta Event torna nel giro).
+		state.log_event("Carta Event! Pesco un rimpiazzo e rimescolo (evento TODO)")
 		state.friendly_discard.append(state.friendly_card_played)
 		state.friendly_card_played = state.draw_friendly_card()
 		state.reshuffle_friendly_deck()
+
+
+# Fase completa senza UI (banco di prova): gioca la prima carta.
+static func friendly_card_phase(state: GameState, play_index: int = 0) -> void:
+	friendly_card_phase_prepare(state)
+	friendly_card_play(state, play_index)
 
 
 # Step 2 - Friendly Order Phase (Rule 7.0)
@@ -49,6 +60,8 @@ static func enemy_order_phase(state: GameState) -> void:
 	for team in state.enemy_teams_with_alerted():
 		var serial := state.draw_enemy_card()
 		state.enemy_cards_in_play[team] = serial
+		state.log_event("Team %s pesca la Enemy Card %d (iniziativa %d)" % [
+			team, serial, EnemyCards.initiative_of(serial)])
 		# SOP step 3b: ordini a tutti gli Alerted del team, ciascuno
 		# secondo il proprio morale e la propria copertura.
 		for c in state.characters_of_team(team):
@@ -86,14 +99,29 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	var in_cover := hex != null and Domain.terrain_gives_cover(hex.terrain)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
 	c.set_order(entry["order"], entry["move"], entry["grenade"], entry["charge"])
+	var extra := "" if c.order_move.is_empty() else " " + c.order_move
+	if entry["grenade"]:
+		extra += " +Grenade"
+	if entry["charge"]:
+		extra += " +Charge"
+	state.log_event("%s (%s, %s) -> %s%s" % [
+		c.display_name, Domain.MORALE_NAMES[c.morale],
+		"In Cover" if in_cover else "In Open",
+		Domain.ORDER_NAMES[c.order], extra,
+	])
 
 
 # Step 4 - Action Phase: 4 impulsi (Rule 4.0 step 4)
 static func action_phase(state: GameState) -> void:
 	for imp in range(1, 5):
-		state.impulse = imp
-		for team in state.initiative_order:
-			_activate_team(state, team)
+		run_impulse(state, imp)
+
+
+# Un singolo impulse: i Team agiscono in ordine di iniziativa.
+static func run_impulse(state: GameState, imp: int) -> void:
+	state.impulse = imp
+	for team in state.initiative_order:
+		_activate_team(state, team)
 
 
 static func _activate_team(state: GameState, team: String) -> void:

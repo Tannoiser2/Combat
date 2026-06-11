@@ -104,6 +104,29 @@ enum Terrain {
 	FIELD, FOXHOLE, RUBBLE, CRATER,
 }
 
+# Nomi leggibili dei terreni per debug/UI
+const TERRAIN_NAMES := {
+	Terrain.OPEN_LEVEL_0: "Open (L0)",
+	Terrain.OPEN_LEVEL_1: "Open (L1)",
+	Terrain.OPEN_LEVEL_2: "Open (L2)",
+	Terrain.OPEN_LEVEL_3: "Open (L3)",
+	Terrain.ROCKS: "Rocks",
+	Terrain.BUILDING: "Building",
+	Terrain.TREES: "Trees",
+	Terrain.MARSH: "Marsh",
+	Terrain.HEDGEROW: "Hedgerow",
+	Terrain.WALL: "Wall",
+	Terrain.LONG_GRASS: "Long Grass",
+	Terrain.DEPRESSION: "Depression",
+	Terrain.STREAM: "Stream",
+	Terrain.ORCHARD: "Orchard",
+	Terrain.LOGS: "Logs",
+	Terrain.FIELD: "Field",
+	Terrain.FOXHOLE: "Foxhole",
+	Terrain.RUBBLE: "Rubble",
+	Terrain.CRATER: "Crater",
+}
+
 # Terreni che contano come "In Cover" per le tabelle delle Enemy Card.
 # PROVVISORIO: classificazione di buon senso (protezione fisica si',
 # semplice occultamento no). Da verificare contro il regolamento (Rule 9/11).
