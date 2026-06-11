@@ -5,7 +5,10 @@
 ## - con `board` (scansione della mappa come texture): disegna la mappa
 ##   vera e ci posiziona sopra i segnalini, usando la calibrazione della
 ##   griglia presa dal modulo Vassal (vedi BOARDS);
-## - senza: griglia procedurale a colori per terreno (banco di prova).
+## - senza (es. build web: le scansioni non sono nel repo): la stessa
+##   griglia viene disegnata proceduralmente, con feature generate a
+##   runtime (chiome, solchi, sassi, acqua, siepi, tetti) dal terreno
+##   classificato in Boards.gd. Nessun artwork protetto, solo codice.
 ##
 ## Geometria delle mappe stampate: esagoni flat-top in colonne, numerati
 ## col.riga; le colonne PARI sono mezzo passo piu' in basso.
@@ -28,29 +31,47 @@ const BOARDS := {
 const HEX_SIZE := 46.0  # raggio centro-vertice
 const SQRT3 := sqrt(3.0)
 
-# Colori provvisori del terreno (solo modalita' procedurale)
-const TERRAIN_COLORS := {
-	D.Terrain.OPEN_LEVEL_0: Color(0.62, 0.71, 0.47),
-	D.Terrain.OPEN_LEVEL_1: Color(0.67, 0.69, 0.45),
-	D.Terrain.OPEN_LEVEL_2: Color(0.71, 0.67, 0.44),
-	D.Terrain.OPEN_LEVEL_3: Color(0.74, 0.64, 0.42),
-	D.Terrain.ROCKS: Color(0.62, 0.62, 0.60),
-	D.Terrain.BUILDING: Color(0.48, 0.33, 0.26),
-	D.Terrain.TREES: Color(0.28, 0.45, 0.25),
-	D.Terrain.MARSH: Color(0.45, 0.58, 0.52),
-	D.Terrain.HEDGEROW: Color(0.22, 0.38, 0.20),
-	D.Terrain.WALL: Color(0.52, 0.50, 0.46),
-	D.Terrain.LONG_GRASS: Color(0.55, 0.66, 0.36),
-	D.Terrain.DEPRESSION: Color(0.58, 0.56, 0.40),
-	D.Terrain.STREAM: Color(0.42, 0.60, 0.74),
-	D.Terrain.ORCHARD: Color(0.45, 0.58, 0.32),
-	D.Terrain.LOGS: Color(0.45, 0.32, 0.20),
-	D.Terrain.FIELD: Color(0.60, 0.55, 0.33),
-	D.Terrain.FOXHOLE: Color(0.42, 0.36, 0.28),
-	D.Terrain.RUBBLE: Color(0.55, 0.48, 0.42),
-	D.Terrain.CRATER: Color(0.50, 0.42, 0.32),
-	D.Terrain.BOCAGE: Color(0.18, 0.32, 0.16),
+# Colore di base (riempimento) di ogni hex in modalita' procedurale.
+# Per i terreni "decorati" (alberi, sassi, edifici...) la base e' il
+# suolo, le feature vengono disegnate sopra da _draw_feature().
+const BASE_COLORS := {
+	D.Terrain.OPEN_LEVEL_0: Color(0.52, 0.63, 0.37),
+	D.Terrain.OPEN_LEVEL_1: Color(0.60, 0.64, 0.40),
+	D.Terrain.OPEN_LEVEL_2: Color(0.68, 0.63, 0.42),
+	D.Terrain.OPEN_LEVEL_3: Color(0.74, 0.64, 0.44),
+	D.Terrain.ROCKS: Color(0.52, 0.63, 0.37),
+	D.Terrain.BUILDING: Color(0.52, 0.63, 0.37),
+	D.Terrain.TREES: Color(0.40, 0.52, 0.30),
+	D.Terrain.MARSH: Color(0.46, 0.57, 0.50),
+	D.Terrain.HEDGEROW: Color(0.50, 0.61, 0.36),
+	D.Terrain.WALL: Color(0.52, 0.63, 0.37),
+	D.Terrain.LONG_GRASS: Color(0.56, 0.66, 0.34),
+	D.Terrain.DEPRESSION: Color(0.60, 0.61, 0.42),
+	D.Terrain.STREAM: Color(0.50, 0.62, 0.40),
+	D.Terrain.ORCHARD: Color(0.46, 0.58, 0.33),
+	D.Terrain.LOGS: Color(0.52, 0.63, 0.37),
+	D.Terrain.FIELD: Color(0.75, 0.68, 0.42),
+	D.Terrain.FOXHOLE: Color(0.52, 0.63, 0.37),
+	D.Terrain.RUBBLE: Color(0.58, 0.53, 0.47),
+	D.Terrain.CRATER: Color(0.54, 0.47, 0.36),
+	D.Terrain.BOCAGE: Color(0.48, 0.59, 0.34),
 }
+
+# Colori delle decorazioni procedurali.
+const C_CANOPY := Color(0.20, 0.38, 0.19)
+const C_CANOPY_HI := Color(0.29, 0.49, 0.26)
+const C_HEDGE := Color(0.15, 0.31, 0.15)
+const C_BOCAGE := Color(0.10, 0.25, 0.12)
+const C_ROCK := Color(0.62, 0.62, 0.59)
+const C_ROCK_HI := Color(0.75, 0.75, 0.72)
+const C_ROOF := Color(0.56, 0.28, 0.22)
+const C_WATER := Color(0.40, 0.58, 0.74)
+const C_WALL := Color(0.56, 0.54, 0.49)
+const C_LOG := Color(0.46, 0.32, 0.19)
+const C_DIRT := Color(0.47, 0.39, 0.29)
+const C_DIRT_DK := Color(0.36, 0.29, 0.21)
+const C_FURROW := Color(0.64, 0.57, 0.33)
+const C_GRASS_DK := Color(0.34, 0.46, 0.23)
 const SIDE_COLORS := {
 	D.Side.FRIENDLY: Color(0.18, 0.32, 0.60),
 	D.Side.ENEMY: Color(0.55, 0.55, 0.52),  # feldgrau
@@ -158,18 +179,153 @@ func _draw() -> void:
 
 
 func _draw_procedural_terrain(font: Font, radius: float) -> void:
+	# Tre passate: prima tutti i riempimenti, poi le decorazioni (cosi'
+	# cio' che sborda da un hex non viene coperto dal vicino), infine i
+	# bordi e le etichette delle coordinate.
 	for key in state.map:
-		var parts: PackedStringArray = key.split(",")
-		var col := int(parts[0])
-		var row := int(parts[1])
 		var hex: GameState.MapHex = state.map[key]
-		var center := hex_center(col, row)
-		var points := _hex_points(center, radius)
-		draw_colored_polygon(points, TERRAIN_COLORS.get(hex.terrain, Color.MAGENTA))
-		draw_polyline(points + PackedVector2Array([points[0]]), Color(0, 0, 0, 0.25), 1.5)
-		draw_string(font, center + Vector2(-14, -radius * 0.55),
-			"%02d.%02d" % [col, row], HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
-			Color(0, 0, 0, 0.45))
+		var c := _key_to_cell(key)
+		draw_colored_polygon(_hex_points(hex_center(c.x, c.y), radius),
+			BASE_COLORS.get(hex.terrain, Color.MAGENTA))
+	for key in state.map:
+		var hex2: GameState.MapHex = state.map[key]
+		var c2 := _key_to_cell(key)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(key)
+		_draw_feature(hex_center(c2.x, c2.y), radius, hex2.terrain, rng)
+	for key in state.map:
+		var c3 := _key_to_cell(key)
+		var center := hex_center(c3.x, c3.y)
+		draw_polyline(_closed(_hex_points(center, radius)), Color(0, 0, 0, 0.18), 1.0)
+		draw_string(font, center + Vector2(-radius * 0.42, -radius * 0.60),
+			"%02d.%02d" % [c3.x, c3.y], HORIZONTAL_ALIGNMENT_LEFT, -1,
+			maxi(8, int(radius * 0.22)), Color(0, 0, 0, 0.32))
+
+
+# Decorazione procedurale di un hex secondo il terreno. Il rng e' seminato
+# da (col,row), quindi le feature sono stabili tra un redraw e l'altro.
+func _draw_feature(center: Vector2, radius: float, terrain: int, rng: RandomNumberGenerator) -> void:
+	match terrain:
+		D.Terrain.TREES: _draw_canopies(center, radius, rng, 5)
+		D.Terrain.ORCHARD: _draw_canopies(center, radius, rng, 3)
+		D.Terrain.HEDGEROW: _draw_hedge(center, radius, rng, C_HEDGE, radius * 0.40)
+		D.Terrain.BOCAGE: _draw_hedge(center, radius, rng, C_BOCAGE, radius * 0.55)
+		D.Terrain.ROCKS: _draw_rocks(center, radius, rng, 5)
+		D.Terrain.RUBBLE: _draw_rocks(center, radius, rng, 7)
+		D.Terrain.BUILDING: _draw_building(center, radius, rng)
+		D.Terrain.STREAM: _draw_band(center, radius, rng, C_WATER, radius * 0.5)
+		D.Terrain.WALL: _draw_band(center, radius, rng, C_WALL, radius * 0.2)
+		D.Terrain.LOGS: _draw_logs(center, radius, rng)
+		D.Terrain.MARSH: _draw_marsh(center, radius, rng)
+		D.Terrain.DEPRESSION: _draw_rings(center, radius)
+		D.Terrain.CRATER: _draw_crater(center, radius)
+		D.Terrain.FOXHOLE: _draw_foxhole(center, radius)
+		D.Terrain.FIELD: _draw_furrows(center, radius, rng)
+		D.Terrain.LONG_GRASS: _draw_grass(center, radius, rng)
+
+
+func _draw_canopies(center: Vector2, radius: float, rng: RandomNumberGenerator, n: int) -> void:
+	for i in n:
+		var off := Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * radius * 0.42
+		var rad := radius * rng.randf_range(0.30, 0.44)
+		draw_circle(center + off, rad, C_CANOPY)
+		draw_circle(center + off - Vector2(rad, rad) * 0.22, rad * 0.55, C_CANOPY_HI)
+
+
+func _draw_hedge(center: Vector2, radius: float, rng: RandomNumberGenerator, col: Color, width: float) -> void:
+	var ang := rng.randi_range(0, 2) * PI / 3.0  # orientata come un lato hex
+	var dir := Vector2(cos(ang), sin(ang))
+	var perp := Vector2(-dir.y, dir.x)
+	var f := center - dir * radius * 0.95
+	var t := center + dir * radius * 0.95
+	draw_line(f, t, col, width)
+	for i in 3:
+		var p := f.lerp(t, (i + 0.5) / 3.0) + perp * rng.randf_range(-1, 1) * width * 0.25
+		draw_circle(p, width * 0.6, col)
+
+
+func _draw_rocks(center: Vector2, radius: float, rng: RandomNumberGenerator, n: int) -> void:
+	for i in n:
+		var off := Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * radius * 0.5
+		var rad := radius * rng.randf_range(0.14, 0.26)
+		draw_circle(center + off, rad, C_ROCK)
+		draw_circle(center + off - Vector2(rad, rad) * 0.25, rad * 0.5, C_ROCK_HI)
+		draw_arc(center + off, rad, 0, TAU, 10, Color(0, 0, 0, 0.30), 1.0)
+
+
+func _draw_building(center: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	var ang := rng.randf_range(-0.3, 0.3)
+	var hw := radius * 0.60
+	var hh := radius * 0.45
+	var pts := PackedVector2Array()
+	for corner in [Vector2(-hw, -hh), Vector2(hw, -hh), Vector2(hw, hh), Vector2(-hw, hh)]:
+		pts.append(center + corner.rotated(ang))
+	draw_colored_polygon(pts, C_ROOF)
+	draw_polyline(_closed(pts), Color(0, 0, 0, 0.55), 2.0)
+	draw_line(center + Vector2(-hw, 0).rotated(ang), center + Vector2(hw, 0).rotated(ang),
+		Color(0, 0, 0, 0.35), 1.5)
+
+
+func _draw_band(center: Vector2, radius: float, rng: RandomNumberGenerator, col: Color, width: float) -> void:
+	var ang := rng.randi_range(0, 2) * PI / 3.0
+	var dir := Vector2(cos(ang), sin(ang))
+	draw_line(center - dir * radius, center + dir * radius, col, width)
+
+
+func _draw_logs(center: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	var ang := rng.randf_range(0, PI)
+	var dir := Vector2(cos(ang), sin(ang))
+	var perp := Vector2(-dir.y, dir.x)
+	for i in 3:
+		var o := perp * (i - 1) * radius * 0.28
+		draw_line(center + o - dir * radius * 0.55, center + o + dir * radius * 0.55,
+			C_LOG, radius * 0.12)
+
+
+func _draw_marsh(center: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	for i in 4:
+		var off := Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * radius * 0.45
+		draw_circle(center + off, radius * rng.randf_range(0.12, 0.20), C_WATER)
+	for i in 5:
+		var b := center + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * radius * 0.5
+		draw_line(b, b + Vector2(0, -radius * 0.25), C_GRASS_DK, 1.5)
+
+
+func _draw_rings(center: Vector2, radius: float) -> void:
+	for s in [0.70, 0.45]:
+		draw_arc(center, radius * s, 0, TAU, 20, C_DIRT_DK, 2.0)
+
+
+func _draw_crater(center: Vector2, radius: float) -> void:
+	draw_circle(center, radius * 0.55, C_DIRT)
+	draw_circle(center, radius * 0.32, C_DIRT_DK)
+	draw_arc(center, radius * 0.55, 0, TAU, 20, Color(0, 0, 0, 0.30), 1.5)
+
+
+func _draw_foxhole(center: Vector2, radius: float) -> void:
+	draw_circle(center, radius * 0.30, C_DIRT)
+	draw_circle(center, radius * 0.18, C_DIRT_DK)
+
+
+func _draw_furrows(center: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	var ang := rng.randf_range(0, PI)
+	var dir := Vector2(cos(ang), sin(ang))
+	var perp := Vector2(-dir.y, dir.x)
+	for i in range(-2, 3):
+		var o := perp * (i * radius * 0.22)
+		draw_line(center + o - dir * radius * 0.70, center + o + dir * radius * 0.70,
+			C_FURROW, 1.5)
+
+
+func _draw_grass(center: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	for i in 8:
+		var b := center + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * radius * 0.55
+		draw_line(b, b + Vector2(rng.randf_range(-0.2, 0.2), -1) * radius * 0.22, C_GRASS_DK, 1.5)
+
+
+static func _key_to_cell(key: String) -> Vector2i:
+	var p := key.split(",")
+	return Vector2i(int(p[0]), int(p[1]))
 
 
 # I sei vertici di un esagono flat-top attorno a un centro.
