@@ -225,8 +225,7 @@ func _on_card_chosen(index: int) -> void:
 	hand_panel.hide()
 	phase = Phase.ORDERS
 	hint_label.text = "Order Phase: clicca i tuoi uomini e assegna gli ordini"
-	next_button.text = "Conferma ordini"
-	next_button.disabled = not _all_friendly_ordered()
+	_update_orders_button()
 	_refresh()
 
 
@@ -243,6 +242,7 @@ func _on_next_pressed() -> void:
 		return
 	match phase:
 		Phase.ORDERS:
+			order_panel.hide()
 			phase = Phase.ENEMY
 			TurnSequence.friendly_order_phase(state)
 			TurnSequence.enemy_order_phase(state)
@@ -397,11 +397,6 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 			return false
 
 
-func _all_friendly_ordered() -> bool:
-	for c in state.characters:
-		if c.side == Domain.Side.FRIENDLY and not c.is_dead() and not c.has_order:
-			return false
-	return true
 
 
 # ---------------------------------------------------------------- input
@@ -441,6 +436,8 @@ func _on_map_clicked() -> void:
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	# Deselezione o selezione di altro: il pannello ordini si chiude.
+	order_panel.hide()
 	if phase == Phase.ORDERS and c != null \
 			and c.side == Domain.Side.FRIENDLY and not c.is_dead():
 		_open_order_panel(c)
@@ -464,6 +461,23 @@ func _open_order_panel(c: Character) -> void:
 		b.pressed.connect(_on_order_selected.bind(o))
 		b.mouse_entered.connect(_describe_order.bind(o))
 		order_list.add_child(b)
+	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
+	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
+	# facile da colpire.
+	var none := Button.new()
+	none.text = "Senza ordine"
+	none.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	none.modulate = Color(0.8, 0.8, 0.65)
+	none.mouse_entered.connect(func():
+		order_desc.text = "[b][color=#f3e88a]Senza ordine[/color][/b]\n\nNon agisce negli impulsi (puo' comunque avvistare). Attenzione: un uomo senza ordine allo scoperto e' PIU' facile da colpire.")
+	none.pressed.connect(func():
+		order_panel.hide()
+		if order_target != null:
+			order_target.clear_order()
+			state.log_event("%s resta senza ordine" % order_target.display_name)
+			_update_orders_button()
+			_refresh())
+	order_list.add_child(none)
 	var cancel := Button.new()
 	cancel.text = "Annulla"
 	cancel.modulate = Color(0.85, 0.7, 0.7)
@@ -523,8 +537,21 @@ func _on_order_selected(id: int) -> void:
 	order_target.set_order(id)
 	state.log_event("%s riceve l'ordine %s" % [
 		order_target.display_name, Domain.ORDER_NAMES[id]])
-	next_button.disabled = not _all_friendly_ordered()
+	_update_orders_button()
 	_refresh()
+
+
+# Conferma sempre possibile: il pulsante segnala quanti sono senza ordine.
+func _update_orders_button() -> void:
+	if phase != Phase.ORDERS:
+		return
+	next_button.disabled = false
+	var missing := 0
+	for c in state.characters:
+		if c.side == Domain.Side.FRIENDLY and not c.is_dead() and not c.has_order:
+			missing += 1
+	next_button.text = "Conferma ordini" if missing == 0 \
+		else "Conferma (%d senza ordine)" % missing
 
 
 # ---------------------------------------------------------------- HUD
