@@ -6,7 +6,7 @@ name: Deploy su GitHub Pages
 
 on:
   push:
-    branches: [claude/vibrant-noether-ncsw3j]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
