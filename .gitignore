@@ -13,6 +13,10 @@ riferimenti/
 # Copiare qui i jpg estratti dal modulo Vassal con questi nomi:
 #   assets/maps/farmhouse.jpg, hill.jpg, village.jpg, hedgerows.jpg
 assets/maps/
+# Segnalini estratti dal modulo Vassal (copyright Compass Games): solo
+# in locale. Copiare i PNG <id>-f.png in assets/counters/ (vedi
+# Character.counter); senza, la UI usa i cerchietti colorati di ripiego.
+assets/counters/
 
 # Sistema
 .DS_Store

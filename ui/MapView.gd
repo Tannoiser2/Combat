@@ -84,6 +84,13 @@ var cell := Vector2(1.5 * HEX_SIZE, SQRT3 * HEX_SIZE)
 var first_col := 0                  # prima colonna etichettata (1 sulle mappe vere)
 var selected: Character = null      # personaggio evidenziato
 var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
+var _counter_cache := {}            # id -> Texture2D oppure null (assente)
+
+# Segnalino "retro"/dummy per lato: nemico non ancora identificato.
+const DUMMY_COUNTER := {
+	D.Side.ENEMY: "GE-RedTeam-Dummy-1",
+	D.Side.FRIENDLY: "",
+}
 
 
 # Carica una delle 4 mappe (se la scansione e' presente in assets/maps).
@@ -137,6 +144,18 @@ func character_at_hex(hex: Vector2i) -> Character:
 	return null if c == null or c.is_dead() else c
 
 
+# Texture del segnalino "<id>-f.png" da assets/counters/, o null se manca
+# (caricata una volta sola). Cosi' la build web senza i PNG ripiega sui
+# cerchietti, mentre in locale compaiono le pedine vere.
+func _counter_tex(counter_id: String) -> Texture2D:
+	if counter_id.is_empty():
+		return null
+	if not _counter_cache.has(counter_id):
+		var path := "res://assets/counters/%s-f.png" % counter_id
+		_counter_cache[counter_id] = load(path) if ResourceLoader.exists(path) else null
+	return _counter_cache[counter_id]
+
+
 func _draw() -> void:
 	if state == null:
 		return
@@ -151,29 +170,38 @@ func _draw() -> void:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)
 		draw_polyline(_closed(_hex_points(hc, radius * 0.96)),
 			Color(1.0, 1.0, 0.3, 0.9), radius * 0.06)
-	# Segnalini. Un Enemy non Known si mostra come "?" senza ordine:
-	# il giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
+	# Segnalini. Un Enemy non Known mostra il retro generico (dummy): il
+	# giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
 	for c in state.characters:
 		if c.is_dead():
 			continue
 		var hidden := c.side == D.Side.ENEMY and not c.known
 		var center := hex_center(c.position.x, c.position.y)
 		if c == selected:
-			draw_circle(center, radius * 0.58, Color(1.0, 1.0, 0.3, 0.85))
-		draw_circle(center, radius * 0.45,
-			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[c.side])
-		draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
-		draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
-			"?" if hidden else c.display_name.substr(0, 1),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
+			draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
+		# Segnalino vero se disponibile (dummy se nemico non identificato),
+		# altrimenti cerchietto di ripiego (build web senza i PNG).
+		var counter_id: String = DUMMY_COUNTER[c.side] if hidden else c.counter
+		var tex := _counter_tex(counter_id)
+		if tex != null:
+			var s := radius * 1.5
+			draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+		else:
+			draw_circle(center, radius * 0.45,
+				Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[c.side])
+			draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
+			draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
+				"?" if hidden else c.display_name.substr(0, 1),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
 		if c.side == D.Side.FRIENDLY and c.spotted:
-			draw_circle(center + Vector2(radius * 0.38, -radius * 0.38),
+			draw_circle(center + Vector2(radius * 0.45, -radius * 0.45),
 				radius * 0.12, Color(0.9, 0.15, 0.15))
+		# Etichetta dell'ordine (finche' non useremo i segnalini ordine).
 		if c.has_order and not hidden:
 			var label: String = D.ORDER_NAMES[c.order]
 			if not c.order_move.is_empty():
 				label += " " + c.order_move
-			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.78),
+			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
 				label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
 				Color(0.95, 0.95, 0.2))
 

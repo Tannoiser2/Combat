@@ -349,31 +349,35 @@ func _make_hedgerows_state() -> GameState:
 	taylor.leadership = 3
 	taylor.weapon_skills = {"SMG": 7}
 	taylor.position = Vector2i(9, 10)
+	taylor.counter = "US-Able-Sgt-Taylor"
 	state_.characters.append(taylor)
 
 	var miller := Character.new("miller", "Pvt Miller", Domain.Side.FRIENDLY, "Able")
 	miller.troop_quality = 5
 	miller.weapon_skills = {"Rifle": 5}
 	miller.position = Vector2i(9, 11)
+	miller.counter = "US-Baker-Pvt-Miller"
 	state_.characters.append(miller)
 
-	# Jung nel bosco di 11.10 (In Cover), Braun allo scoperto in 13.10
+	# Jung nel bosco di 11.10 (In Cover), Roth allo scoperto in 13.10.
 	# Nemici Alerted (ricevono ordini) ma non Known: il giocatore vede
-	# solo un "?" finche' i suoi uomini non li individuano (Spotting).
+	# solo il retro generico finche' i suoi uomini non li individuano.
 	var jung := Character.new("jung", "Soldat Jung", Domain.Side.ENEMY, "Red")
 	jung.troop_quality = 4
 	jung.weapon_skills = {"Rifle": 3}
 	jung.position = Vector2i(11, 10)
+	jung.counter = "GE-RedTeam-Soldat-Jung"
 	jung.alerted = true
 	state_.characters.append(jung)
 
-	var braun := Character.new("braun", "Gefr Braun", Domain.Side.ENEMY, "Red")
-	braun.troop_quality = 5
-	braun.weapon_skills = {"Rifle": 4}
-	braun.position = Vector2i(13, 10)
-	braun.morale = Domain.Morale.SHAKEN
-	braun.alerted = true
-	state_.characters.append(braun)
+	var roth := Character.new("roth", "Soldat Roth", Domain.Side.ENEMY, "Red")
+	roth.troop_quality = 5
+	roth.weapon_skills = {"Rifle": 4}
+	roth.position = Vector2i(13, 10)
+	roth.morale = Domain.Morale.SHAKEN
+	roth.counter = "GE-RedTeam-Soldat-Roth"
+	roth.alerted = true
+	state_.characters.append(roth)
 
 	state_.initiative_order = ["Able", "Red"]
 	return state_

@@ -11,6 +11,9 @@ var id: String
 var display_name: String
 var side: int            # Domain.Side
 var team: String  # "Able"/"Baker"/"Charlie" oppure "Red"/"Yellow"/"White"/"Blue"
+# Base del file del segnalino Vassal (es. "GE-RedTeam-Soldat-Jung"); la UI
+# disegna "<counter>-f.png" da assets/counters/ se presente. "" = ripiego.
+var counter: String = ""
 
 # Attributi base
 var troop_quality: int          # TQ
