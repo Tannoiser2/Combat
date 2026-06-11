@@ -106,8 +106,16 @@ static func _activate_team(state: GameState, team: String) -> void:
 static func _activate_character(state: GameState, c: Character) -> void:
 	# TODO: eseguire l'azione dell'impulse corrente secondo l'Order del
 	#       personaggio (move/fire/melee...), fare Spotting Checks,
-	#       gestire Duck Back. A strati.
-	pass
+	#       gestire Duck Back. A strati. Primo strato: Rally.
+	if c.is_dead() or not c.has_order:
+		return
+	if c.order == Domain.Order.RALLY and state.impulse == 1:
+		var res := Checks.rally_check(c, state.rng)
+		state.log_event("%s tenta Rally: tira %d (TQ %d) -> %s%s" % [
+			c.display_name, res["roll"], Checks.effective_tq(c),
+			Domain.MORALE_NAMES[res["after"]],
+			"" if res["delta"] != 0 else " (nessun effetto)",
+		])
 
 
 # Step 5 - End Phase (Rule 4.0 step 5)

@@ -114,7 +114,7 @@ const COVER_TERRAINS := [
 ]
 
 
-func terrain_gives_cover(terrain: int) -> bool:
+static func terrain_gives_cover(terrain: int) -> bool:
 	return terrain in COVER_TERRAINS
 
 
@@ -126,11 +126,11 @@ enum Wound { LIGHT, BAD }
 
 # Alza il morale di n livelli (verso BERSERK), senza superare un tetto.
 # Ritorna il nuovo valore di morale.
-func raise_morale(current: Morale, levels: int, cap: Morale = Morale.BERSERK) -> Morale:
+static func raise_morale(current: Morale, levels: int, cap: Morale = Morale.BERSERK) -> Morale:
 	var new_value: int = max(int(cap), int(current) - levels)
 	return new_value as Morale
 
 # Abbassa il morale di n livelli (verso ROUT).
-func lower_morale(current: Morale, levels: int) -> Morale:
+static func lower_morale(current: Morale, levels: int) -> Morale:
 	var new_value: int = min(int(Morale.ROUT), int(current) + levels)
 	return new_value as Morale

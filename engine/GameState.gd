@@ -50,6 +50,20 @@ var friendly_card_played: int = -1
 var max_turns: int = 10
 var game_over: bool = false
 
+# Log eventi del motore: il motore registra, la UI consuma e stampa.
+var log: Array[String] = []
+
+
+func log_event(msg: String) -> void:
+	log.append(msg)
+
+
+# Svuota il log e ritorna le righe accumulate.
+func drain_log() -> Array[String]:
+	var lines := log.duplicate()
+	log.clear()
+	return lines
+
 
 # Chiave di una cella a partire da coordinate.
 static func hex_key(col: int, row: int) -> String:

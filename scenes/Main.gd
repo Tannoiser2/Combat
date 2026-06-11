@@ -62,6 +62,8 @@ func _run_one_turn() -> void:
 		print("    Initiative Track: %s" % " -> ".join(state.initiative_order))
 	else:
 		TurnSequence.action_phase(state)
+		for line in state.drain_log():
+			print("    " + line)
 		TurnSequence.end_phase(state)
 		print("  fine turno -> turno %d, game_over: %s" % [state.turn, state.game_over])
 	_mid_turn = not _mid_turn
