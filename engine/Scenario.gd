@@ -13,12 +13,14 @@ extends RefCounted
 const D := preload("res://engine/Domain.gd")
 
 # Profilo per ruolo: TQ, leadership, arma, WS. Approssimazioni da rifinire.
+# Valori calibrati leggendo i segnalini Vassal (TQ rossa in alto, WS
+# accanto alle armi). Variano un po' per pedina: questi sono tipici.
 const ROLE := {
-	"Recruit": {"tq": 3, "ldr": 0, "weapon": "KAR 98K", "ws": 3},
-	"Rifleman": {"tq": 4, "ldr": 0, "weapon": "KAR 98K", "ws": 4},
-	"Veteran": {"tq": 6, "ldr": 0, "weapon": "KAR 98K", "ws": 6},
-	"NCO": {"tq": 5, "ldr": 2, "weapon": "MP40", "ws": 5},
-	"Sniper": {"tq": 6, "ldr": 0, "weapon": "KAR 98K", "ws": 8},
+	"Recruit": {"tq": 4, "ldr": 0, "weapon": "KAR 98K", "ws": 3},
+	"Rifleman": {"tq": 5, "ldr": 0, "weapon": "KAR 98K", "ws": 4},
+	"Veteran": {"tq": 6, "ldr": 0, "weapon": "KAR 98K", "ws": 5},
+	"NCO": {"tq": 5, "ldr": 1, "weapon": "MP40", "ws": 5},
+	"Sniper": {"tq": 5, "ldr": 0, "weapon": "KAR 98K", "ws": 8},
 	# Friendly
 	"Leader": {"tq": 6, "ldr": 3, "weapon": "M3 Grease Gun", "ws": 7},
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
