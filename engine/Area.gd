@@ -117,12 +117,14 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 	var hex: Vector2i = m["hex"]
 	var pw: Array = POWER[m["type"]]
 	state.log_event("%s esplode in %02d.%02d!" % [NAMES[m["type"]], hex.x, hex.y])
-	# Cannone (intro3): la C4 nel suo hex lo distrugge.
+	# Cannoni (intro3/s9): la C4 nell'hex di un pezzo lo distrugge.
 	if m["type"] == Type.C4 and not state.scenario_id.is_empty():
-		var gun: String = Scenario.SCENARIOS[state.scenario_id].get("gun_hex", "")
-		if gun == "%d,%d" % [hex.x, hex.y]:
-			state.gun_destroyed = true
-			state.log_event("  IL CANNONE E' DISTRUTTO!")
+		var key := "%d,%d" % [hex.x, hex.y]
+		var guns: Array = Scenario.SCENARIOS[state.scenario_id].get("gun_hexes", [])
+		if key in guns and not key in state.guns_destroyed:
+			state.guns_destroyed.append(key)
+			state.log_event("  CANNONE DISTRUTTO! (%d/%d)" % [
+				state.guns_destroyed.size(), guns.size()])
 	for c in state.characters:
 		if c.is_dead():
 			continue

@@ -511,6 +511,9 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 static func end_phase(state: GameState) -> void:
 	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
 	Area.end_phase(state)
+	# Obiettivi di ricognizione raggiunti in questo turno.
+	if not state.scenario_id.is_empty():
+		Scenario.scan_objectives(state)
 	# SOP step 5d: rimuovere tutti gli ordini.
 	for c in state.characters:
 		c.clear_order()

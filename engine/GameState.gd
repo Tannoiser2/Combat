@@ -54,7 +54,8 @@ var scenario_id: String = ""
 var enemy_reserve: Array = []
 var waves_done: Array = []      # turni di rinforzo gia' eseguiti
 var night: bool = false         # scenario notturno
-var gun_destroyed: bool = false # obiettivo di intro3
+var guns_destroyed: Array = []  # hex (chiavi) dei cannoni saltati
+var visited_objectives: Array = []  # punti di ricognizione raggiunti
 
 # Modificatori della carta giocata, validi per il turno (azzerati in End
 # Phase). Es. ws_all, ws_team{team:mod}, ws_cover_self, no_impulse1,

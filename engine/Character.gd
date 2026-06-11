@@ -42,6 +42,8 @@ var alerted: bool = false       # Enemy: ha sentito qualcosa
 var low_ammo: bool = false
 var no_ammo: bool = false
 
+# Ruolo dello scenario ("Recruit", "NCO", "Officer"...): serve ai VP.
+var role: String = ""
 # Pedina-esca (Dummy): nessun valore reale; quando viene individuata si
 # rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
 var is_dummy: bool = false

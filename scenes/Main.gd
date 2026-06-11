@@ -14,7 +14,7 @@
 ## - COMBAT_SCREENSHOT=path: salva screenshot a ogni avanzamento
 extends Node
 
-enum Phase { CARD, ORDERS, ENEMY, ACTION, END_TURN, GAME_OVER }
+enum Phase { DEPLOY, CARD, ORDERS, ENEMY, ACTION, END_TURN, GAME_OVER }
 
 var state: GameState
 var map_view: MapView
@@ -42,6 +42,10 @@ var action_queue: Array = []
 var acting: Character = null
 var action_kind: int = 0   # TurnSequence.Act
 var moves_left: int = 0
+
+# Fase di schieramento: uomini ancora da piazzare e zona valida.
+var deploy_queue: Array = []
+var deploy_zone: Array[Vector2i] = []
 
 
 func _ready() -> void:
@@ -97,7 +101,52 @@ func _start_scenario(scenario_id: String) -> void:
 	add_child(camera)
 
 	_build_hud()
-	_start_turn()
+	# Fase di schieramento, se lo scenario ha una zona e siamo interattivi.
+	deploy_zone = Scenario.deploy_hexes(state, scenario_id)
+	if not auto_play and not deploy_zone.is_empty():
+		_start_deploy()
+	else:
+		_start_turn()
+
+
+# --------------------------------------------------------- schieramento
+
+# Il giocatore piazza i suoi uomini uno per uno nella zona evidenziata.
+func _start_deploy() -> void:
+	phase = Phase.DEPLOY
+	deploy_queue = []
+	for c in state.characters:
+		if c.side == Domain.Side.FRIENDLY:
+			deploy_queue.append(c)
+	map_view.cue_hexes = deploy_zone
+	map_view.cue_color = Color(0.3, 0.7, 0.95, 0.9)
+	_prompt_deploy()
+	next_button.text = "Posizioni standard"
+	next_button.disabled = false
+	hand_panel.hide()
+	_refresh()
+
+
+func _prompt_deploy() -> void:
+	if deploy_queue.is_empty():
+		map_view.cue_hexes = []
+		_start_turn()
+		return
+	var c: Character = deploy_queue[0]
+	map_view.selected = c
+	hint_label.text = "Schieramento: piazza %s su un hex azzurro" % c.display_name
+	map_view.queue_redraw()
+
+
+func _handle_deploy_click(hex: Vector2i) -> void:
+	if not hex in deploy_zone:
+		return
+	if state.character_at(hex.x, hex.y) != null:
+		return  # occupato
+	var c: Character = deploy_queue.pop_front()
+	c.position = hex
+	_refresh()
+	_prompt_deploy()
 
 
 # ------------------------------------------------------- menu scenari
@@ -165,6 +214,12 @@ func _on_card_chosen(index: int) -> void:
 
 
 func _on_next_pressed() -> void:
+	# In schieramento: "Posizioni standard" = accetta i default del libro.
+	if phase == Phase.DEPLOY:
+		deploy_queue = []
+		map_view.cue_hexes = []
+		_start_turn()
+		return
 	# Durante l'attesa di un'azione friendly, il pulsante = "passa/fine".
 	if acting != null:
 		_finish_friendly_action()
@@ -356,6 +411,9 @@ func _zoom(factor: float) -> void:
 func _on_map_clicked() -> void:
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
+		return
+	if phase == Phase.DEPLOY:
+		_handle_deploy_click(hex)
 		return
 	# Durante l'azione di un proprio uomo, il click esegue fuoco/movimento.
 	if acting != null:

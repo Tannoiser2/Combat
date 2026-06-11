@@ -88,6 +88,59 @@ var cue_hexes: Array[Vector2i] = []  # hex suggeriti (bersagli/mosse)
 var cue_color := Color(0.95, 0.85, 0.2, 0.9)
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
+# Animazioni: posizione "visiva" dei segnalini (insegue quella logica)
+# e traccianti dei colpi (eta' per dissolvenza e proiettile in volo).
+var _display_pos := {}              # Character -> Vector2
+var _tracers: Array = []            # {from: Vector2, to: Vector2, hit, age}
+var _seen_shots := 0                # quanti state.shots gia' convertiti
+
+
+func _ready() -> void:
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if state == null:
+		return
+	var dirty := false
+	# Segnalini: inseguimento esponenziale della posizione logica.
+	for c in state.characters:
+		var target := hex_center(c.position.x, c.position.y)
+		if not _display_pos.has(c):
+			_display_pos[c] = target
+			continue
+		var cur: Vector2 = _display_pos[c]
+		if cur.distance_to(target) > 0.5:
+			_display_pos[c] = cur.lerp(target, minf(1.0, delta * 9.0))
+			dirty = true
+		elif cur != target:
+			_display_pos[c] = target
+			dirty = true
+	# Nuovi colpi -> traccianti.
+	if state.shots.size() < _seen_shots:
+		_seen_shots = 0  # azzerati a inizio impulse
+	while _seen_shots < state.shots.size():
+		var s: Dictionary = state.shots[_seen_shots]
+		_tracers.append({
+			"from": hex_center(s["from"].x, s["from"].y),
+			"to": hex_center(s["to"].x, s["to"].y),
+			"hit": s["hit"], "age": 0.0,
+		})
+		_seen_shots += 1
+	# Invecchia i traccianti.
+	if not _tracers.is_empty():
+		dirty = true
+		for t in _tracers:
+			t["age"] += delta
+		_tracers = _tracers.filter(func(t): return t["age"] < 1.6)
+	if dirty:
+		queue_redraw()
+
+
+# Posizione visiva (animata) di un personaggio.
+func _pos_of(c: Character) -> Vector2:
+	return _display_pos.get(c, hex_center(c.position.x, c.position.y))
+
 # Segnalino "retro"/dummy generico per team nemico (non identificato).
 const DUMMY_BY_TEAM := {
 	"Blue": "GE-BlueTeam-Dummy-1",
@@ -179,20 +232,28 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
-	# Cannone obiettivo (intro3): cerchio scuro, X rossa se distrutto.
+	# Cannoni obiettivo (intro3/s9): cerchio scuro, X rossa se distrutti.
 	if not state.scenario_id.is_empty():
-		var gun: String = Scenario.SCENARIOS[state.scenario_id].get("gun_hex", "")
-		if not gun.is_empty():
-			var gp := gun.split(",")
+		for gun in Scenario.SCENARIOS[state.scenario_id].get("gun_hexes", []):
+			var gp: PackedStringArray = String(gun).split(",")
 			var gc := hex_center(int(gp[0]), int(gp[1]))
 			draw_circle(gc, radius * 0.55, Color(0.25, 0.25, 0.22, 0.9))
 			draw_string(font, gc + Vector2(-radius * 0.45, radius * 0.15),
 				"GUN", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.35), Color.WHITE)
-			if state.gun_destroyed:
+			if String(gun) in state.guns_destroyed:
 				draw_line(gc - Vector2(radius, radius) * 0.5, gc + Vector2(radius, radius) * 0.5,
 					Color(0.9, 0.1, 0.1), radius * 0.12)
 				draw_line(gc + Vector2(-radius, radius) * 0.5, gc + Vector2(radius, -radius) * 0.5,
 					Color(0.9, 0.1, 0.1), radius * 0.12)
+		# Punti di ricognizione (s6): bandierine.
+		for obj in Scenario.SCENARIOS[state.scenario_id].get("objective_hexes", []):
+			var op: PackedStringArray = String(obj).split(",")
+			var oc := hex_center(int(op[0]), int(op[1]))
+			var done: bool = String(obj) in state.visited_objectives
+			draw_circle(oc, radius * 0.30,
+				Color(0.2, 0.8, 0.3, 0.9) if done else Color(0.95, 0.8, 0.1, 0.9))
+			draw_string(font, oc + Vector2(-radius * 0.15, radius * 0.12),
+				"R", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3), Color.BLACK)
 	# Segnalini d'area (granate, fumo, mortai, illuminazione)
 	for m in state.area_markers:
 		var ac := hex_center(m["hex"].x, m["hex"].y)
@@ -213,14 +274,19 @@ func _draw() -> void:
 				draw_arc(ac, radius * 0.55, 0, TAU, 20, Color(0.9, 0.2, 0.1, 0.9), radius * 0.06)
 				draw_string(font, ac + Vector2(-radius * 0.2, radius * 0.12),
 					"!", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.5), Color.WHITE)
-	# Linee di fuoco dell'impulse: chi spara a chi (rosso pieno = colpito,
-	# tratteggio chiaro = mancato). Disegnate sotto i segnalini.
-	for s in state.shots:
-		var a := hex_center(s["from"].x, s["from"].y)
-		var b := hex_center(s["to"].x, s["to"].y)
-		var col: Color = Color(0.95, 0.15, 0.1, 0.85) if s["hit"] else Color(0.9, 0.85, 0.4, 0.5)
-		draw_line(a, b, col, radius * (0.10 if s["hit"] else 0.05))
-		draw_circle(b, radius * 0.16, col)  # impatto sul bersaglio
+	# Traccianti dei colpi: linea che sbiadisce + proiettile in volo nei
+	# primi istanti, segno d'impatto sul bersaglio se colpito.
+	for t in _tracers:
+		var age: float = t["age"]
+		var fade := clampf(1.6 - age, 0.0, 1.0)
+		var col: Color = Color(0.95, 0.15, 0.1, 0.85 * fade) if t["hit"] \
+			else Color(0.9, 0.85, 0.4, 0.55 * fade)
+		draw_line(t["from"], t["to"], col, radius * (0.10 if t["hit"] else 0.05))
+		if age < 0.35:
+			var bullet: Vector2 = t["from"].lerp(t["to"], age / 0.35)
+			draw_circle(bullet, radius * 0.14, Color(1.0, 0.9, 0.4, 0.95))
+		elif t["hit"]:
+			draw_circle(t["to"], radius * 0.18 * fade + radius * 0.06, col)
 	# Hex suggeriti (bersagli di fuoco in rosso, mosse in verde)
 	for h in cue_hexes:
 		var cc := hex_center(h.x, h.y)
@@ -238,7 +304,7 @@ func _draw() -> void:
 		if c.is_dead():
 			continue
 		var hidden := c.side == D.Side.ENEMY and not c.known
-		var center := hex_center(c.position.x, c.position.y)
+		var center := _pos_of(c)
 		if c == selected:
 			draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
 		# Segnalino vero se disponibile (dummy se nemico non identificato),
