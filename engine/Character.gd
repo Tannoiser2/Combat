@@ -41,6 +41,13 @@ var alerted: bool = false       # Enemy: ha sentito qualcosa
 var low_ammo: bool = false
 var no_ammo: bool = false
 
+# Pedina-esca (Dummy): nessun valore reale; quando viene individuata si
+# rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
+var is_dummy: bool = false
+var removed: bool = false
+# Ha gia' ricevuto il primo ordine? (per gli ordini forzati di scenario)
+var had_first_order: bool = false
+
 
 func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
 	id = p_id
@@ -85,6 +92,8 @@ func wound_total() -> int:
 # Note del Fire Resolution Chart: Enemy morto se malus ferite >= TQ;
 # Friendly incapacitato se = TQ, morto se > TQ.
 func is_dead() -> bool:
+	if removed:
+		return true
 	if side == Domain.Side.ENEMY:
 		return wound_total() >= troop_quality
 	return wound_total() >= troop_quality  # incap o morto: comunque fuori

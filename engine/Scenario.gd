@@ -23,6 +23,14 @@ const ROLE := {
 	"Leader": {"tq": 6, "ldr": 3, "weapon": "M3 Grease Gun", "ws": 7},
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	"BAR Gunner": {"tq": 5, "ldr": 0, "weapon": "BAR", "ws": 5},
+	# Pedina-esca: valori minimi, non combatte mai.
+	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
+}
+
+# Nome ordine -> enum, per le tabelle testuali degli scenari.
+const ORDER_BY_NAME := {
+	"EVADE": D.Order.EVADE, "SNEAK": D.Order.SNEAK, "HIDE": D.Order.HIDE,
+	"RUN_AND_GUN": D.Order.RUN_AND_GUN, "SPRINT": D.Order.SPRINT,
 }
 
 const SCENARIOS := {
@@ -72,9 +80,19 @@ const SCENARIOS := {
 			"22,5", "23,5", "24,5", "24,6", "27,4", "28,3",
 			"29,4", "30,4", "29,8", "30,8", "30,9", "31,8",
 		],
-		# TODO regole speciali: ordini forzati Evade/Sneak al turno 1
-		# (SR10), rinforzi al turno 4 (SR11), bussola/vento, Dummy,
-		# uscita dal bordo per i nemici (SR13).
+		# Pedine-esca aggiunte alla Coppa (SR del libro: Blue x5, Red x4).
+		"dummies": 9,
+		# SR1: nessun Event quando esce una carta Event (si rimescola).
+		"no_events": true,
+		# SR10: al PRIMO ordine (turno 1, e i rinforzi al turno 4) l'ordine
+		# nemico non viene dal lookup ma da un 1D6 (0..9 -> qui 1..6).
+		"first_order_d6": ["EVADE 5/6", "EVADE 6/5", "EVADE 5",
+			"EVADE 6", "SNEAK 5", "SNEAK 6"],
+		# SR11: rinforzi al turno 4, 4 pedine dalla Coppa ai seguenti hex.
+		"reinforce_turn": 4,
+		"reinforce_hexes": ["35,8", "35,7", "35,6", "35,5"],
+		# SR13: i nemici possono uscire dalla mappa da qualsiasi bordo.
+		"enemy_may_exit": true,
 	},
 }
 
@@ -83,6 +101,7 @@ const SCENARIOS := {
 static func build(state: GameState, scenario_id: String) -> void:
 	assert(SCENARIOS.has(scenario_id), "Scenario sconosciuto: %s" % scenario_id)
 	var sc: Dictionary = SCENARIOS[scenario_id]
+	state.scenario_id = scenario_id
 	state.max_turns = sc["turns"]
 	state.hand_limit = sc["hand_limit"]
 	Boards.fill(state, sc["map"])
@@ -90,21 +109,57 @@ static func build(state: GameState, scenario_id: String) -> void:
 	for f in sc["friendly"]:
 		state.characters.append(_make(f, D.Side.FRIENDLY))
 
-	# Coppa nemica: mescola e piazza ai setup hex (coperti = alerted ma
-	# non known, finche' il giocatore non li individua).
+	# Coppa nemica = personaggi reali + pedine-esca, mescolata.
 	var cup: Array = sc["enemy_cup"].duplicate()
+	for i in range(int(sc.get("dummies", 0))):
+		cup.append({"name": "Esca", "role": "Dummy",
+			"team": "Blue" if i % 2 == 0 else "Red"})
 	_shuffle(cup, state.rng)
+	# Si piazza ai setup hex (coperti); il resto resta in riserva (rinforzi).
 	var hexes: Array = sc["enemy_setup"]
-	for i in range(min(cup.size(), hexes.size())):
-		var e := _make(cup[i], D.Side.ENEMY)
-		var p: PackedStringArray = String(hexes[i]).split(",")
-		e.position = Vector2i(int(p[0]), int(p[1]))
-		e.alerted = true
-		state.characters.append(e)
+	var placed := 0
+	for entry in cup:
+		if placed >= hexes.size():
+			state.enemy_reserve.append(entry)
+			continue
+		_place_enemy(state, entry, hexes[placed])
+		placed += 1
 
 	# Mano iniziale (Starting Hand Size).
 	for i in range(state.hand_limit):
 		state.friendly_hand.append(state.draw_friendly_card())
+
+
+# Piazza un personaggio nemico (coperto = alerted, non known) a un hex.
+static func _place_enemy(state: GameState, entry: Dictionary, hexkey: String) -> Character:
+	var e := _make(entry, D.Side.ENEMY)
+	var p: PackedStringArray = String(hexkey).split(",")
+	e.position = Vector2i(int(p[0]), int(p[1]))
+	e.alerted = true
+	state.characters.append(e)
+	return e
+
+
+# Rinforzi (SR11): pesca dalla riserva e piazza ai reinforce_hexes.
+static func bring_reinforcements(state: GameState) -> void:
+	var sc: Dictionary = SCENARIOS[state.scenario_id]
+	var hexes: Array = sc.get("reinforce_hexes", [])
+	for hexkey in hexes:
+		if state.enemy_reserve.is_empty():
+			return
+		_place_enemy(state, state.enemy_reserve.pop_front(), hexkey)
+	state.log_event("Arrivano rinforzi nemici al bordo!")
+
+
+# Ordine forzato di scenario al primo ordine (1D6). Ritorna {order, move}
+# oppure {} se lo scenario non ha la regola.
+static func first_order(scenario_id: String, rng: RandomNumberGenerator) -> Dictionary:
+	var sc: Dictionary = SCENARIOS[scenario_id]
+	if not sc.has("first_order_d6"):
+		return {}
+	var entry: String = sc["first_order_d6"][rng.randi_range(0, 5)]
+	var parts := entry.split(" ")
+	return {"order": ORDER_BY_NAME[parts[0]], "move": parts[1]}
 
 
 # Crea un Character da una voce di scenario applicando il profilo del ruolo.
@@ -114,8 +169,10 @@ static func _make(entry: Dictionary, side: int) -> Character:
 		entry["name"], side, entry["team"])
 	c.troop_quality = prof["tq"]
 	c.leadership = prof["ldr"]
-	c.weapon_skills = {prof["weapon"]: prof["ws"]}
+	if not String(prof["weapon"]).is_empty():
+		c.weapon_skills = {prof["weapon"]: prof["ws"]}
 	c.counter = entry.get("counter", "")
+	c.is_dummy = entry["role"] == "Dummy"
 	if entry.has("pos"):
 		var p: PackedStringArray = String(entry["pos"]).split(",")
 		c.position = Vector2i(int(p[0]), int(p[1]))

@@ -55,6 +55,12 @@ static func friendly_order_phase(state: GameState) -> void:
 
 # Step 3 - Enemy Card and Order Phase (Rule 9.0)
 static func enemy_order_phase(state: GameState) -> void:
+	# SR11: rinforzi al turno previsto, prima di assegnare gli ordini.
+	if not state.scenario_id.is_empty():
+		var sc: Dictionary = Scenario.SCENARIOS[state.scenario_id]
+		if not state.reinforced and state.turn == int(sc.get("reinforce_turn", -1)):
+			Scenario.bring_reinforcements(state)
+			state.reinforced = true
 	# SOP step 3a: una carta per ogni Enemy Team con almeno un Alerted.
 	state.enemy_cards_in_play.clear()
 	for team in state.enemy_teams_with_alerted():
@@ -89,6 +95,17 @@ static func _update_initiative_order(state: GameState) -> void:
 
 
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
+	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
+	# 1D6 di scenario, non dal lookup morale x cover.
+	if not c.had_first_order and not state.scenario_id.is_empty():
+		var fo := Scenario.first_order(state.scenario_id, state.rng)
+		if not fo.is_empty():
+			c.set_order(fo["order"], fo["move"])
+			c.had_first_order = true
+			state.log_event("%s (ordine iniziale) -> %s %s" % [
+				c.display_name, Domain.ORDER_NAMES[c.order], c.order_move])
+			return
+	c.had_first_order = true
 	if not EnemyCards.has_table_row(c.morale):
 		# Berserk e Rout agiscono d'istinto (Rule 17), col movimento
 		# stampato sulla carta: il Berserk carica il nemico piu' vicino,
@@ -266,9 +283,14 @@ static func _spotting_checks(state: GameState, spotter: Character) -> void:
 		var res := Spotting.attempt(state, spotter, target)
 		if res["success"]:
 			if target.side == Domain.Side.ENEMY:
-				state.log_event("%s individua %s! (tira %d <= %d, dist %d)" % [
-					spotter.display_name, target.display_name,
-					res["roll"], res["threshold"], res["dist"]])
+				if target.is_dummy:
+					target.removed = true
+					state.log_event("%s scopre un'esca in %02d.%02d (rimossa)" % [
+						spotter.display_name, target.position.x, target.position.y])
+				else:
+					state.log_event("%s individua %s! (tira %d <= %d, dist %d)" % [
+						spotter.display_name, target.display_name,
+						res["roll"], res["threshold"], res["dist"]])
 			else:
 				state.log_event("%s e' stato avvistato da %s! (tira %d <= %d, dist %d)" % [
 					target.display_name, spotter.display_name,

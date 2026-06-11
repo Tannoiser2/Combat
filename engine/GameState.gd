@@ -48,6 +48,12 @@ var friendly_discard: Array[int] = []
 var friendly_hand: Array[int] = []
 var friendly_card_played: int = -1
 
+# Scenario in corso e riserva nemica (Coppa non ancora schierata, per i
+# rinforzi); flag per rinforzi gia' arrivati.
+var scenario_id: String = ""
+var enemy_reserve: Array = []
+var reinforced: bool = false
+
 # Fine partita
 var max_turns: int = 10
 var game_over: bool = false
