@@ -724,7 +724,7 @@ func _build_hud() -> void:
 	legend.add_theme_font_size_override("normal_font_size", 12)
 	var parts: Array[String] = []
 	for m in Domain.MORALE_NAMES:
-		parts.append("[color=#%s]●[/color]%s" % [
+		parts.append("[bgcolor=#%s]  [/bgcolor] %s" % [
 			MapView.MORALE_COLORS[m].to_html(false), Domain.MORALE_NAMES[m]])
 	legend.text = "Morale:  " + "  ".join(parts)
 	side_box.add_child(legend)
@@ -791,11 +791,11 @@ func _build_hud() -> void:
 	rows.append("[i]Riempimenti (hex):[/i]")
 	for t in MapView.OVERLAY_TINTS:
 		var c: Color = MapView.OVERLAY_TINTS[t]
-		rows.append("[color=#%s]⬢[/color] %s" % [
+		rows.append("[bgcolor=#%s]  [/bgcolor] %s" % [
 			Color(c.r, c.g, c.b).to_html(false), Domain.TERRAIN_NAMES[t]])
 	rows.append("[i]Hexside (bordi):[/i]")
 	for t in MapView.HEXSIDE_COLORS:
-		rows.append("[color=#%s]▬[/color] %s" % [
+		rows.append("[bgcolor=#%s]  [/bgcolor] %s (bordo)" % [
 			MapView.HEXSIDE_COLORS[t].to_html(false), Domain.TERRAIN_NAMES[t]])
 	rows.append("[i]Hex senza tinta = Open L0[/i]")
 	leg.text = "\n".join(rows)
@@ -953,7 +953,7 @@ func _refresh_roster() -> void:
 				flags += " low ammo"
 			if c.spotted:
 				flags += " visto!"
-		b.text = "● %s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
+		b.text = "%s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
 		b.disabled = c.is_dead()
 		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
 		if not c.is_dead():

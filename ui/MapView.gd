@@ -85,7 +85,7 @@ const MORALE_COLORS := {
 	D.Morale.NORMAL: Color(0.30, 0.80, 0.30),     # verde
 	D.Morale.CAUTIOUS: Color(0.95, 0.85, 0.15),   # giallo
 	D.Morale.SHAKEN: Color(0.90, 0.25, 0.20),     # rosso
-	D.Morale.ROUT: Color(0.15, 0.15, 0.15),       # nero
+	D.Morale.ROUT: Color(0.35, 0.32, 0.30),       # grigio scuro
 }
 
 var state: GameState
