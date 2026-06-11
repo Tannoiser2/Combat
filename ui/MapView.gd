@@ -49,6 +49,7 @@ const TERRAIN_COLORS := {
 	D.Terrain.FOXHOLE: Color(0.42, 0.36, 0.28),
 	D.Terrain.RUBBLE: Color(0.55, 0.48, 0.42),
 	D.Terrain.CRATER: Color(0.50, 0.42, 0.32),
+	D.Terrain.BOCAGE: Color(0.18, 0.32, 0.16),
 }
 const SIDE_COLORS := {
 	D.Side.FRIENDLY: Color(0.18, 0.32, 0.60),
@@ -125,19 +126,25 @@ func _draw() -> void:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)
 		draw_polyline(_closed(_hex_points(hc, radius * 0.96)),
 			Color(1.0, 1.0, 0.3, 0.9), radius * 0.06)
-	# Segnalini
+	# Segnalini. Un Enemy non Known si mostra come "?" senza ordine:
+	# il giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
 	for c in state.characters:
 		if c.is_dead():
 			continue
+		var hidden := c.side == D.Side.ENEMY and not c.known
 		var center := hex_center(c.position.x, c.position.y)
 		if c == selected:
 			draw_circle(center, radius * 0.58, Color(1.0, 1.0, 0.3, 0.85))
-		draw_circle(center, radius * 0.45, SIDE_COLORS[c.side])
+		draw_circle(center, radius * 0.45,
+			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[c.side])
 		draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
 		draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
-			c.display_name.substr(0, 1), HORIZONTAL_ALIGNMENT_LEFT, -1,
-			int(radius * 0.42), Color.WHITE)
-		if c.has_order:
+			"?" if hidden else c.display_name.substr(0, 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
+		if c.side == D.Side.FRIENDLY and c.spotted:
+			draw_circle(center + Vector2(radius * 0.38, -radius * 0.38),
+				radius * 0.12, Color(0.9, 0.15, 0.15))
+		if c.has_order and not hidden:
 			var label: String = D.ORDER_NAMES[c.order]
 			if not c.order_move.is_empty():
 				label += " " + c.order_move

@@ -101,7 +101,7 @@ enum Terrain {
 	OPEN_LEVEL_0, OPEN_LEVEL_1, OPEN_LEVEL_2, OPEN_LEVEL_3,
 	ROCKS, BUILDING, TREES, MARSH, HEDGEROW, WALL,
 	LONG_GRASS, DEPRESSION, STREAM, ORCHARD, LOGS,
-	FIELD, FOXHOLE, RUBBLE, CRATER,
+	FIELD, FOXHOLE, RUBBLE, CRATER, BOCAGE,
 }
 
 # Nomi leggibili dei terreni per debug/UI
@@ -125,6 +125,7 @@ const TERRAIN_NAMES := {
 	Terrain.FOXHOLE: "Foxhole",
 	Terrain.RUBBLE: "Rubble",
 	Terrain.CRATER: "Crater",
+	Terrain.BOCAGE: "Bocage",
 }
 
 # Terreni che contano come "In Cover" per le tabelle delle Enemy Card.
@@ -133,7 +134,7 @@ const TERRAIN_NAMES := {
 const COVER_TERRAINS := [
 	Terrain.ROCKS, Terrain.BUILDING, Terrain.TREES, Terrain.HEDGEROW,
 	Terrain.WALL, Terrain.DEPRESSION, Terrain.STREAM, Terrain.LOGS,
-	Terrain.FOXHOLE, Terrain.RUBBLE, Terrain.CRATER,
+	Terrain.FOXHOLE, Terrain.RUBBLE, Terrain.CRATER, Terrain.BOCAGE,
 ]
 
 

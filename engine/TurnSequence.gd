@@ -133,17 +133,42 @@ static func _activate_team(state: GameState, team: String) -> void:
 
 static func _activate_character(state: GameState, c: Character) -> void:
 	# TODO: eseguire l'azione dell'impulse corrente secondo l'Order del
-	#       personaggio (move/fire/melee...), fare Spotting Checks,
-	#       gestire Duck Back. A strati. Primo strato: Rally.
-	if c.is_dead() or not c.has_order:
+	#       personaggio (move/fire/melee...), gestire Duck Back.
+	#       A strati: per ora Rally e Spotting (SOP 4a-ii).
+	if c.is_dead():
 		return
-	if c.order == Domain.Order.RALLY and state.impulse == 1:
+	if c.has_order and c.order == Domain.Order.RALLY and state.impulse == 1:
 		var res := Checks.rally_check(c, state.rng)
 		state.log_event("%s tenta Rally: tira %d (TQ %d) -> %s%s" % [
 			c.display_name, res["roll"], Checks.effective_tq(c),
 			Domain.MORALE_NAMES[res["after"]],
 			"" if res["delta"] != 0 else " (nessun effetto)",
 		])
+	if state.impulse == 1:
+		_spotting_checks(state, c)
+
+
+# Spotting check dello spotter contro ogni avversario non ancora
+# individuato (una volta per turno, all'impulse 1; si raffina quando
+# arrivera' il movimento). TODO: Line of Sight.
+static func _spotting_checks(state: GameState, spotter: Character) -> void:
+	for target in state.characters:
+		if target.side == spotter.side or target.is_dead():
+			continue
+		if target.side == Domain.Side.ENEMY and target.known:
+			continue
+		if target.side == Domain.Side.FRIENDLY and target.spotted:
+			continue
+		var res := Spotting.attempt(state, spotter, target)
+		if res["success"]:
+			if target.side == Domain.Side.ENEMY:
+				state.log_event("%s individua %s! (tira %d <= %d, dist %d)" % [
+					spotter.display_name, target.display_name,
+					res["roll"], res["threshold"], res["dist"]])
+			else:
+				state.log_event("%s e' stato avvistato da %s! (tira %d <= %d, dist %d)" % [
+					target.display_name, spotter.display_name,
+					res["roll"], res["threshold"], res["dist"]])
 
 
 # Step 5 - End Phase (Rule 4.0 step 5)

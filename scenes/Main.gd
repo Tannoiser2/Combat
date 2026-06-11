@@ -276,6 +276,11 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 		hex.x, hex.y, Domain.TERRAIN_NAMES[hexdata.terrain],
 		"  (Cover)" if Domain.terrain_gives_cover(hexdata.terrain) else "",
 	])
+	if c != null and c.side == Domain.Side.ENEMY and not c.known:
+		lines.append("")
+		lines.append("[b]Nemico non identificato[/b]")
+		info_text.text = "\n".join(lines)
+		return
 	if c != null:
 		lines.append("")
 		lines.append("[b]%s[/b]  (%s, team %s)" % [c.display_name,
@@ -351,6 +356,8 @@ func _make_hedgerows_state() -> GameState:
 	state_.characters.append(miller)
 
 	# Jung nel bosco di 11.10 (In Cover), Braun allo scoperto in 13.10
+	# Nemici Alerted (ricevono ordini) ma non Known: il giocatore vede
+	# solo un "?" finche' i suoi uomini non li individuano (Spotting).
 	var jung := Character.new("jung", "Soldat Jung", Domain.Side.ENEMY, "Red")
 	jung.troop_quality = 4
 	jung.weapon_skills = {"Rifle": 3}
