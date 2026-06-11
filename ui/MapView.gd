@@ -66,16 +66,20 @@ var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
 
 
 # Carica una delle 4 mappe (se la scansione e' presente in assets/maps).
-# Ritorna true se la texture e' stata caricata.
+# Ritorna true se la texture e' stata caricata; senza texture la stessa
+# griglia si disegna in modalita' procedurale (terreno da Boards.gd).
 func load_board(board_name: String) -> bool:
 	assert(BOARDS.has(board_name), "Mappa sconosciuta: %s" % board_name)
 	var info: Dictionary = BOARDS[board_name]
+	first_col = 1
 	if not ResourceLoader.exists(info["file"]):
+		board = null
+		origin = Vector2(HEX_SIZE, HEX_SIZE)
+		cell = Vector2(1.5 * HEX_SIZE, SQRT3 * HEX_SIZE)
 		return false
 	board = load(info["file"])
 	origin = info["origin"]
 	cell = CELL
-	first_col = 1
 	return true
 
 

@@ -38,17 +38,19 @@ func _ready() -> void:
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 
 	map_view = MapView.new()
-	if map_view.load_board("hedgerows"):
-		state = _make_hedgerows_state()
-	else:
-		state = _make_tiny_state()
-		map_view.position = Vector2(120, 100)
+	# Con la scansione in assets/maps si gioca sull'artwork vero; senza
+	# (es. build web: le scansioni non sono nel repo) la stessa mappa
+	# viene disegnata proceduralmente dal terreno di Boards.gd.
+	if not map_view.load_board("hedgerows"):
+		print("Scansione non trovata: Hedgerows in modalita' procedurale")
+	state = _make_hedgerows_state()
 	map_view.state = state
 	add_child(map_view)
 
 	camera = Camera2D.new()
 	camera.position = map_view.hex_center(11, 10)
-	camera.zoom = Vector2(0.5, 0.5)
+	var z := 75.0 / map_view.cell.x
+	camera.zoom = Vector2(z, z)
 	add_child(camera)
 
 	_build_hud()
@@ -377,31 +379,3 @@ func _make_hedgerows_state() -> GameState:
 	return state_
 
 
-# Mini-partita di fallback: griglia 3x3, due personaggi.
-func _make_tiny_state() -> GameState:
-	var state_ := GameState.new()
-	state_.max_turns = 3
-	state_.rng.seed = hash("combat-test")
-
-	for col in range(3):
-		for row in range(3):
-			var key := GameState.hex_key(col, row)
-			state_.map[key] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0, 0)
-	state_.map[GameState.hex_key(2, 2)] = GameState.MapHex.new(Domain.Terrain.TREES, 0)
-
-	var taylor := Character.new("taylor", "Sgt Taylor", Domain.Side.FRIENDLY, "Able")
-	taylor.troop_quality = 6
-	taylor.leadership = 3
-	taylor.weapon_skills = {"SMG": 7}
-	taylor.position = Vector2i(0, 0)
-	state_.characters.append(taylor)
-
-	var jung := Character.new("jung", "Soldat Jung", Domain.Side.ENEMY, "Red")
-	jung.troop_quality = 4
-	jung.weapon_skills = {"Rifle": 3}
-	jung.position = Vector2i(2, 2)
-	jung.alerted = true
-	state_.characters.append(jung)
-
-	state_.initiative_order = ["Able", "Red"]
-	return state_
