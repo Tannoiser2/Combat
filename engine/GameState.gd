@@ -55,6 +55,10 @@ var game_over: bool = false
 # Log eventi del motore: il motore registra, la UI consuma e stampa.
 var log: Array[String] = []
 
+# Colpi sparati nell'impulse corrente, come dati per la UI (linee di
+# fuoco): {from, to, hit, side}. La UI li disegna e li azzera per impulse.
+var shots: Array = []
+
 
 func log_event(msg: String) -> void:
 	log.append(msg)

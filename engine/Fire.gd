@@ -83,13 +83,20 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
 	var rof := int(Weapons.info(weapon)["rof"])
+	var any_hit := false
 	for i in range(rof):
 		if target.is_dead() or firer.no_ammo:
-			return
-		_resolve_attack(state, firer, target, weapon)
+			break
+		if _resolve_attack(state, firer, target, weapon):
+			any_hit = true
+	# Registra il colpo come dato per la visualizzazione (linea di fuoco).
+	state.shots.append({
+		"from": firer.position, "to": target.position,
+		"hit": any_hit, "side": firer.side,
+	})
 
 
-static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> void:
+static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> bool:
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var hex := state.hex_at(target.position.x, target.position.y)
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
@@ -113,12 +120,12 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		_log(state, "%s spara a %s con %s: 9 naturale, mancato!" % [
 			firer.display_name, target.display_name, weapon])
 		_spend_ammo(state, firer, weapon)
-		return
+		return false
 	# TODO nota 2 del chart: WS modificato < 0 richiede un TQC di conferma.
 	if roll != 0 and roll > ws:
 		_log(state, "%s spara a %s con %s: tira %d > WS %d, mancato" % [
 			firer.display_name, target.display_name, weapon, roll, ws])
-		return
+		return false
 
 	_log(state, "%s COLPISCE %s con %s (tira %d, WS %d)" % [
 		firer.display_name, target.display_name, weapon, roll, ws])
@@ -133,6 +140,7 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
+	return true
 
 
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.

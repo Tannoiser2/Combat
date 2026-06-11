@@ -33,6 +33,7 @@ var info_text: RichTextLabel
 var order_menu: PopupMenu
 var order_target: Character
 var enemy_card_rect: TextureRect
+var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -118,6 +119,7 @@ func _on_next_pressed() -> void:
 			phase = Phase.ACTION
 			impulse_next = 1
 			state.impulse = 1
+			state.shots.clear()
 			state.log_event("--- Impulse 1 ---")
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
@@ -136,6 +138,7 @@ func _advance_action() -> void:
 				_end_action_phase()
 				return
 			state.impulse = impulse_next
+			state.shots.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
@@ -372,6 +375,19 @@ func _build_hud() -> void:
 	enemy_card_rect.hide()
 	hud.add_child(enemy_card_rect)
 
+	# Anteprima ingrandita della carta (al passaggio del mouse sulla mano).
+	card_preview = TextureRect.new()
+	card_preview.set_anchors_preset(Control.PRESET_CENTER)
+	card_preview.offset_left = -185
+	card_preview.offset_right = 185
+	card_preview.offset_top = -390
+	card_preview.offset_bottom = 130
+	card_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	card_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	card_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_preview.hide()
+	hud.add_child(card_preview)
+
 	# Menu degli ordini
 	order_menu = PopupMenu.new()
 	for order in Domain.ORDER_NAMES:
@@ -394,14 +410,16 @@ func _show_hand() -> void:
 		]
 		var img := FriendlyCards.image(serial)
 		if not img.is_empty():
-			# Grafica originale della carta, cliccabile.
+			# Grafica originale della carta, cliccabile; hover = ingrandimento.
 			var tb := TextureButton.new()
 			tb.texture_normal = load(img)
 			tb.ignore_texture_size = true
 			tb.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-			tb.custom_minimum_size = Vector2(140, 195)
+			tb.custom_minimum_size = Vector2(150, 208)
 			tb.tooltip_text = tip
 			tb.pressed.connect(_on_card_chosen.bind(i))
+			tb.mouse_entered.connect(_show_card_preview.bind(tb.texture_normal))
+			tb.mouse_exited.connect(_hide_card_preview)
 			hand_box.add_child(tb)
 		else:
 			var button := Button.new()  # ripiego testuale
@@ -411,6 +429,15 @@ func _show_hand() -> void:
 			button.pressed.connect(_on_card_chosen.bind(i))
 			hand_box.add_child(button)
 	hand_panel.show()
+
+
+func _show_card_preview(tex: Texture2D) -> void:
+	card_preview.texture = tex
+	card_preview.show()
+
+
+func _hide_card_preview() -> void:
+	card_preview.hide()
 
 
 func _show_info(hex: Vector2i, c: Character) -> void:

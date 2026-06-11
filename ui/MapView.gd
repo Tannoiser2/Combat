@@ -160,6 +160,16 @@ func _counter_tex(counter_id: String) -> Texture2D:
 	return _counter_cache[counter_id]
 
 
+# Segnalino-ordine (con impulse track) per ordine e lato, o null se assente.
+func _order_tex(order: int, side: int) -> Texture2D:
+	var prefix := "US" if side == D.Side.FRIENDLY else "GE"
+	var name := "ord-%s-%s" % [prefix, D.Order.keys()[order]]
+	if not _counter_cache.has(name):
+		var path := "res://assets/counters/%s.png" % name
+		_counter_cache[name] = load(path) if ResourceLoader.exists(path) else null
+	return _counter_cache[name]
+
+
 func _draw() -> void:
 	if state == null:
 		return
@@ -169,6 +179,14 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Linee di fuoco dell'impulse: chi spara a chi (rosso pieno = colpito,
+	# tratteggio chiaro = mancato). Disegnate sotto i segnalini.
+	for s in state.shots:
+		var a := hex_center(s["from"].x, s["from"].y)
+		var b := hex_center(s["to"].x, s["to"].y)
+		var col: Color = Color(0.95, 0.15, 0.1, 0.85) if s["hit"] else Color(0.9, 0.85, 0.4, 0.5)
+		draw_line(a, b, col, radius * (0.10 if s["hit"] else 0.05))
+		draw_circle(b, radius * 0.16, col)  # impatto sul bersaglio
 	# Hex suggeriti (bersagli di fuoco in rosso, mosse in verde)
 	for h in cue_hexes:
 		var cc := hex_center(h.x, h.y)
@@ -206,14 +224,21 @@ func _draw() -> void:
 		if c.side == D.Side.FRIENDLY and c.spotted:
 			draw_circle(center + Vector2(radius * 0.45, -radius * 0.45),
 				radius * 0.12, Color(0.9, 0.15, 0.15))
-		# Etichetta dell'ordine (finche' non useremo i segnalini ordine).
+		# Ordine: segnalino-ordine vero (con impulse track) come badge in
+		# basso a destra; ripiego a etichetta per gli ordini senza marker.
 		if c.has_order and not hidden:
-			var label: String = D.ORDER_NAMES[c.order]
-			if not c.order_move.is_empty():
-				label += " " + c.order_move
-			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
-				label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
-				Color(0.95, 0.95, 0.2))
+			var otex := _order_tex(c.order, c.side)
+			if otex != null:
+				var ms := radius * 0.95
+				draw_texture_rect(otex,
+					Rect2(center + Vector2(radius * 0.18, radius * 0.18), Vector2(ms, ms)), false)
+			else:
+				var label: String = D.ORDER_NAMES[c.order]
+				if not c.order_move.is_empty():
+					label += " " + c.order_move
+				draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
+					label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
+					Color(0.95, 0.95, 0.2))
 
 
 func _draw_procedural_terrain(font: Font, radius: float) -> void:
