@@ -144,8 +144,9 @@ static func _activate_character(state: GameState, c: Character) -> void:
 			Domain.MORALE_NAMES[res["after"]],
 			"" if res["delta"] != 0 else " (nessun effetto)",
 		])
-	if state.impulse == 1:
-		_spotting_checks(state, c)
+	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
+	# movimento, quindi LOS e gittata vanno ricontrollate ogni impulse).
+	_spotting_checks(state, c)
 	# Azione dell'impulse secondo l'ordine (Orders.IMPULSES).
 	# NOTA: per ora si risolve automaticamente per entrambi i lati (fuoco
 	# sul bersaglio piu' vicino, movimento verso/lontano dal nemico). La
