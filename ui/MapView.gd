@@ -77,6 +77,17 @@ const SIDE_COLORS := {
 	D.Side.ENEMY: Color(0.55, 0.55, 0.52),  # feldgrau
 }
 
+# Colore del pallino di morale sul segnalino (e nel roster).
+const MORALE_COLORS := {
+	D.Morale.BERSERK: Color(0.75, 0.20, 0.85),    # viola
+	D.Morale.AGGRESSIVE: Color(0.95, 0.45, 0.10), # arancio
+	D.Morale.BOLD: Color(0.25, 0.65, 0.95),       # azzurro
+	D.Morale.NORMAL: Color(0.30, 0.80, 0.30),     # verde
+	D.Morale.CAUTIOUS: Color(0.95, 0.85, 0.15),   # giallo
+	D.Morale.SHAKEN: Color(0.90, 0.25, 0.20),     # rosso
+	D.Morale.ROUT: Color(0.15, 0.15, 0.15),       # nero
+}
+
 var state: GameState
 var board: Texture2D = null
 var origin := Vector2.ZERO          # centro dell'hex con etichetta (first_col, 0)
@@ -86,6 +97,8 @@ var selected: Character = null      # personaggio evidenziato
 var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
 var cue_hexes: Array[Vector2i] = []  # hex suggeriti (bersagli/mosse)
 var cue_color := Color(0.95, 0.85, 0.2, 0.9)
+# Linee di vista dall'unita' selezionata: [{to: Vector2, clear: bool}]
+var los_lines: Array = []
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
 # Animazioni: posizione "visiva" dei segnalini (insegue quella logica)
@@ -274,6 +287,18 @@ func _draw() -> void:
 				draw_arc(ac, radius * 0.55, 0, TAU, 20, Color(0.9, 0.2, 0.1, 0.9), radius * 0.06)
 				draw_string(font, ac + Vector2(-radius * 0.2, radius * 0.12),
 					"!", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.5), Color.WHITE)
+	# Linee di vista dall'unita' selezionata: verde tratteggiata = LOS
+	# libera, rossa = bloccata (con una x sul punto di arrivo).
+	if selected != null and not los_lines.is_empty():
+		var from := _pos_of(selected)
+		for l in los_lines:
+			var col: Color = Color(0.25, 0.9, 0.35, 0.8) if l["clear"] \
+				else Color(0.9, 0.25, 0.2, 0.7)
+			_draw_dashed(from, l["to"], col, radius * 0.06, radius * 0.35)
+			if not l["clear"]:
+				var p: Vector2 = l["to"]
+				draw_line(p + Vector2(-1, -1) * radius * 0.2, p + Vector2(1, 1) * radius * 0.2, col, radius * 0.06)
+				draw_line(p + Vector2(-1, 1) * radius * 0.2, p + Vector2(1, -1) * radius * 0.2, col, radius * 0.06)
 	# Traccianti dei colpi: linea che sbiadisce + proiettile in volo nei
 	# primi istanti, segno d'impatto sul bersaglio se colpito.
 	for t in _tracers:
@@ -321,8 +346,13 @@ func _draw() -> void:
 			draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
 				"?" if hidden else c.display_name.substr(0, 1),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
+		# Pallino del morale (alto a sinistra), bordato per leggibilita'.
+		if not hidden:
+			var mc := center + Vector2(-radius * 0.52, -radius * 0.52)
+			draw_circle(mc, radius * 0.17, MORALE_COLORS[c.morale])
+			draw_circle(mc, radius * 0.17, Color(0, 0, 0, 0.8), false, radius * 0.03)
 		if c.side == D.Side.FRIENDLY and c.spotted:
-			draw_circle(center + Vector2(radius * 0.45, -radius * 0.45),
+			draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
 				radius * 0.12, Color(0.9, 0.15, 0.15))
 		# Ordine: segnalino-ordine vero (con impulse track) come badge in
 		# basso a destra; ripiego a etichetta per gli ordini senza marker.
@@ -502,3 +532,14 @@ static func _hex_points(center: Vector2, radius: float) -> PackedVector2Array:
 
 static func _closed(points: PackedVector2Array) -> PackedVector2Array:
 	return points + PackedVector2Array([points[0]])
+
+
+# Linea tratteggiata (per le linee di vista).
+func _draw_dashed(a: Vector2, b: Vector2, col: Color, width: float, dash: float) -> void:
+	var total := a.distance_to(b)
+	var dir := (b - a).normalized()
+	var t := 0.0
+	while t < total:
+		var seg_end := minf(t + dash, total)
+		draw_line(a + dir * t, a + dir * seg_end, col, width)
+		t += dash * 1.7

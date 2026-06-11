@@ -30,7 +30,9 @@ var hand_panel: PanelContainer
 var hand_box: HBoxContainer
 var log_text: RichTextLabel
 var info_text: RichTextLabel
-var order_menu: PopupMenu
+var order_panel: PanelContainer   # selettore ordini con spiegazioni
+var order_list: VBoxContainer
+var order_desc: RichTextLabel
 var order_target: Character
 var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
@@ -438,14 +440,47 @@ func _on_map_clicked() -> void:
 	_show_info(hex, c)
 	if phase == Phase.ORDERS and c != null \
 			and c.side == Domain.Side.FRIENDLY and not c.is_dead():
-		order_target = c
-		# Solo gli ordini legali per questo personaggio (limitazioni carte).
-		order_menu.clear()
-		for o in TurnSequence.legal_orders(state, c):
-			order_menu.add_item(Domain.ORDER_NAMES[o], o)
-		order_menu.position = Vector2i(get_viewport().get_mouse_position()) \
-			+ Vector2i(8, 8)
-		order_menu.popup()
+		_open_order_panel(c)
+
+
+# Selettore ordini: bottoni a sinistra (solo quelli legali), descrizione
+# con track degli impulsi a destra quando passi sopra un ordine.
+func _open_order_panel(c: Character) -> void:
+	order_target = c
+	for child in order_list.get_children():
+		child.queue_free()
+	var title := Label.new()
+	title.text = "Ordine per %s" % c.display_name
+	title.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	order_list.add_child(title)
+	for o in TurnSequence.legal_orders(state, c):
+		var b := Button.new()
+		b.text = Domain.ORDER_NAMES[o]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(190, 0)
+		b.pressed.connect(_on_order_selected.bind(o))
+		b.mouse_entered.connect(_describe_order.bind(o))
+		order_list.add_child(b)
+	var cancel := Button.new()
+	cancel.text = "Annulla"
+	cancel.modulate = Color(0.85, 0.7, 0.7)
+	cancel.pressed.connect(func(): order_panel.hide())
+	order_list.add_child(cancel)
+	order_desc.text = "[i]Passa il mouse su un ordine per la spiegazione.[/i]"
+	order_panel.show()
+
+
+func _describe_order(o: int) -> void:
+	var ws_mod: int = Orders.FIRE_WS_MOD.get(o, 0)
+	var lines: Array[String] = []
+	lines.append("[b][color=#f3e88a]%s[/color][/b]" % Domain.ORDER_NAMES[o])
+	lines.append("")
+	lines.append(Orders.DESC.get(o, ""))
+	lines.append("")
+	lines.append("[b]Impulsi:[/b]  %s" % Orders.track_text(o))
+	if ws_mod != 0:
+		lines.append("[b]Mod. al fuoco:[/b] %+d WS" % ws_mod)
+	order_desc.text = "\n".join(lines)
 
 
 func _handle_action_click(hex: Vector2i) -> void:
@@ -472,6 +507,7 @@ func _handle_action_click(hex: Vector2i) -> void:
 func _on_order_selected(id: int) -> void:
 	if order_target == null:
 		return
+	order_panel.hide()
 	order_target.set_order(id)
 	state.log_event("%s riceve l'ordine %s" % [
 		order_target.display_name, Domain.ORDER_NAMES[id]])
@@ -481,59 +517,114 @@ func _on_order_selected(id: int) -> void:
 
 # ---------------------------------------------------------------- HUD
 
+# Tema "militare": pannelli verde oliva scuro semi-trasparenti, bordi
+# morbidi, pulsanti coerenti. Tutto in codice, niente risorse esterne.
+func _make_theme() -> Theme:
+	var theme := Theme.new()
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color(0.09, 0.11, 0.07, 0.93)
+	panel.border_color = Color(0.35, 0.40, 0.25)
+	panel.set_border_width_all(1)
+	panel.set_corner_radius_all(6)
+	panel.set_content_margin_all(10)
+	theme.set_stylebox("panel", "PanelContainer", panel)
+	var btn := StyleBoxFlat.new()
+	btn.bg_color = Color(0.18, 0.22, 0.13)
+	btn.border_color = Color(0.45, 0.52, 0.30)
+	btn.set_border_width_all(1)
+	btn.set_corner_radius_all(4)
+	btn.set_content_margin_all(6)
+	theme.set_stylebox("normal", "Button", btn)
+	var btn_h := btn.duplicate()
+	btn_h.bg_color = Color(0.28, 0.34, 0.18)
+	theme.set_stylebox("hover", "Button", btn_h)
+	var btn_p := btn.duplicate()
+	btn_p.bg_color = Color(0.40, 0.46, 0.24)
+	theme.set_stylebox("pressed", "Button", btn_p)
+	var btn_d := btn.duplicate()
+	btn_d.bg_color = Color(0.12, 0.13, 0.10)
+	theme.set_stylebox("disabled", "Button", btn_d)
+	theme.set_color("font_color", "Label", Color(0.92, 0.92, 0.85))
+	theme.set_color("default_color", "RichTextLabel", Color(0.92, 0.92, 0.85))
+	return theme
+
+
 func _build_hud() -> void:
 	var hud := CanvasLayer.new()
 	add_child(hud)
+	# Radice Control a tutto schermo: i figli ereditano il tema.
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = _make_theme()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(root)
 
 	# Barra superiore: turno/fase + pulsante Avanti
 	var top := PanelContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hud.add_child(top)
+	root.add_child(top)
 	var top_box := HBoxContainer.new()
 	top.add_child(top_box)
 	turn_label = Label.new()
+	turn_label.add_theme_font_size_override("font_size", 18)
 	top_box.add_child(turn_label)
 	hint_label = Label.new()
 	hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint_label.add_theme_font_size_override("font_size", 17)
+	hint_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
 	top_box.add_child(hint_label)
 	next_button = Button.new()
 	next_button.text = "Avanti"
-	next_button.custom_minimum_size = Vector2(170, 0)
+	next_button.custom_minimum_size = Vector2(180, 40)
 	next_button.pressed.connect(_on_next_pressed)
 	top_box.add_child(next_button)
 
-	# Log eventi in basso a sinistra
-	var log_panel := PanelContainer.new()
-	log_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	log_panel.offset_top = -185
-	log_panel.offset_right = 520
-	log_panel.offset_bottom = -8
-	log_panel.offset_left = 8
-	hud.add_child(log_panel)
+	# SIDEBAR destra unificata: INFO sopra, LOG sotto, legenda morale.
+	var side := PanelContainer.new()
+	side.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	side.offset_left = -330
+	side.offset_top = 46
+	side.offset_bottom = -8
+	side.offset_right = -8
+	root.add_child(side)
+	var side_box := VBoxContainer.new()
+	side_box.add_theme_constant_override("separation", 6)
+	side.add_child(side_box)
+	side_box.add_child(_section_label("UNITA' / HEX"))
+	info_text = RichTextLabel.new()
+	info_text.bbcode_enabled = true
+	info_text.fit_content = false
+	info_text.custom_minimum_size = Vector2(0, 200)
+	info_text.add_theme_font_size_override("normal_font_size", 15)
+	side_box.add_child(info_text)
+	side_box.add_child(HSeparator.new())
+	side_box.add_child(_section_label("DIARIO DI BATTAGLIA"))
 	log_text = RichTextLabel.new()
 	log_text.scroll_following = true
 	log_text.fit_content = false
-	log_panel.add_child(log_text)
-
-	# Pannello info in alto a destra
-	var info_panel := PanelContainer.new()
-	info_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	info_panel.offset_left = -300
-	info_panel.offset_right = -8
-	info_panel.offset_top = 44
-	info_panel.offset_bottom = 280
-	hud.add_child(info_panel)
-	info_text = RichTextLabel.new()
-	info_text.bbcode_enabled = true
-	info_panel.add_child(info_text)
+	log_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	log_text.add_theme_font_size_override("normal_font_size", 13)
+	side_box.add_child(log_text)
+	side_box.add_child(HSeparator.new())
+	# Legenda dei pallini di morale.
+	var legend := RichTextLabel.new()
+	legend.bbcode_enabled = true
+	legend.fit_content = true
+	legend.add_theme_font_size_override("normal_font_size", 12)
+	var parts: Array[String] = []
+	for m in Domain.MORALE_NAMES:
+		parts.append("[color=#%s]●[/color]%s" % [
+			MapView.MORALE_COLORS[m].to_html(false), Domain.MORALE_NAMES[m]])
+	legend.text = "Morale:  " + "  ".join(parts)
+	side_box.add_child(legend)
 
 	# Roster della squadra, a sinistra (clic = seleziona e centra).
 	var roster_panel := PanelContainer.new()
 	roster_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	roster_panel.offset_left = 8
-	roster_panel.offset_top = 220
-	hud.add_child(roster_panel)
+	roster_panel.offset_top = 224
+	root.add_child(roster_panel)
 	roster_box = VBoxContainer.new()
 	roster_box.add_theme_constant_override("separation", 2)
 	roster_panel.add_child(roster_box)
@@ -541,10 +632,10 @@ func _build_hud() -> void:
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
 	hand_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	hand_panel.offset_top = -210
+	hand_panel.offset_top = -224
 	hand_panel.offset_bottom = -12
 	hand_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	hud.add_child(hand_panel)
+	root.add_child(hand_panel)
 	hand_box = HBoxContainer.new()
 	hand_panel.add_child(hand_box)
 
@@ -552,12 +643,12 @@ func _build_hud() -> void:
 	enemy_card_rect = TextureRect.new()
 	enemy_card_rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	enemy_card_rect.offset_left = 8
-	enemy_card_rect.offset_top = 44
+	enemy_card_rect.offset_top = 48
 	enemy_card_rect.custom_minimum_size = Vector2(120, 167)
 	enemy_card_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	enemy_card_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	enemy_card_rect.hide()
-	hud.add_child(enemy_card_rect)
+	root.add_child(enemy_card_rect)
 
 	# Anteprima ingrandita della carta (al passaggio del mouse sulla mano).
 	card_preview = TextureRect.new()
@@ -570,14 +661,39 @@ func _build_hud() -> void:
 	card_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	card_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_preview.hide()
-	hud.add_child(card_preview)
+	root.add_child(card_preview)
 
-	# Menu degli ordini
-	order_menu = PopupMenu.new()
-	for order in Domain.ORDER_NAMES:
-		order_menu.add_item(Domain.ORDER_NAMES[order], order)
-	order_menu.id_pressed.connect(_on_order_selected)
-	hud.add_child(order_menu)
+	# Pannello ordini con spiegazioni (al posto del vecchio PopupMenu):
+	# bottoni a sinistra, descrizione al passaggio del mouse a destra.
+	order_panel = PanelContainer.new()
+	order_panel.set_anchors_preset(Control.PRESET_CENTER)
+	order_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	order_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	order_panel.hide()
+	root.add_child(order_panel)
+	var order_h := HBoxContainer.new()
+	order_h.add_theme_constant_override("separation", 10)
+	order_panel.add_child(order_h)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(210, 430)
+	order_h.add_child(scroll)
+	order_list = VBoxContainer.new()
+	order_list.add_theme_constant_override("separation", 2)
+	scroll.add_child(order_list)
+	order_desc = RichTextLabel.new()
+	order_desc.bbcode_enabled = true
+	order_desc.fit_content = false
+	order_desc.custom_minimum_size = Vector2(300, 430)
+	order_desc.add_theme_font_size_override("normal_font_size", 15)
+	order_h.add_child(order_desc)
+
+
+func _section_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", Color(0.65, 0.72, 0.50))
+	return l
 
 
 func _show_hand() -> void:
@@ -615,6 +731,27 @@ func _show_hand() -> void:
 	hand_panel.show()
 
 
+# Linee di vista dall'unita' selezionata verso ogni avversario in vista
+# di mappa (verde = LOS libera, rosso = bloccata). Risponde alla domanda
+# "questi due si vedono?" con un click sul tuo uomo.
+func _update_los_lines(c: Character) -> void:
+	map_view.los_lines = []
+	if c == null or c.is_dead():
+		map_view.queue_redraw()
+		return
+	for other in state.characters:
+		if other.side == c.side or other.is_dead():
+			continue
+		# verso i nemici noti (o, per un nemico selezionato, i tuoi uomini)
+		if other.side == Domain.Side.ENEMY and not other.known:
+			continue
+		map_view.los_lines.append({
+			"to": map_view.hex_center(other.position.x, other.position.y),
+			"clear": LOS.clear(state, c, other),
+		})
+	map_view.queue_redraw()
+
+
 func _show_card_preview(tex: Texture2D) -> void:
 	card_preview.texture = tex
 	card_preview.show()
@@ -625,6 +762,7 @@ func _hide_card_preview() -> void:
 
 
 func _show_info(hex: Vector2i, c: Character) -> void:
+	_update_los_lines(c)
 	var hexdata := state.hex_at(hex.x, hex.y)
 	var lines: Array[String] = []
 	lines.append("[b]Hex %02d.%02d[/b]  %s%s" % [
@@ -674,9 +812,21 @@ func _refresh_roster() -> void:
 				flags += " low ammo"
 			if c.spotted:
 				flags += " visto!"
-		b.text = "%s\n  %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
+		b.text = "● %s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
 		b.disabled = c.is_dead()
 		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
+		if not c.is_dead():
+			b.add_theme_color_override("font_color", Color.WHITE)
+			# il pallino eredita il colore del morale via icona... semplice:
+			# coloriamo la prima riga con un modulate leggero non e' possibile
+			# per singolo carattere: usiamo il bordo del bottone.
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = Color(0.18, 0.22, 0.13)
+			sb.border_color = MapView.MORALE_COLORS[c.morale]
+			sb.set_border_width_all(2)
+			sb.set_corner_radius_all(4)
+			sb.set_content_margin_all(6)
+			b.add_theme_stylebox_override("normal", sb)
 		var ch := c
 		b.pressed.connect(func():
 			map_view.selected = ch
