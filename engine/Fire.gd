@@ -134,7 +134,10 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 				ws += int(state.turn_fx["ws_cover_self"])
 	# Condizioni ambientali (default spente; attivate da scenario/eventi).
 	ws += int(state.turn_fx.get("fire_env_mod", 0))
-	# TODO: fumo localizzato, filo spinato per-hex.
+	# Fumo: -4 per hex di fumo pieno, -2 per fading, sull'intera linea
+	# di tiro (hex del tiratore, del bersaglio e interposti).
+	ws += _smoke_modifier(state, firer.position, target.position)
+	# TODO: filo spinato per-hex.
 
 	var roll := Checks.roll_d10(state.rng)
 	if roll == 9:
@@ -230,6 +233,18 @@ static func _spend_ammo(state: GameState, firer: Character, weapon: String) -> v
 	else:
 		firer.low_ammo = true
 		_log(state, "  %s e' a corto di munizioni" % firer.display_name)
+
+
+# Penalita' del fumo lungo la linea di tiro (-4 pieno / -2 fading per hex).
+static func _smoke_modifier(state: GameState, a: Vector2i, b: Vector2i) -> int:
+	var mod := 0
+	var line: Array[Vector2i] = [a, b]
+	line.append_array(LOS.hexes_between(a, b))
+	for hex in line:
+		match Area.smoke_level(state, hex):
+			2: mod -= 4
+			1: mod -= 2
+	return mod
 
 
 static func _log(state: GameState, msg: String) -> void:

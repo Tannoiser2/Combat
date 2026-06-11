@@ -59,6 +59,9 @@ var reinforced: bool = false
 # restrict (limitazione ordini), event.
 var turn_fx: Dictionary = {}
 
+# Segnalini d'area sugli hex (granate, fumo, mortai...): vedi Area.gd.
+var area_markers: Array = []
+
 # Fine partita
 var max_turns: int = 10
 var game_over: bool = false

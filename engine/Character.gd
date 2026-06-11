@@ -30,6 +30,7 @@ var has_order: bool = false
 var order_move: String = ""     # valore di movimento, es. "5/6" ("" = nessuno)
 var order_grenade: bool = false # G: lancia una granata se possibile
 var order_charge: bool = false  # C: carica se possibile
+var thrown: bool = false        # granata gia' lanciata in questo turno
 var wounds: Array[int] = []     # Domain.Wound
 
 # Stato di conoscenza/allerta
@@ -70,6 +71,7 @@ func clear_order() -> void:
 	order_grenade = false
 	order_charge = false
 	has_order = false
+	thrown = false
 
 
 # Somma dei modificatori TQ dovuti alle ferite (Rule 16.2).

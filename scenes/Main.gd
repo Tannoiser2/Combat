@@ -47,7 +47,15 @@ func _ready() -> void:
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 
 	state = GameState.new()
-	state.rng.seed = hash("combat-test")
+	# Seed fisso per partite riproducibili; COMBAT_SEED per variarlo
+	# (nei test) o "time" per una partita sempre diversa.
+	var seed_env := OS.get_environment("COMBAT_SEED")
+	if seed_env == "time":
+		state.rng.randomize()
+	elif not seed_env.is_empty():
+		state.rng.seed = hash(seed_env)
+	else:
+		state.rng.seed = hash("combat-test")
 	Scenario.build(state, "intro1")
 
 	map_view = MapView.new()

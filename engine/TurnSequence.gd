@@ -226,13 +226,58 @@ static func resolve_action(state: GameState, c: Character) -> void:
 		return
 	match Orders.impulse_action(c.order, state.impulse):
 		Domain.ImpulseAction.MAY_FIRE:
-			_try_fire(state, c)
+			if c.order in [Domain.Order.GRENADE, Domain.Order.SMOKE_GRENADE]:
+				if not c.thrown:
+					_try_throw(state, c)
+			else:
+				_try_fire(state, c)
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
 			_do_move(state, c, 1)
 		Domain.ImpulseAction.MUST_MOVE_2:
 			_do_move(state, c, 2)
 		Domain.ImpulseAction.MELEE:
 			_do_melee(state, c)
+
+
+# Lancio granata (gittata 3, Grenade Check = TQC; il marker esplode in
+# End Phase). Automatico: sull'avversario visibile piu' vicino entro 3.
+static func _try_throw(state: GameState, thrower: Character) -> void:
+	var best: Character = null
+	var best_d := 99
+	for t in state.characters:
+		if t.side == thrower.side or t.is_dead():
+			continue
+		if t.side == Domain.Side.ENEMY and not t.known:
+			continue
+		if t.side == Domain.Side.FRIENDLY and not t.spotted:
+			continue
+		var d := Spotting.hex_distance(thrower.position, t.position)
+		if d <= 3 and d < best_d and LOS.clear(state, thrower, t):
+			best_d = d
+			best = t
+	if best == null:
+		return
+	throw_grenade(state, thrower, best.position)
+
+
+# Lancio verso un hex (anche per la UI). Grenade Check: TQC; se fallisce
+# la granata scatta comunque ma con deviazione garantita.
+static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -> void:
+	var smoke := thrower.order == Domain.Order.SMOKE_GRENADE
+	var check := Checks.troop_quality_check(thrower, state.rng)
+	state.log_event("%s lancia una granata%s verso %02d.%02d (TQC %s)" % [
+		thrower.display_name, " fumogena" if smoke else "",
+		hex.x, hex.y, "ok" if check["passed"] else "fallito"])
+	var target := hex
+	if not check["passed"]:
+		# lancio sbagliato: devia di 1 hex prima ancora dello scatter
+		var dir: Vector3i = Move.CUBE_DIRS[state.rng.randi_range(0, 5)]
+		var dev := Move.from_cube(Move.to_cube(hex) + dir)
+		if state.map.has(GameState.hex_key(dev.x, dev.y)):
+			target = dev
+	Area.place_with_scatter(state,
+		Area.Type.SMOKE if smoke else Area.Type.GRENADE, target)
+	thrower.thrown = true  # un lancio per turno; la track prosegue (move)
 
 
 # Medical Aid: un TQC (skill MEDIC, Rule 18); se passa, stabilizza o
@@ -372,6 +417,8 @@ static func valid_fire_targets(state: GameState, firer: Character) -> Array[Char
 
 
 # Fuoco automatico (nemici / demo): bersaglio valido piu' vicino.
+# Estensione G delle Enemy Card: se puo', lancia una granata al posto
+# di sparare quando il bersaglio e' a portata di lancio (3 hex).
 static func _try_fire(state: GameState, firer: Character) -> void:
 	var targets := valid_fire_targets(state, firer)
 	var best: Character = null
@@ -381,8 +428,12 @@ static func _try_fire(state: GameState, firer: Character) -> void:
 		if dist < best_dist:
 			best_dist = dist
 			best = target
-	if best != null:
-		Fire.fire_action(state, firer, best, firer.weapon_skills.keys()[0])
+	if best == null:
+		return
+	if firer.order_grenade and not firer.thrown and best_dist <= 3:
+		throw_grenade(state, firer, best.position)
+		return
+	Fire.fire_action(state, firer, best, firer.weapon_skills.keys()[0])
 
 
 # Spotting check dello spotter contro ogni avversario non ancora
@@ -415,8 +466,8 @@ static func _spotting_checks(state: GameState, spotter: Character) -> void:
 
 # Step 5 - End Phase (Rule 4.0 step 5)
 static func end_phase(state: GameState) -> void:
-	# TODO: granate esplodono; medic; plan draw; smoke; alert dei waiting;
-	#       reset; check vittoria.
+	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
+	Area.end_phase(state)
 	# SOP step 5d: rimuovere tutti gli ordini.
 	for c in state.characters:
 		c.clear_order()

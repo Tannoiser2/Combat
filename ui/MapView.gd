@@ -179,6 +179,21 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Segnalini d'area (granate, fumo, mortai, illuminazione)
+	for m in state.area_markers:
+		var ac := hex_center(m["hex"].x, m["hex"].y)
+		match m["type"]:
+			Area.Type.SMOKE:
+				var alpha := 0.55 if m["turns_left"] >= 2 else 0.30
+				draw_circle(ac, radius * 0.85, Color(0.85, 0.85, 0.85, alpha))
+			Area.Type.ILLUM:
+				draw_circle(ac, radius * 0.9, Color(1.0, 0.95, 0.5, 0.25))
+			_:
+				# ordigni in attesa di esplodere: cerchio arancio pulsante
+				draw_circle(ac, radius * 0.4, Color(0.95, 0.5, 0.1, 0.85))
+				draw_arc(ac, radius * 0.55, 0, TAU, 20, Color(0.9, 0.2, 0.1, 0.9), radius * 0.06)
+				draw_string(font, ac + Vector2(-radius * 0.2, radius * 0.12),
+					"!", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.5), Color.WHITE)
 	# Linee di fuoco dell'impulse: chi spara a chi (rosso pieno = colpito,
 	# tratteggio chiaro = mancato). Disegnate sotto i segnalini.
 	for s in state.shots:
