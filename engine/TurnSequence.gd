@@ -495,11 +495,16 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 	elif roll <= 6:
 		var names := ["Cpl Thomas", "Pvt Stubbs", "Pvt Templeman",
 			"Pvt Butterman", "Pvt Walsh", "Pvt Kowalski"]
+		var counters := ["US-Charlie-Pvt-Thomas", "US-Charlie-Pvt-Stubbs",
+			"US-Charlie-Pvt-Temple", "US-Charlie-Pvt-Butterman",
+			"US-Charlie-Pvt-Walsh", "US-Charlie-Pvt-Kowalski"]
 		var lost := Character.new("lost_%d" % roll, names[roll - 1],
 			Domain.Side.FRIENDLY, "Charlie")
 		lost.troop_quality = 5
 		lost.weapon_skills = {"M1 Garand": 5}
 		lost.position = dummy.position
+		lost.counter = counters[roll - 1]
+		lost.role = "US Rifleman"
 		state.characters.append(lost)
 		state.log_event("Era %s di Charlie Team, disperso: si unisce alla squadra!" % lost.display_name)
 	else:

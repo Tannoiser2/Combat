@@ -98,7 +98,7 @@ const FULL_SQUAD := [
 	{"name": "Pvt Johnson", "role": "US Rifleman", "team": "Baker", "counter": "US-Baker-Pvt-Johnson"},
 	{"name": "Pvt Miller", "role": "BAR Gunner", "team": "Baker", "counter": "US-Baker-Pvt-Miller"},
 	{"name": "Pvt Peters", "role": "US Rifleman", "team": "Baker", "counter": "US-Baker-Pvt-Peters"},
-	{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie"},
+	{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie", "counter": "US-Charlie-Pvt-Thomas"},
 	{"name": "Pvt Butterman", "role": "US Rifleman", "team": "Charlie", "counter": "US-Charlie-Pvt-Butterman"},
 	{"name": "Pvt Connor", "role": "US Rifleman", "team": "Charlie", "counter": "US-Charlie-Pvt-Connor"},
 	{"name": "Pvt Douglas", "role": "US Rifleman", "team": "Charlie", "counter": "US-Charlie-Pvt-Douglas"},
@@ -250,7 +250,7 @@ const SCENARIOS := {
 		"desc": "Un pezzo d'artiglieria martella il C.P. della compagnia.\nCharlie Team avanza con le cariche C4.",
 		"friendly_morale": 2,  # Bold
 		"friendly": [
-			{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie", "pos": "11,13"},
+			{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie", "pos": "11,13", "counter": "US-Charlie-Pvt-Thomas"},
 			{"name": "Pvt Butterman", "role": "US Rifleman", "team": "Charlie",
 				"pos": "11,14", "counter": "US-Charlie-Pvt-Butterman"},
 			{"name": "Pvt Connor", "role": "US Rifleman", "team": "Charlie",
@@ -299,7 +299,7 @@ const SCENARIOS := {
 		"desc": "Notte. Charlie Team e' di vedetta quando un ramo si spezza.\nUn grido: \"Eccoli, arrivano!\"",
 		"night": true,
 		"friendly": [
-			{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie", "pos": "21,5"},
+			{"name": "Cpl Thomas", "role": "Leader", "team": "Charlie", "pos": "21,5", "counter": "US-Charlie-Pvt-Thomas"},
 			{"name": "Pvt Butterman", "role": "US Rifleman", "team": "Charlie",
 				"pos": "20,4", "counter": "US-Charlie-Pvt-Butterman"},
 			{"name": "Pvt Connor", "role": "US Rifleman", "team": "Charlie",
