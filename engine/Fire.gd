@@ -137,6 +137,9 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	# Fumo: -4 per hex di fumo pieno, -2 per fading, sull'intera linea
 	# di tiro (hex del tiratore, del bersaglio e interposti).
 	ws += _smoke_modifier(state, firer.position, target.position)
+	# Notte: -2 oltre 2 hex, salvo bersaglio illuminato.
+	if state.night and dist > 2 and not Area.illuminated(state, target.position):
+		ws += -2
 	# TODO: filo spinato per-hex.
 
 	var roll := Checks.roll_d10(state.rng)

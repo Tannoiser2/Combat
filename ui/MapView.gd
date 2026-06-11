@@ -179,6 +179,20 @@ func _draw() -> void:
 		draw_texture(board, Vector2.ZERO)
 	else:
 		_draw_procedural_terrain(font, radius)
+	# Cannone obiettivo (intro3): cerchio scuro, X rossa se distrutto.
+	if not state.scenario_id.is_empty():
+		var gun: String = Scenario.SCENARIOS[state.scenario_id].get("gun_hex", "")
+		if not gun.is_empty():
+			var gp := gun.split(",")
+			var gc := hex_center(int(gp[0]), int(gp[1]))
+			draw_circle(gc, radius * 0.55, Color(0.25, 0.25, 0.22, 0.9))
+			draw_string(font, gc + Vector2(-radius * 0.45, radius * 0.15),
+				"GUN", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.35), Color.WHITE)
+			if state.gun_destroyed:
+				draw_line(gc - Vector2(radius, radius) * 0.5, gc + Vector2(radius, radius) * 0.5,
+					Color(0.9, 0.1, 0.1), radius * 0.12)
+				draw_line(gc + Vector2(-radius, radius) * 0.5, gc + Vector2(radius, -radius) * 0.5,
+					Color(0.9, 0.1, 0.1), radius * 0.12)
 	# Segnalini d'area (granate, fumo, mortai, illuminazione)
 	for m in state.area_markers:
 		var ac := hex_center(m["hex"].x, m["hex"].y)
@@ -188,6 +202,11 @@ func _draw() -> void:
 				draw_circle(ac, radius * 0.85, Color(0.85, 0.85, 0.85, alpha))
 			Area.Type.ILLUM:
 				draw_circle(ac, radius * 0.9, Color(1.0, 0.95, 0.5, 0.25))
+			Area.Type.C4:
+				draw_rect(Rect2(ac - Vector2(radius, radius) * 0.25,
+					Vector2(radius, radius) * 0.5), Color(0.8, 0.7, 0.2))
+				draw_string(font, ac + Vector2(-radius * 0.22, radius * 0.12),
+					"C4", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3), Color.BLACK)
 			_:
 				# ordigni in attesa di esplodere: cerchio arancio pulsante
 				draw_circle(ac, radius * 0.4, Color(0.95, 0.5, 0.1, 0.85))

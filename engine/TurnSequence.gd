@@ -69,12 +69,9 @@ static func friendly_order_phase(state: GameState) -> void:
 
 # Step 3 - Enemy Card and Order Phase (Rule 9.0)
 static func enemy_order_phase(state: GameState) -> void:
-	# SR11: rinforzi al turno previsto, prima di assegnare gli ordini.
+	# Ondate di rinforzi del turno, prima di assegnare gli ordini.
 	if not state.scenario_id.is_empty():
-		var sc: Dictionary = Scenario.SCENARIOS[state.scenario_id]
-		if not state.reinforced and state.turn == int(sc.get("reinforce_turn", -1)):
-			Scenario.bring_reinforcements(state)
-			state.reinforced = true
+		Scenario.run_waves(state)
 	# SOP step 3a: una carta per ogni Enemy Team con almeno un Alerted.
 	state.enemy_cards_in_play.clear()
 	for team in state.enemy_teams_with_alerted():
@@ -120,6 +117,16 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 				c.display_name, Domain.ORDER_NAMES[c.order], c.order_move])
 			return
 	c.had_first_order = true
+	# SR12 (intro2): nemico in un edificio: se passa un TQC riceve
+	# Aimed Fire e ignora la carta.
+	if not state.scenario_id.is_empty() \
+			and Scenario.SCENARIOS[state.scenario_id].get("building_tqc_aimed", false):
+		var bhex := state.hex_at(c.position.x, c.position.y)
+		if bhex != null and bhex.terrain == Domain.Terrain.BUILDING:
+			if Checks.troop_quality_check(c, state.rng)["passed"]:
+				c.set_order(Domain.Order.AIMED_FIRE)
+				state.log_event("%s si apposta alla finestra -> Aimed Fire" % c.display_name)
+				return
 	if not EnemyCards.has_table_row(c.morale):
 		# Berserk e Rout agiscono d'istinto (Rule 17), col movimento
 		# stampato sulla carta: il Berserk carica il nemico piu' vicino,
@@ -205,8 +212,16 @@ static func activate_passive(state: GameState, c: Character) -> void:
 			Domain.Order.SEARCH:
 				_do_search(state, c)
 			Domain.Order.PLAN:
-				# Plan (approssimato): genera una carta da parte (Rule 5/7).
-				if c.side == Domain.Side.FRIENDLY:
+				if c.side != Domain.Side.FRIENDLY:
+					pass
+				elif not state.scenario_id.is_empty() \
+						and Scenario.SCENARIOS[state.scenario_id].get("c4", false):
+					# Intro3 SR13: il Plan piazza una carica C4 nell'hex.
+					Area.place_c4(state, c.position)
+					state.log_event("%s piazza una carica C4 in %02d.%02d" % [
+						c.display_name, c.position.x, c.position.y])
+				else:
+					# Plan (approssimato): genera una carta da parte (Rule 5/7).
 					state.friendly_hand.append(state.draw_friendly_card())
 					state.log_event("%s pianifica: una carta extra in mano" % c.display_name)
 	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
@@ -451,9 +466,7 @@ static func _spotting_checks(state: GameState, spotter: Character) -> void:
 		if res["success"]:
 			if target.side == Domain.Side.ENEMY:
 				if target.is_dummy:
-					target.removed = true
-					state.log_event("%s scopre un'esca in %02d.%02d (rimossa)" % [
-						spotter.display_name, target.position.x, target.position.y])
+					_reveal_dummy(state, spotter, target)
 				else:
 					state.log_event("%s individua %s! (tira %d <= %d, dist %d)" % [
 						spotter.display_name, target.display_name,
@@ -462,6 +475,36 @@ static func _spotting_checks(state: GameState, spotter: Character) -> void:
 				state.log_event("%s e' stato avvistato da %s! (tira %d <= %d, dist %d)" % [
 					target.display_name, spotter.display_name,
 					res["roll"], res["threshold"], res["dist"]])
+
+
+# Esca rivelata. In intro2 (SR13) si tira 1D10: 0 = documenti, 1-6 = un
+# uomo disperso di Charlie Team che si unisce, 7-9 = niente.
+static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character) -> void:
+	dummy.removed = true
+	var sc: Dictionary = {} if state.scenario_id.is_empty() \
+		else Scenario.SCENARIOS[state.scenario_id]
+	if not sc.get("dummy_roll", false):
+		state.log_event("%s scopre un'esca in %02d.%02d (rimossa)" % [
+			spotter.display_name, dummy.position.x, dummy.position.y])
+		return
+	var roll := Checks.roll_d10(state.rng)
+	if roll == 0:
+		# Documenti: +5 VP se raccolti (TODO raccolta con Search; per ora log).
+		state.log_event("%s trova dei DOCUMENTI in %02d.%02d!" % [
+			spotter.display_name, dummy.position.x, dummy.position.y])
+	elif roll <= 6:
+		var names := ["Cpl Thomas", "Pvt Stubbs", "Pvt Templeman",
+			"Pvt Butterman", "Pvt Walsh", "Pvt Kowalski"]
+		var lost := Character.new("lost_%d" % roll, names[roll - 1],
+			Domain.Side.FRIENDLY, "Charlie")
+		lost.troop_quality = 5
+		lost.weapon_skills = {"M1 Garand": 5}
+		lost.position = dummy.position
+		state.characters.append(lost)
+		state.log_event("Era %s di Charlie Team, disperso: si unisce alla squadra!" % lost.display_name)
+	else:
+		state.log_event("%s scopre un'esca in %02d.%02d (niente)" % [
+			spotter.display_name, dummy.position.x, dummy.position.y])
 
 
 # Step 5 - End Phase (Rule 4.0 step 5)

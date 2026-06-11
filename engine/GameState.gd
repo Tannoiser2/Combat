@@ -52,7 +52,9 @@ var friendly_card_played: int = -1
 # rinforzi); flag per rinforzi gia' arrivati.
 var scenario_id: String = ""
 var enemy_reserve: Array = []
-var reinforced: bool = false
+var waves_done: Array = []      # turni di rinforzo gia' eseguiti
+var night: bool = false         # scenario notturno
+var gun_destroyed: bool = false # obiettivo di intro3
 
 # Modificatori della carta giocata, validi per il turno (azzerati in End
 # Phase). Es. ws_all, ws_team{team:mod}, ws_cover_self, no_impulse1,

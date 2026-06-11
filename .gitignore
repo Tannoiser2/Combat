@@ -9,15 +9,6 @@ build/
 riferimenti/
 *.pdf
 *.vmod
-# Mappe: per ora si pubblica solo quella usata dallo scenario corrente
-# (hedgerows). Le altre restano fuori finche' i loro scenari non servono,
-# per non gonfiare il download della build web.
-assets/maps/farmhouse.jpg
-assets/maps/farmhouse.jpg.import
-assets/maps/hill.jpg
-assets/maps/hill.jpg.import
-assets/maps/village.jpg
-assets/maps/village.jpg.import
 
 # Sistema
 .DS_Store

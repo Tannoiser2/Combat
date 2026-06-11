@@ -21,12 +21,13 @@ extends RefCounted
 
 const D := preload("res://engine/Domain.gd")
 
-enum Type { GRENADE, SMOKE, MORTAR_60, MORTAR_81, ARTILLERY_105, ILLUM }
+enum Type { GRENADE, SMOKE, MORTAR_60, MORTAR_81, ARTILLERY_105, ILLUM, C4 }
 
 const NAMES := {
 	Type.GRENADE: "Granata", Type.SMOKE: "Fumo",
 	Type.MORTAR_60: "Mortaio 60mm", Type.MORTAR_81: "Mortaio 81mm",
 	Type.ARTILLERY_105: "Artiglieria 105mm", Type.ILLUM: "Illuminazione",
+	Type.C4: "Carica C4",
 }
 
 # Potenza: [danno nell'hex, danno negli adiacenti]
@@ -35,7 +36,16 @@ const POWER := {
 	Type.MORTAR_60: [3, 2],
 	Type.MORTAR_81: [4, 2],
 	Type.ARTILLERY_105: [5, 3],
+	Type.C4: [3, 3],               # intro3 SR15: Blast 3 / Frag 3
 }
+
+
+# C4 (intro3): resta nell'hex e a ogni End Phase esplode con 0-2 su 1D10
+# (sempre, a fine partita). Distrugge il cannone se nel suo hex.
+static func place_c4(state: GameState, hex: Vector2i) -> void:
+	state.area_markers.append({
+		"type": Type.C4, "hex": hex, "placed_turn": state.turn, "turns_left": 99,
+	})
 
 
 # Piazza un marker con scatter 1D6: 1-2 resta, altrimenti devia di 1 hex
@@ -78,12 +88,22 @@ static func illuminated(state: GameState, hex: Vector2i) -> bool:
 
 # End Phase: esplosioni, dissolvenza fumo, rimozione.
 static func end_phase(state: GameState) -> void:
+	var last_turn := state.turn >= state.max_turns
 	var keep: Array = []
 	for m in state.area_markers:
 		var t: int = m["type"]
 		if t in [Type.GRENADE, Type.MORTAR_60, Type.MORTAR_81, Type.ARTILLERY_105]:
 			_explode(state, m)
 			continue  # esploso: via
+		if t == Type.C4:
+			# Esplode con 0-2 su 1D10 (non nel turno in cui e' piazzata),
+			# o automaticamente a fine partita.
+			var armed: bool = m["placed_turn"] < state.turn
+			if last_turn or (armed and Checks.roll_d10(state.rng) <= 2):
+				_explode(state, m)
+				continue
+			keep.append(m)
+			continue
 		m["turns_left"] -= 1
 		if m["turns_left"] > 0:
 			keep.append(m)
@@ -97,6 +117,12 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 	var hex: Vector2i = m["hex"]
 	var pw: Array = POWER[m["type"]]
 	state.log_event("%s esplode in %02d.%02d!" % [NAMES[m["type"]], hex.x, hex.y])
+	# Cannone (intro3): la C4 nel suo hex lo distrugge.
+	if m["type"] == Type.C4 and not state.scenario_id.is_empty():
+		var gun: String = Scenario.SCENARIOS[state.scenario_id].get("gun_hex", "")
+		if gun == "%d,%d" % [hex.x, hex.y]:
+			state.gun_destroyed = true
+			state.log_event("  IL CANNONE E' DISTRUTTO!")
 	for c in state.characters:
 		if c.is_dead():
 			continue

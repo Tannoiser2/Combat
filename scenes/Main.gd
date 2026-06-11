@@ -34,6 +34,7 @@ var order_menu: PopupMenu
 var order_target: Character
 var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
+var roster_box: VBoxContainer   # elenco della squadra a sinistra
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -45,30 +46,52 @@ var moves_left: int = 0
 
 func _ready() -> void:
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
+	if auto_play:
+		# Modalita' test: parte subito (scenario da env, default intro1).
+		var sid := OS.get_environment("COMBAT_SCENARIO")
+		_start_scenario(sid if not sid.is_empty() else "intro1")
+		var timer := Timer.new()
+		timer.wait_time = 0.4
+		timer.timeout.connect(_auto_step)
+		add_child(timer)
+		timer.start()
+	else:
+		_show_scenario_menu()
 
+
+# Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.
+func _start_scenario(scenario_id: String) -> void:
+	for child in get_children():
+		child.queue_free()
 	state = GameState.new()
 	# Seed fisso per partite riproducibili; COMBAT_SEED per variarlo
 	# (nei test) o "time" per una partita sempre diversa.
 	var seed_env := OS.get_environment("COMBAT_SEED")
-	if seed_env == "time":
+	if seed_env == "time" or (seed_env.is_empty() and not auto_play):
 		state.rng.randomize()
 	elif not seed_env.is_empty():
 		state.rng.seed = hash(seed_env)
 	else:
 		state.rng.seed = hash("combat-test")
-	Scenario.build(state, "intro1")
+	Scenario.build(state, scenario_id)
 
 	map_view = MapView.new()
 	# Con la scansione in assets/maps si gioca sull'artwork vero; senza
-	# (es. build web: le scansioni non sono nel repo) la stessa mappa
-	# viene disegnata proceduralmente dal terreno di Boards.gd.
-	if not map_view.load_board(Scenario.SCENARIOS["intro1"]["map"]):
+	# la mappa viene disegnata proceduralmente dal terreno di Boards.gd.
+	if not map_view.load_board(Scenario.SCENARIOS[scenario_id]["map"]):
 		print("Scansione non trovata: mappa in modalita' procedurale")
 	map_view.state = state
 	add_child(map_view)
 
+	# Camera centrata sulla squadra.
 	camera = Camera2D.new()
-	camera.position = map_view.hex_center(24, 12)  # centro dell'azione
+	var centroid := Vector2.ZERO
+	var n := 0
+	for c in state.characters:
+		if c.side == Domain.Side.FRIENDLY:
+			centroid += map_view.hex_center(c.position.x, c.position.y)
+			n += 1
+	camera.position = centroid / maxf(1.0, float(n))
 	var z := 60.0 / map_view.cell.x
 	camera.zoom = Vector2(z, z)
 	add_child(camera)
@@ -76,12 +99,43 @@ func _ready() -> void:
 	_build_hud()
 	_start_turn()
 
-	if auto_play:
-		var timer := Timer.new()
-		timer.wait_time = 0.4
-		timer.timeout.connect(_auto_step)
-		add_child(timer)
-		timer.start()
+
+# ------------------------------------------------------- menu scenari
+
+func _show_scenario_menu() -> void:
+	var hud := CanvasLayer.new()
+	hud.name = "menu"
+	add_child(hud)
+	var bg := ColorRect.new()
+	bg.color = Color(0.10, 0.12, 0.09)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud.add_child(bg)
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	box.add_theme_constant_override("separation", 14)
+	hud.add_child(box)
+	var title := Label.new()
+	title.text = "COMBAT!"
+	title.add_theme_font_size_override("font_size", 64)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var sub := Label.new()
+	sub.text = "Scegli lo scenario"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.modulate = Color(0.8, 0.8, 0.7)
+	box.add_child(sub)
+	for sid in Scenario.SCENARIOS:
+		var sc: Dictionary = Scenario.SCENARIOS[sid]
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(540, 64)
+		b.text = "%s  -  %s (%d turni)" % [sc["name"], sc["map"].capitalize(), sc["turns"]]
+		b.tooltip_text = sc.get("desc", "")
+		b.pressed.connect(func():
+			hud.queue_free()
+			_start_scenario(sid))
+		box.add_child(b)
 
 
 # ---------------------------------------------------------------- fasi
@@ -194,17 +248,55 @@ func _end_action_phase() -> void:
 	TurnSequence.end_phase(state)
 	if state.game_over:
 		phase = Phase.GAME_OVER
-		var v := Scenario.victory(state, "intro1")
+		var v := Scenario.victory(state, state.scenario_id)
 		hint_label.text = "Fine partita: %s" % v["outcome"]
 		state.log_event("=== %s === %s" % [v["outcome"], v["detail"]])
 		next_button.text = "Partita finita"
 		next_button.disabled = true
+		if not auto_play:
+			_show_victory_banner(v)
 	else:
 		phase = Phase.END_TURN
 		hint_label.text = "End Phase: ordini rimossi"
 		next_button.text = "Turno %d" % state.turn
 		next_button.disabled = false
 	_refresh()
+
+
+# Banner di fine partita con esito, VP e ritorno al menu.
+func _show_victory_banner(v: Dictionary) -> void:
+	var hud := CanvasLayer.new()
+	hud.layer = 10
+	add_child(hud)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	hud.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	box.custom_minimum_size = Vector2(520, 0)
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = v["outcome"]
+	title.add_theme_font_size_override("font_size", 40)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var win := "vittoria" in String(v["outcome"]).to_lower()
+	title.modulate = Color(0.5, 0.95, 0.4) if win else Color(0.95, 0.45, 0.35)
+	box.add_child(title)
+	var detail := Label.new()
+	detail.text = v["detail"]
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(detail)
+	var back := Button.new()
+	back.text = "Torna al menu"
+	back.custom_minimum_size = Vector2(0, 48)
+	back.pressed.connect(func():
+		for child in get_children():
+			child.queue_free()
+		_show_scenario_menu())
+	box.add_child(back)
 
 
 func _hexes_of(chars: Array) -> Array[Vector2i]:
@@ -366,6 +458,16 @@ func _build_hud() -> void:
 	info_text.bbcode_enabled = true
 	info_panel.add_child(info_text)
 
+	# Roster della squadra, a sinistra (clic = seleziona e centra).
+	var roster_panel := PanelContainer.new()
+	roster_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	roster_panel.offset_left = 8
+	roster_panel.offset_top = 220
+	hud.add_child(roster_panel)
+	roster_box = VBoxContainer.new()
+	roster_box.add_theme_constant_override("separation", 2)
+	roster_panel.add_child(roster_box)
+
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
 	hand_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -480,9 +582,45 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 	info_text.text = "\n".join(lines)
 
 
+# Roster: una riga per uomo con stato sintetico (morale, ferite, ammo).
+func _refresh_roster() -> void:
+	for child in roster_box.get_children():
+		child.queue_free()
+	for c in state.characters:
+		if c.side != Domain.Side.FRIENDLY:
+			continue
+		var b := Button.new()
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(190, 0)
+		var flags := ""
+		if c.is_dead():
+			flags = "  [KIA]" if c.is_killed() else "  [INCAP]"
+		else:
+			if not c.wounds.is_empty():
+				flags += " +%d ferite" % c.wounds.size() if c.wounds.size() > 1 else " ferito"
+			if c.no_ammo:
+				flags += " NO AMMO"
+			elif c.low_ammo:
+				flags += " low ammo"
+			if c.spotted:
+				flags += " visto!"
+		b.text = "%s\n  %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
+		b.disabled = c.is_dead()
+		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
+		var ch := c
+		b.pressed.connect(func():
+			map_view.selected = ch
+			map_view.highlight_hex = ch.position
+			camera.position = map_view.hex_center(ch.position.x, ch.position.y)
+			map_view.queue_redraw()
+			_show_info(ch.position, ch))
+		roster_box.add_child(b)
+
+
 func _refresh() -> void:
 	turn_label.text = "  Turno %d/%d  " % [mini(state.turn, state.max_turns), state.max_turns]
 	_update_enemy_card()
+	_refresh_roster()
 	for line in state.drain_log():
 		log_text.append_text(line + "\n")
 		print(line)
