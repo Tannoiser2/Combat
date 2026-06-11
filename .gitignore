@@ -1,0 +1,15 @@
+# Cartelle generate da Godot
+.godot/
+export.cfg
+export_presets.cfg
+*.translation
+
+# Materiale di riferimento protetto - NON pubblicare
+# (regolamento Combat!, carte, mappe, modulo Vassal)
+riferimenti/
+*.pdf
+*.vmod
+
+# Sistema
+.DS_Store
+*.log

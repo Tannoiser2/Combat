@@ -1,0 +1,19 @@
+; Engine configuration file per Combat! (prototipo personale)
+; Godot 4.x
+
+config_version=5
+
+[application]
+
+config/name="Combat! Solitaire"
+config/description="Reimplementazione del motore del solitario tattico Combat! (uso personale)"
+config/features=PackedStringArray("4.3")
+run/main_scene="res://scenes/Main.tscn"
+
+[autoload]
+
+Domain="*res://engine/Domain.gd"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
