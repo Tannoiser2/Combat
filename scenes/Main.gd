@@ -1,33 +1,72 @@
-## Scena principale: per ora fa da banco di prova del motore.
-## Costruisce una mini-partita e fa girare i turni stampando lo stato.
-## Quando il motore reggera', qui sotto costruiremo la UI vera (griglia,
-## segnalini, pannelli). Per ora dimostra che le fondamenta girano.
+## Scena principale: banco di prova del motore.
+## Costruisce una mini-partita, mostra la mappa (MapView) e fa avanzare
+## un turno al secondo stampando lo stato in console.
 extends Node
+
+const TURN_SECONDS := 1.5
+
+var state: GameState
+var map_view: MapView
+var turn_timer: Timer
 
 
 func _ready() -> void:
 	print("=== Combat! - test del motore ===")
 
-	var state := _make_tiny_state()
+	state = _make_tiny_state()
 	print("Mappa: %d hex" % state.map.size())
 	print("Personaggi: %d" % state.characters.size())
 	_print_morale_check()
 
-	print("\n--- Ciclo dei turni ---")
-	print("Turno iniziale: %d, game_over: %s" % [state.turn, state.game_over])
-	while not state.game_over:
-		# Step espliciti invece di run_turn: cosi' possiamo stampare gli
-		# ordini nemici prima che la End Phase li rimuova.
+	map_view = MapView.new()
+	map_view.state = state
+	map_view.position = Vector2(120, 100)
+	add_child(map_view)
+
+	print("\n--- Ciclo dei turni (uno ogni %.1fs) ---" % TURN_SECONDS)
+	turn_timer = Timer.new()
+	turn_timer.wait_time = TURN_SECONDS
+	turn_timer.timeout.connect(_run_one_turn)
+	add_child(turn_timer)
+	turn_timer.start()
+
+
+# Il turno avanza in due battute del timer: prima le fasi delle carte e
+# degli ordini (cosi' gli ordini restano visibili sulla mappa per un
+# tick), poi Action e End Phase. run_turn resta la via "tutta d'un fiato".
+var _mid_turn := false
+
+
+func _run_one_turn() -> void:
+	if state.game_over:
+		print("Partita finita al turno %d." % state.turn)
+		turn_timer.stop()
+		return
+	if not _mid_turn:
 		TurnSequence.friendly_card_phase(state)
 		_print_friendly_card(state)
 		TurnSequence.friendly_order_phase(state)
 		TurnSequence.enemy_order_phase(state)
 		_print_enemy_orders(state)
 		print("    Initiative Track: %s" % " -> ".join(state.initiative_order))
+	else:
 		TurnSequence.action_phase(state)
 		TurnSequence.end_phase(state)
 		print("  fine turno -> turno %d, game_over: %s" % [state.turn, state.game_over])
-	print("Partita finita al turno %d." % state.turn)
+	_mid_turn = not _mid_turn
+	map_view.queue_redraw()
+	_maybe_screenshot()
+
+
+# Hook di debug per verifiche senza monitor (CI/cloud): se la variabile
+# d'ambiente COMBAT_SCREENSHOT e' impostata, salva li' uno screenshot
+# del viewport a ogni turno.
+func _maybe_screenshot() -> void:
+	var path := OS.get_environment("COMBAT_SCREENSHOT")
+	if path.is_empty():
+		return
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
 
 
 # Costruisce una mini-partita di prova: griglia 3x3, due personaggi.
