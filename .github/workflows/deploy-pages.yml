@@ -28,6 +28,10 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
+      - name: Etichetta di build
+        # Scritta dentro il gioco e mostrata nel menu: per capire al volo
+        # se il browser sta servendo una build vecchia dalla cache.
+        run: echo "${GITHUB_SHA::8} $(date -u '+%Y-%m-%d %H:%M UTC')" > build_tag.txt
       - name: Installa gli export template
         # Il runner imposta HOME=/github/home, ma l'immagine tiene i
         # template in /root; serve anche la variante web "nothreads".

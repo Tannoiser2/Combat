@@ -17,3 +17,4 @@ riferimenti/
 # Python (tools/)
 __pycache__/
 *.pyc
+build_tag.txt

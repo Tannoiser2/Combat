@@ -178,13 +178,25 @@ func _show_scenario_menu() -> void:
 	for sid in Scenario.SCENARIOS:
 		var sc: Dictionary = Scenario.SCENARIOS[sid]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(540, 64)
+		b.custom_minimum_size = Vector2(540, 48)
 		b.text = "%s  -  %s (%d turni)" % [sc["name"], sc["map"].capitalize(), sc["turns"]]
 		b.tooltip_text = sc.get("desc", "")
 		b.pressed.connect(func():
 			hud.queue_free()
 			_start_scenario(sid))
 		box.add_child(b)
+	# Etichetta di build (scritta dalla CI): smaschera le build in cache.
+	var tag := Label.new()
+	tag.text = "build: " + _build_tag()
+	tag.modulate = Color(0.6, 0.6, 0.55)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(tag)
+
+
+func _build_tag() -> String:
+	if FileAccess.file_exists("res://build_tag.txt"):
+		return FileAccess.get_file_as_string("res://build_tag.txt").strip_edges()
+	return "dev locale"
 
 
 # ---------------------------------------------------------------- fasi
