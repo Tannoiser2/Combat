@@ -86,7 +86,7 @@ func _make_hedgerows_state() -> GameState:
 	var state := GameState.new()
 	state.max_turns = 3
 	state.rng.seed = hash("combat-test")
-	Boards.fill_hedgerows(state)
+	Boards.fill(state, "hedgerows")
 
 	var taylor := Character.new("taylor", "Sgt Taylor", Domain.Side.FRIENDLY, "Able")
 	taylor.troop_quality = 6
