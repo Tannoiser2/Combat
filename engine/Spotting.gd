@@ -89,8 +89,10 @@ static func target_modifier(state: GameState, target: Character) -> int:
 
 
 # Tentativo di spotting. Applica l'esito (Known/Spotted) e ritorna
-# {roll, threshold, dist, success}.
+# {roll, threshold, dist, success}; senza LOS non c'e' tentativo.
 static func attempt(state: GameState, spotter: Character, target: Character) -> Dictionary:
+	if not LOS.clear(state, spotter, target):
+		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
 	var dist := hex_distance(spotter.position, target.position)
 	var threshold := Checks.effective_tq(spotter) \
 		+ target_modifier(state, target) + range_modifier(dist)
