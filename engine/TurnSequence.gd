@@ -146,6 +146,39 @@ static func _activate_character(state: GameState, c: Character) -> void:
 		])
 	if state.impulse == 1:
 		_spotting_checks(state, c)
+	# Azione dell'impulse secondo l'ordine (Orders.IMPULSES).
+	if c.has_order and not c.is_dead():
+		match Orders.impulse_action(c.order, state.impulse):
+			Domain.ImpulseAction.MAY_FIRE:
+				_try_fire(state, c)
+			# TODO: MAY_MOVE_1 / MUST_MOVE_1 / MUST_MOVE_2 / MELEE
+			#       quando ci sara' il movimento.
+
+
+# Fuoco nell'impulse: bersaglio piu' vicino visibile e ingaggiabile.
+# TODO: per i Friendly il bersaglio andra' scelto dal giocatore (UI).
+static func _try_fire(state: GameState, firer: Character) -> void:
+	if firer.weapon_skills.is_empty():
+		return
+	var weapon: String = firer.weapon_skills.keys()[0]
+	var best: Character = null
+	var best_dist := 9999
+	for target in state.characters:
+		if target.side == firer.side or target.is_dead():
+			continue
+		# si ingaggia solo cio' che si vede
+		if target.side == Domain.Side.ENEMY and not target.known:
+			continue
+		if target.side == Domain.Side.FRIENDLY and not target.spotted:
+			continue
+		if not Fire.can_fire(state, firer, target, weapon):
+			continue
+		var dist := Spotting.hex_distance(firer.position, target.position)
+		if dist < best_dist:
+			best_dist = dist
+			best = target
+	if best != null:
+		Fire.fire_action(state, firer, best, weapon)
 
 
 # Spotting check dello spotter contro ogni avversario non ancora
