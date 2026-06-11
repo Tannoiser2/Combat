@@ -1,0 +1,48 @@
+# Esporta il progetto Godot per il Web e lo pubblica su GitHub Pages.
+# Richiede Pages con source "GitHub Actions" nelle impostazioni del repo.
+# Nota: le scansioni delle mappe non sono nel repo (copyright), quindi la
+# build web gira sulla mini-mappa procedurale di fallback.
+name: Deploy su GitHub Pages
+
+on:
+  push:
+    branches: [claude/vibrant-noether-ncsw3j]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import risorse
+        run: godot --headless --import || true
+      - name: Export Web
+        run: |
+          mkdir -p build/web
+          godot --headless --export-release "Web" build/web/index.html
+      - name: Upload artefatto Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy su Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
