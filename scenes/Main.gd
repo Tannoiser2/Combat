@@ -167,42 +167,137 @@ func _show_scenario_menu() -> void:
 	var hud := CanvasLayer.new()
 	hud.name = "menu"
 	add_child(hud)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = _make_theme()
+	hud.add_child(root)
 	var bg := ColorRect.new()
-	bg.color = Color(0.10, 0.12, 0.09)
+	bg.color = Color(0.08, 0.10, 0.07)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hud.add_child(bg)
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.add_theme_constant_override("separation", 14)
-	hud.add_child(box)
-	var title := Label.new()
-	title.text = "COMBAT!"
-	title.add_theme_font_size_override("font_size", 64)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Scegli lo scenario"
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.modulate = Color(0.8, 0.8, 0.7)
-	box.add_child(sub)
-	for sid in Scenario.SCENARIOS:
-		var sc: Dictionary = Scenario.SCENARIOS[sid]
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(540, 48)
-		b.text = "%s  -  %s (%d turni)" % [sc["name"], sc["map"].capitalize(), sc["turns"]]
-		b.tooltip_text = sc.get("desc", "")
-		b.pressed.connect(func():
-			hud.queue_free()
-			_start_scenario(sid))
-		box.add_child(b)
-	# Etichetta di build (scritta dalla CI): smaschera le build in cache.
+	root.add_child(bg)
+
+	# Due colonne: copertina a sinistra, card delle missioni a destra.
+	var split := HBoxContainer.new()
+	split.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	split.offset_left = 60
+	split.offset_right = -60
+	split.offset_top = 30
+	split.offset_bottom = -30
+	split.add_theme_constant_override("separation", 40)
+	root.add_child(split)
+
+	# --- colonna sinistra: copertina (o titolo di ripiego) + build tag
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(440, 0)
+	left.add_theme_constant_override("separation", 10)
+	split.add_child(left)
+	if ResourceLoader.exists("res://assets/menu/cover.jpg"):
+		var cover := TextureRect.new()
+		cover.texture = load("res://assets/menu/cover.jpg")
+		cover.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		cover.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		cover.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(cover)
+	else:
+		var spacer := Control.new()
+		spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(spacer)
+		var title := Label.new()
+		title.text = "COMBAT!"
+		title.add_theme_font_size_override("font_size", 84)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		left.add_child(title)
+		var sub := Label.new()
+		sub.text = "Volume 1 - Normandia, 1944\n\nUn solitario tattico uomo-a-uomo.\nTu guidi la squadra: il sistema\ncomanda il nemico."
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub.modulate = Color(0.8, 0.8, 0.7)
+		left.add_child(sub)
+		var spacer2 := Control.new()
+		spacer2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(spacer2)
 	var tag := Label.new()
 	tag.text = "build: " + _build_tag()
-	tag.modulate = Color(0.6, 0.6, 0.55)
+	tag.modulate = Color(0.55, 0.55, 0.50)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(tag)
+	left.add_child(tag)
+
+	# --- colonna destra: card scorrevoli delle missioni
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 8)
+	split.add_child(right)
+	var head := Label.new()
+	head.text = "SCEGLI LA MISSIONE"
+	head.add_theme_font_size_override("font_size", 22)
+	head.add_theme_color_override("font_color", Color(0.95, 0.88, 0.55))
+	right.add_child(head)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	for sid in Scenario.SCENARIOS:
+		list.add_child(_mission_card(hud, sid))
+	_maybe_screenshot()
+
+
+# Card di missione: thumbnail della mappa + titolo + sottotitolo + sinossi.
+func _mission_card(menu: CanvasLayer, sid: String) -> Button:
+	var sc: Dictionary = Scenario.SCENARIOS[sid]
+	var card := Button.new()
+	card.custom_minimum_size = Vector2(0, 104)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.pressed.connect(func():
+		menu.queue_free()
+		_start_scenario(sid))
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 8
+	row.offset_right = -8
+	row.offset_top = 6
+	row.offset_bottom = -6
+	row.add_theme_constant_override("separation", 14)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var thumb_path := "res://assets/menu/thumb_%s.jpg" % sc["map"]
+	if ResourceLoader.exists(thumb_path):
+		var thumb := TextureRect.new()
+		thumb.texture = load(thumb_path)
+		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		thumb.custom_minimum_size = Vector2(140, 0)
+		thumb.clip_contents = true
+		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(thumb)
+	var txt := VBoxContainer.new()
+	txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(txt)
+	var name := Label.new()
+	name.text = sc["name"]
+	name.add_theme_font_size_override("font_size", 18)
+	name.add_theme_color_override("font_color", Color(0.95, 0.90, 0.65))
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	txt.add_child(name)
+	var meta := Label.new()
+	meta.text = "%s - %d turni - %d uomini" % [sc["map"].capitalize(), sc["turns"],
+		(Scenario.FULL_SQUAD.size() if sc.get("squad_full", false)
+			else sc.get("friendly", []).size())]
+	meta.add_theme_font_size_override("font_size", 12)
+	meta.modulate = Color(0.7, 0.72, 0.6)
+	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	txt.add_child(meta)
+	var desc := Label.new()
+	desc.text = String(sc.get("desc", "")).replace("\n", " ")
+	desc.add_theme_font_size_override("font_size", 13)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.modulate = Color(0.85, 0.85, 0.78)
+	desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	txt.add_child(desc)
+	return card
 
 
 func _build_tag() -> String:
