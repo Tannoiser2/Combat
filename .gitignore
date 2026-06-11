@@ -9,6 +9,10 @@ export_presets.cfg
 riferimenti/
 *.pdf
 *.vmod
+# Scansioni delle mappe (copyright Compass Games): solo in locale.
+# Copiare qui i jpg estratti dal modulo Vassal con questi nomi:
+#   assets/maps/farmhouse.jpg, hill.jpg, village.jpg, hedgerows.jpg
+assets/maps/
 
 # Sistema
 .DS_Store

@@ -13,15 +13,26 @@ var turn_timer: Timer
 func _ready() -> void:
 	print("=== Combat! - test del motore ===")
 
-	state = _make_tiny_state()
+	map_view = MapView.new()
+	# Con la scansione della Hedgerows in assets/maps si gioca sulla
+	# mappa vera; senza, si ripiega sulla 3x3 procedurale di prova.
+	if map_view.load_board("hedgerows"):
+		print("Mappa: The Hedgerows (scansione)")
+		state = _make_hedgerows_state()
+		var camera := Camera2D.new()
+		camera.position = map_view.hex_center(13, 10)
+		camera.zoom = Vector2(0.45, 0.45)
+		add_child(camera)
+	else:
+		print("Scansione mappa non trovata: uso la mini-mappa di prova")
+		state = _make_tiny_state()
+		map_view.position = Vector2(120, 100)
+	map_view.state = state
+	add_child(map_view)
+
 	print("Mappa: %d hex" % state.map.size())
 	print("Personaggi: %d" % state.characters.size())
 	_print_morale_check()
-
-	map_view = MapView.new()
-	map_view.state = state
-	map_view.position = Vector2(120, 100)
-	add_child(map_view)
 
 	print("\n--- Ciclo dei turni (uno ogni %.1fs) ---" % TURN_SECONDS)
 	turn_timer = Timer.new()
@@ -67,6 +78,49 @@ func _maybe_screenshot() -> void:
 		return
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(path)
+
+
+# Partita di prova sulla mappa The Hedgerows: griglia completa 35x20
+# (colonne pari: righe 00..18, mezzo passo piu' in basso).
+# TODO: classificare il terreno hex per hex dalla mappa; per ora tutto
+# Open tranne i boschi attorno alla zona di prova (11.10, 12.10).
+func _make_hedgerows_state() -> GameState:
+	var state := GameState.new()
+	state.max_turns = 3
+	state.rng.seed = hash("combat-test")
+
+	for col in range(1, 36):
+		var last_row := 19 if col % 2 == 1 else 18
+		for row in range(0, last_row + 1):
+			state.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0, 0)
+	state.map[GameState.hex_key(11, 10)] = GameState.MapHex.new(Domain.Terrain.TREES, 0)
+	state.map[GameState.hex_key(12, 10)] = GameState.MapHex.new(Domain.Terrain.TREES, 0)
+
+	var taylor := Character.new("taylor", "Sgt Taylor", Domain.Side.FRIENDLY, "Able")
+	taylor.troop_quality = 6
+	taylor.leadership = 3
+	taylor.weapon_skills = {"SMG": 7}
+	taylor.position = Vector2i(9, 10)
+	state.characters.append(taylor)
+
+	# Jung nel bosco di 11.10 (In Cover), Braun allo scoperto in 13.10
+	var jung := Character.new("jung", "Soldat Jung", Domain.Side.ENEMY, "Red")
+	jung.troop_quality = 4
+	jung.weapon_skills = {"Rifle": 3}
+	jung.position = Vector2i(11, 10)
+	jung.alerted = true
+	state.characters.append(jung)
+
+	var braun := Character.new("braun", "Gefr Braun", Domain.Side.ENEMY, "Red")
+	braun.troop_quality = 5
+	braun.weapon_skills = {"Rifle": 4}
+	braun.position = Vector2i(13, 10)
+	braun.morale = Domain.Morale.SHAKEN
+	braun.alerted = true
+	state.characters.append(braun)
+
+	state.initiative_order = ["Able", "Red"]
+	return state
 
 
 # Costruisce una mini-partita di prova: griglia 3x3, due personaggi.
