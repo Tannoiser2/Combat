@@ -80,21 +80,13 @@ func _maybe_screenshot() -> void:
 	get_viewport().get_texture().get_image().save_png(path)
 
 
-# Partita di prova sulla mappa The Hedgerows: griglia completa 35x20
-# (colonne pari: righe 00..18, mezzo passo piu' in basso).
-# TODO: classificare il terreno hex per hex dalla mappa; per ora tutto
-# Open tranne i boschi attorno alla zona di prova (11.10, 12.10).
+# Partita di prova sulla mappa The Hedgerows: griglia completa con il
+# terreno classificato automaticamente dalla scansione (engine/Boards.gd).
 func _make_hedgerows_state() -> GameState:
 	var state := GameState.new()
 	state.max_turns = 3
 	state.rng.seed = hash("combat-test")
-
-	for col in range(1, 36):
-		var last_row := 19 if col % 2 == 1 else 18
-		for row in range(0, last_row + 1):
-			state.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0, 0)
-	state.map[GameState.hex_key(11, 10)] = GameState.MapHex.new(Domain.Terrain.TREES, 0)
-	state.map[GameState.hex_key(12, 10)] = GameState.MapHex.new(Domain.Terrain.TREES, 0)
+	Boards.fill_hedgerows(state)
 
 	var taylor := Character.new("taylor", "Sgt Taylor", Domain.Side.FRIENDLY, "Able")
 	taylor.troop_quality = 6
