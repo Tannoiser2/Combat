@@ -90,10 +90,17 @@ static func _update_initiative_order(state: GameState) -> void:
 
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
 	if not EnemyCards.has_table_row(c.morale):
-		# Berserk e Rout non ricevono ordini dalla carta: agiscono
-		# d'istinto (TODO Rule 17: carica obbligata / fuga, con il
-		# movimento di EnemyCards.berserk_move/rout_move).
-		c.clear_order()
+		# Berserk e Rout agiscono d'istinto (Rule 17), col movimento
+		# stampato sulla carta: il Berserk carica il nemico piu' vicino,
+		# il Rout fugge.
+		if c.morale == Domain.Morale.BERSERK:
+			c.set_order(Domain.Order.CHARGE, EnemyCards.berserk_move(serial), false, true)
+			state.log_event("%s e' BERSERK -> Charge %s" % [
+				c.display_name, c.order_move])
+		else:  # ROUT
+			c.set_order(Domain.Order.EVADE, EnemyCards.rout_move(serial))
+			state.log_event("%s e' in ROUT -> fugge %s" % [
+				c.display_name, c.order_move])
 		return
 	var hex := state.hex_at(c.position.x, c.position.y)
 	var in_cover := hex != null and Domain.terrain_gives_cover(hex.terrain)
@@ -154,6 +161,12 @@ static func activate_passive(state: GameState, c: Character) -> void:
 			Domain.MORALE_NAMES[res["after"]],
 			"" if res["delta"] != 0 else " (nessun effetto)",
 		])
+	# Reload: la ricarica occupa il turno, ripristina le munizioni.
+	if c.has_order and c.order == Domain.Order.RELOAD and state.impulse == 4 \
+			and (c.low_ammo or c.no_ammo):
+		c.low_ammo = false
+		c.no_ammo = false
+		state.log_event("%s ha ricaricato" % c.display_name)
 	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
 	# movimento, quindi LOS e gittata vanno ricontrollate ogni impulse).
 	_spotting_checks(state, c)

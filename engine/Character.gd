@@ -76,6 +76,28 @@ func wound_tq_modifier() -> int:
 	return total
 
 
-# Un personaggio e' morto se le ferite portano la TQ a 0 o sotto (Rule 16.2).
+# Totale (positivo) del malus da ferite.
+func wound_total() -> int:
+	return -wound_tq_modifier()
+
+
+# "Fuori gioco" = morto o incapacitato (per attivazione/bersaglio).
+# Note del Fire Resolution Chart: Enemy morto se malus ferite >= TQ;
+# Friendly incapacitato se = TQ, morto se > TQ.
 func is_dead() -> bool:
-	return troop_quality + wound_tq_modifier() <= 0
+	if side == Domain.Side.ENEMY:
+		return wound_total() >= troop_quality
+	return wound_total() >= troop_quality  # incap o morto: comunque fuori
+
+
+# Friendly incapacitato (malus ferite = TQ): fuori azione ma non ucciso,
+# recuperabile col Medic. I nemici non hanno questo stato.
+func is_incapacitated() -> bool:
+	return side == Domain.Side.FRIENDLY and wound_total() == troop_quality
+
+
+# Davvero ucciso (KIA), per i conteggi di vittoria.
+func is_killed() -> bool:
+	if side == Domain.Side.ENEMY:
+		return wound_total() >= troop_quality
+	return wound_total() > troop_quality

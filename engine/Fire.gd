@@ -84,11 +84,20 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
 	var rof := int(Weapons.info(weapon)["rof"])
 	var any_hit := false
+	var nines := 0
 	for i in range(rof):
 		if target.is_dead() or firer.no_ammo:
 			break
-		if _resolve_attack(state, firer, target, weapon):
+		var res := _resolve_attack(state, firer, target, weapon)
+		if res["hit"]:
 			any_hit = true
+		if res["nine"]:
+			nines += 1
+	# Munizioni: un 9 naturale le intacca; le belt-fed con assistente
+	# richiedono due 9 nello stesso fuoco (nota 3 del chart).
+	var belt: bool = "belt" in Weapons.info(weapon)["flags"]
+	if nines >= (2 if belt else 1):
+		_spend_ammo(state, firer, weapon)
 	# Registra il colpo come dato per la visualizzazione (linea di fuoco).
 	state.shots.append({
 		"from": firer.position, "to": target.position,
@@ -96,7 +105,8 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	})
 
 
-static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> bool:
+# Ritorna {hit: bool, nine: bool}.
+static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> Dictionary:
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var hex := state.hex_at(target.position.x, target.position.y)
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
@@ -119,13 +129,22 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	if roll == 9:
 		_log(state, "%s spara a %s con %s: 9 naturale, mancato!" % [
 			firer.display_name, target.display_name, weapon])
-		_spend_ammo(state, firer, weapon)
-		return false
-	# TODO nota 2 del chart: WS modificato < 0 richiede un TQC di conferma.
-	if roll != 0 and roll > ws:
+		return {"hit": false, "nine": true}
+	# Colpito se 0 naturale o roll <= WS. Con WS < 0 il colpo (solo da 0
+	# naturale) va confermato con un TQC, la cui TQ e' ridotta del valore
+	# per cui il WS era sotto zero (nota 2 del chart).
+	var is_hit := roll == 0 or roll <= ws
+	if not is_hit:
 		_log(state, "%s spara a %s con %s: tira %d > WS %d, mancato" % [
 			firer.display_name, target.display_name, weapon, roll, ws])
-		return false
+		return {"hit": false, "nine": false}
+	if ws < 0:
+		var thr := Checks.effective_tq(firer) + ws
+		var roll2 := Checks.roll_d10(state.rng)
+		if roll2 > thr:
+			_log(state, "%s spara a %s: 0 naturale ma TQC di conferma fallito (tira %d > %d)" % [
+				firer.display_name, target.display_name, roll2, thr])
+			return {"hit": false, "nine": false}
 
 	_log(state, "%s COLPISCE %s con %s (tira %d, WS %d)" % [
 		firer.display_name, target.display_name, weapon, roll, ws])
@@ -140,7 +159,7 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
-	return true
+	return {"hit": true, "nine": false}
 
 
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.
