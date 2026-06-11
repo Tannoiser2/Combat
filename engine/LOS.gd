@@ -45,7 +45,15 @@ static func _from_cube(c: Vector3i) -> Vector2i:
 
 
 # Gli hex attraversati dalla linea tra a e b, esclusi gli estremi.
+# IMPORTANTE: il percorso e' canonicalizzato (si traccia sempre dallo
+# stesso estremo) perche' con linee esattamente sui bordi degli esagoni
+# l'arrotondamento float di A->B e B->A puo' divergere di un hex,
+# rendendo la LOS asimmetrica (X vede Y ma Y non vede X).
 static func hexes_between(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	if b.x < a.x or (b.x == a.x and b.y < a.y):
+		var tmp := a
+		a = b
+		b = tmp
 	var result: Array[Vector2i] = []
 	var ca := _to_cube(a)
 	var cb := _to_cube(b)

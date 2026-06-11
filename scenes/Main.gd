@@ -51,6 +51,9 @@ var deploy_zone: Array[Vector2i] = []
 
 
 func _ready() -> void:
+	if not OS.get_environment("COMBAT_SELFTEST").is_empty():
+		_selftest()
+		return
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 	if auto_play:
 		# Modalita' test: parte subito (scenario da env, default intro1).
@@ -610,6 +613,7 @@ func _build_hud() -> void:
 	side_box.add_child(HSeparator.new())
 	side_box.add_child(_section_label("DIARIO DI BATTAGLIA"))
 	log_text = RichTextLabel.new()
+	log_text.bbcode_enabled = true
 	log_text.scroll_following = true
 	log_text.fit_content = false
 	log_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -851,10 +855,38 @@ func _refresh() -> void:
 	_update_enemy_card()
 	_refresh_roster()
 	for line in state.drain_log():
-		log_text.append_text(line + "\n")
+		log_text.append_text(_format_log_line(line) + "\n")
 		print(line)
 	map_view.queue_redraw()
 	_maybe_screenshot()
+
+
+# Parole chiave del log -> colore (esiti ed eventi salienti).
+const LOG_KEYWORDS := {
+	"COLPISCE": "#f5a623", "Mancato": "#999988", "mancato": "#999988",
+	"Ferito": "#f0483a", "Light Wound": "#f0483a", "Bad Wound": "#d02015",
+	"K.I.A.": "#d02015", "uccidono": "#d02015", "morto": "#d02015",
+	"individua": "#f3e88a", "avvistato": "#f3e88a", "scopre": "#f3e88a",
+	"esplode": "#ff7733", "granata": "#ff9955", "DISTRUTTO": "#ff5522",
+	"Rally": "#7fd87f", "Duck Back": "#7fc8d8", "rinforzi": "#f3e88a",
+	"BERSERK": "#c050e0", "ROUT": "#888888", "ricaricato": "#7fd87f",
+}
+
+
+# Colora il log: nomi in neretto per nazione (blu USA, rosso tedeschi),
+# effetti evidenziati.
+func _format_log_line(line: String) -> String:
+	var out := line
+	for c in state.characters:
+		if c.display_name.is_empty() or not c.display_name in out:
+			continue
+		var col := "#8ab4ff" if c.side == Domain.Side.FRIENDLY else "#ff9484"
+		out = out.replace(c.display_name,
+			"[b][color=%s]%s[/color][/b]" % [col, c.display_name])
+	for kw in LOG_KEYWORDS:
+		if kw in out:
+			out = out.replace(kw, "[b][color=%s]%s[/color][/b]" % [LOG_KEYWORDS[kw], kw])
+	return out
 
 
 # ------------------------------------------------------------ auto-test
@@ -888,6 +920,28 @@ func _update_enemy_card() -> void:
 		return
 	enemy_card_rect.texture = load(img)
 	enemy_card_rect.show()
+
+
+# Self-test (COMBAT_SELFTEST=1): proprieta' che devono valere sempre.
+# Oggi: simmetria della LOS su tutte le coppie di tutti gli scenari.
+func _selftest() -> void:
+	var failures := 0
+	for sid in Scenario.SCENARIOS:
+		var st := GameState.new()
+		st.rng.seed = hash(sid)
+		Scenario.build(st, sid)
+		for i in range(st.characters.size()):
+			for j in range(i + 1, st.characters.size()):
+				var a: Character = st.characters[i]
+				var b: Character = st.characters[j]
+				if LOS.clear(st, a, b) != LOS.clear(st, b, a):
+					failures += 1
+					print("ASIMMETRIA LOS in %s: %s <-> %s (%s / %s)" % [
+						sid, a.display_name, b.display_name,
+						str(a.position), str(b.position)])
+	print("SELFTEST: %s (%d asimmetrie)" % [
+		"OK" if failures == 0 else "FALLITO", failures])
+	get_tree().quit(0 if failures == 0 else 1)
 
 
 # Hook di debug per verifiche senza monitor (CI/cloud).

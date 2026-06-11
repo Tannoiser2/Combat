@@ -85,6 +85,9 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	var rof := int(Weapons.info(weapon)["rof"])
 	var any_hit := false
 	var nines := 0
+	var wounds_before := target.wounds.size()
+	var dead_before := target.is_dead()
+	var morale_before := target.morale
 	for i in range(rof):
 		if target.is_dead() or firer.no_ammo:
 			break
@@ -98,10 +101,20 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	var belt: bool = "belt" in Weapons.info(weapon)["flags"]
 	if nines >= (2 if belt else 1):
 		_spend_ammo(state, firer, weapon)
+	# Esito sintetico per la UI (balloon sul bersaglio).
+	var outcome := "Mancato"
+	if target.is_dead() and not dead_before:
+		outcome = "Ucciso!"
+	elif target.wounds.size() > wounds_before:
+		outcome = "Ferito!"
+	elif any_hit and target.morale > morale_before:
+		outcome = "Soppresso!"  # colpito senza danni ma il morale cede
+	elif any_hit:
+		outcome = "Colpito!"
 	# Registra il colpo come dato per la visualizzazione (linea di fuoco).
 	state.shots.append({
 		"from": firer.position, "to": target.position,
-		"hit": any_hit, "side": firer.side,
+		"hit": any_hit, "side": firer.side, "outcome": outcome,
 	})
 
 

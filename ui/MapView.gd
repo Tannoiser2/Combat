@@ -138,14 +138,15 @@ func _process(delta: float) -> void:
 			"from": hex_center(s["from"].x, s["from"].y),
 			"to": hex_center(s["to"].x, s["to"].y),
 			"hit": s["hit"], "age": 0.0,
+			"outcome": s.get("outcome", ""),
 		})
 		_seen_shots += 1
-	# Invecchia i traccianti.
+	# Invecchia i traccianti (il balloon dell'esito vive piu' a lungo).
 	if not _tracers.is_empty():
 		dirty = true
 		for t in _tracers:
 			t["age"] += delta
-		_tracers = _tracers.filter(func(t): return t["age"] < 1.6)
+		_tracers = _tracers.filter(func(t): return t["age"] < 2.4)
 	if dirty:
 		queue_redraw()
 
@@ -299,19 +300,21 @@ func _draw() -> void:
 				var p: Vector2 = l["to"]
 				draw_line(p + Vector2(-1, -1) * radius * 0.2, p + Vector2(1, 1) * radius * 0.2, col, radius * 0.06)
 				draw_line(p + Vector2(-1, 1) * radius * 0.2, p + Vector2(1, -1) * radius * 0.2, col, radius * 0.06)
-	# Traccianti dei colpi: linea che sbiadisce + proiettile in volo nei
-	# primi istanti, segno d'impatto sul bersaglio se colpito.
+	# Traccianti dei colpi: tratteggio "in marcia" dal tiratore al
+	# bersaglio, proiettile in volo, poi balloon con l'esito che sale.
 	for t in _tracers:
 		var age: float = t["age"]
-		var fade := clampf(1.6 - age, 0.0, 1.0)
+		var fade := clampf((1.6 - age) / 1.2, 0.0, 1.0)
 		var col: Color = Color(0.95, 0.15, 0.1, 0.85 * fade) if t["hit"] \
-			else Color(0.9, 0.85, 0.4, 0.55 * fade)
-		draw_line(t["from"], t["to"], col, radius * (0.10 if t["hit"] else 0.05))
+			else Color(0.9, 0.85, 0.4, 0.6 * fade)
+		if fade > 0.0:
+			_draw_dashed(t["from"], t["to"], col, radius * 0.07,
+				radius * 0.35, age * radius * 3.0)
 		if age < 0.35:
 			var bullet: Vector2 = t["from"].lerp(t["to"], age / 0.35)
 			draw_circle(bullet, radius * 0.14, Color(1.0, 0.9, 0.4, 0.95))
-		elif t["hit"]:
-			draw_circle(t["to"], radius * 0.18 * fade + radius * 0.06, col)
+		elif not String(t["outcome"]).is_empty():
+			_draw_balloon(font, t["to"], t["outcome"], age, radius)
 	# Hex suggeriti (bersagli di fuoco in rosso, mosse in verde)
 	for h in cue_hexes:
 		var cc := hex_center(h.x, h.y)
@@ -534,12 +537,46 @@ static func _closed(points: PackedVector2Array) -> PackedVector2Array:
 	return points + PackedVector2Array([points[0]])
 
 
-# Linea tratteggiata (per le linee di vista).
-func _draw_dashed(a: Vector2, b: Vector2, col: Color, width: float, dash: float) -> void:
+# Linea tratteggiata; phase > 0 fa "marciare" i trattini verso b.
+func _draw_dashed(a: Vector2, b: Vector2, col: Color, width: float,
+		dash: float, phase: float = 0.0) -> void:
 	var total := a.distance_to(b)
 	var dir := (b - a).normalized()
-	var t := 0.0
+	var step := dash * 1.7
+	var t := fmod(phase, step) - step
 	while t < total:
-		var seg_end := minf(t + dash, total)
-		draw_line(a + dir * t, a + dir * seg_end, col, width)
-		t += dash * 1.7
+		var seg_start := maxf(t, 0.0)
+		var seg_end := clampf(t + dash, 0.0, total)
+		if seg_end > seg_start:
+			draw_line(a + dir * seg_start, a + dir * seg_end, col, width)
+		t += step
+
+
+# Colori dei balloon di esito.
+const OUTCOME_COLORS := {
+	"Mancato": Color(0.75, 0.75, 0.65),
+	"Colpito!": Color(0.95, 0.65, 0.15),
+	"Soppresso!": Color(0.95, 0.85, 0.20),
+	"Ferito!": Color(0.95, 0.30, 0.20),
+	"Ucciso!": Color(0.85, 0.10, 0.10),
+}
+
+
+# Balloon dell'esito: sale dal bersaglio e svanisce.
+func _draw_balloon(font: Font, at: Vector2, text: String, age: float, radius: float) -> void:
+	var t := clampf((age - 0.35) / 2.0, 0.0, 1.0)
+	var alpha := clampf(1.4 - t * 1.5, 0.0, 1.0)
+	if alpha <= 0.0:
+		return
+	var pos := at + Vector2(0, -radius * (0.9 + t * 1.1))
+	var fsize := int(radius * 0.34)
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+	var pad := radius * 0.14
+	var rect := Rect2(pos - Vector2(w * 0.5 + pad, fsize * 0.85 + pad * 0.5),
+		Vector2(w + pad * 2.0, fsize + pad))
+	draw_rect(rect, Color(0.05, 0.07, 0.04, 0.85 * alpha))
+	var col: Color = OUTCOME_COLORS.get(text, Color.WHITE)
+	draw_rect(rect, Color(col.r, col.g, col.b, 0.9 * alpha), false, 1.5)
+	draw_string(font, pos - Vector2(w * 0.5, 0), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fsize,
+		Color(col.r, col.g, col.b, alpha))
