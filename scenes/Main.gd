@@ -269,6 +269,10 @@ func _on_map_clicked() -> void:
 	if phase == Phase.ORDERS and c != null \
 			and c.side == Domain.Side.FRIENDLY and not c.is_dead():
 		order_target = c
+		# Solo gli ordini legali per questo personaggio (limitazioni carte).
+		order_menu.clear()
+		for o in TurnSequence.legal_orders(state, c):
+			order_menu.add_item(Domain.ORDER_NAMES[o], o)
 		order_menu.position = Vector2i(get_viewport().get_mouse_position()) \
 			+ Vector2i(8, 8)
 		order_menu.popup()

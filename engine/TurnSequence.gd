@@ -192,12 +192,23 @@ static func activate_passive(state: GameState, c: Character) -> void:
 			Domain.MORALE_NAMES[res["after"]],
 			"" if res["delta"] != 0 else " (nessun effetto)",
 		])
-	# Reload: la ricarica occupa il turno, ripristina le munizioni.
-	if c.has_order and c.order == Domain.Order.RELOAD and state.impulse == 4 \
-			and (c.low_ammo or c.no_ammo):
-		c.low_ammo = false
-		c.no_ammo = false
-		state.log_event("%s ha ricaricato" % c.display_name)
+	# Ordini "fermi" che agiscono a fine attivazione (impulse 4).
+	if c.has_order and state.impulse == 4:
+		match c.order:
+			Domain.Order.RELOAD:
+				if c.low_ammo or c.no_ammo:
+					c.low_ammo = false
+					c.no_ammo = false
+					state.log_event("%s ha ricaricato" % c.display_name)
+			Domain.Order.MEDICAL_AID:
+				_do_medic(state, c)
+			Domain.Order.SEARCH:
+				_do_search(state, c)
+			Domain.Order.PLAN:
+				# Plan (approssimato): genera una carta da parte (Rule 5/7).
+				if c.side == Domain.Side.FRIENDLY:
+					state.friendly_hand.append(state.draw_friendly_card())
+					state.log_event("%s pianifica: una carta extra in mano" % c.display_name)
 	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
 	# movimento, quindi LOS e gittata vanno ricontrollate ogni impulse).
 	_spotting_checks(state, c)
@@ -221,7 +232,90 @@ static func resolve_action(state: GameState, c: Character) -> void:
 		Domain.ImpulseAction.MUST_MOVE_2:
 			_do_move(state, c, 2)
 		Domain.ImpulseAction.MELEE:
-			pass  # TODO: risoluzione della mischia (fine Charge)
+			_do_melee(state, c)
+
+
+# Medical Aid: un TQC (skill MEDIC, Rule 18); se passa, stabilizza o
+# cura un personaggio ferito adiacente (o se stesso).
+static func _do_medic(state: GameState, medic: Character) -> void:
+	for p in state.characters:
+		if p.side != medic.side or p == medic or p.is_dead():
+			continue
+		if Spotting.hex_distance(medic.position, p.position) <= 1 and not p.wounds.is_empty():
+			var res := Checks.troop_quality_check(medic, state.rng)
+			if res["passed"]:
+				p.wounds.remove_at(p.wounds.size() - 1)
+				state.log_event("%s cura %s (TQC riuscito)" % [
+					medic.display_name, p.display_name])
+			else:
+				state.log_event("%s: cura fallita su %s" % [
+					medic.display_name, p.display_name])
+			return
+
+
+# Search: scopre nemici nascosti (ed esche) adiacenti.
+static func _do_search(state: GameState, searcher: Character) -> void:
+	for e in state.characters:
+		if e.side == searcher.side or e.is_dead() or e.known:
+			continue
+		if Spotting.hex_distance(searcher.position, e.position) <= 1:
+			e.known = true
+			if e.is_dummy:
+				e.removed = true
+				state.log_event("%s scopre un'esca cercando" % searcher.display_name)
+			else:
+				state.log_event("%s scopre %s cercando" % [
+					searcher.display_name, e.display_name])
+
+
+# Mischia (fine Charge). APPROSSIMATA: il regolamento di dettaglio non e'
+# trascritto; qui l'attaccante fa un TQC, in caso di successo ferisce
+# l'avversario adiacente (rivelandolo se nascosto).
+static func _do_melee(state: GameState, attacker: Character) -> void:
+	var target: Character = null
+	for d in state.characters:
+		if d.side == attacker.side or d.is_dead():
+			continue
+		if Spotting.hex_distance(attacker.position, d.position) <= 1:
+			target = d
+			break
+	if target == null:
+		return
+	target.known = true
+	if target.is_dummy:
+		target.removed = true
+		state.log_event("%s travolge un'esca in mischia" % attacker.display_name)
+		return
+	var res := Checks.troop_quality_check(attacker, state.rng)
+	state.log_event("%s attacca %s in mischia: TQC %s" % [
+		attacker.display_name, target.display_name,
+		"riuscito" if res["passed"] else "fallito"])
+	if res["passed"]:
+		Fire._resolve_wound(state, target)
+
+
+# Ordini assegnabili a un Friendly, filtrati dalle limitazioni attive
+# (carte Worried/Confusion/Can't Think Straight). Per il menu della UI.
+static func legal_orders(state: GameState, c: Character) -> Array[int]:
+	var restrict: String = state.turn_fx.get("restrict", "")
+	var near_enemy := false
+	for e in state.characters:
+		if e.side != c.side and not e.is_dead() \
+				and Spotting.hex_distance(c.position, e.position) <= 3:
+			near_enemy = true
+			break
+	var allowed: Array[int] = []
+	for o in Domain.Order.values():
+		if restrict == "worried" and c.morale in [Domain.Morale.CAUTIOUS, Domain.Morale.SHAKEN] \
+				and o != Domain.Order.HIDE:
+			continue
+		if restrict == "confusion" and not near_enemy \
+				and o not in [Domain.Order.RALLY, Domain.Order.SNEAK, Domain.Order.HIDE]:
+			continue
+		if restrict == "no_leader_plan" and c.leadership > 0 and o == Domain.Order.PLAN:
+			continue
+		allowed.append(o)
+	return allowed
 
 
 # Azione discrezionale del personaggio in questo impulse: FIRE, MOVE_n
