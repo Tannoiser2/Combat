@@ -1,3 +1,8 @@
+v0.21 — 2026-06-12
+- Segnalini azione: Smoke Grenade (US-Smk-Gren, GE-Smk-Disc) e Search
+  (GEN-Search) ora usano i marker originali dedicati del Vol.2
+  invece del fumetto generico
+
 v0.20 — 2026-06-12
 - Segnalini azione: sostituiti con gli originali dal Vol.1 zip
   (AimedFire, Evade, DuckBack, Grenade, Charge, Guard, Plan, MedicalAid,
