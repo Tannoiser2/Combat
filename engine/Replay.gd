@@ -24,6 +24,7 @@ static func _frame(state: GameState) -> Dictionary:
 			"moves": {},   # idx -> [Vector2i, ...] (percorso, primo = partenza)
 			"shots": [],   # come state.shots
 			"booms": [],   # esplosioni: {hex, type}
+			"sfx": [],     # suoni extra (mischia, urla): chiavi di Main._sfx
 		})
 	return state.replay.back()
 
@@ -67,3 +68,9 @@ static func shot(state: GameState, data: Dictionary) -> void:
 # Un'esplosione (granata/mortaio/C4).
 static func boom(state: GameState, hex: Vector2i, type: int) -> void:
 	_frame(state)["booms"].append({"hex": hex, "type": type})
+
+
+# Un suono senza grafica propria (mischia, urlo): la UI lo riproduce
+# insieme ai colpi del frame.
+static func sfx(state: GameState, key: String) -> void:
+	_frame(state)["sfx"].append(key)

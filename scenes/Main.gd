@@ -164,16 +164,17 @@ func _load_sfx() -> void:
 			add_child(p)
 			_sfx[s] = p
 
+func _play_sfx(key: String) -> void:
+	if _sfx.has(key):
+		_sfx[key].play()
+
 func _consume_audio_events() -> void:
 	for ev in state.audio_events:
-		var key := ""
 		match ev["type"]:
-			"shot":  key = WEAPON_SFX.get(ev["weapon"], "rifle")
-			"boom":  key = AREA_SFX.get(ev["area_type"], "artillery")
-			"melee": key = "melee"
-			"scream": key = "scream"
-		if key != "" and _sfx.has(key):
-			_sfx[key].play()
+			"shot":  _play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+			"boom":  _play_sfx(AREA_SFX.get(ev["area_type"], "artillery"))
+			"melee": _play_sfx("melee")
+			"scream": _play_sfx("scream")
 	state.audio_events.clear()
 
 
@@ -614,23 +615,31 @@ func _replay_apply(f: Dictionary) -> void:
 	_maybe_screenshot()
 
 
-# Scandisce il replay: movimento simultaneo, poi i colpi, poi frame dopo.
+# Scandisce il replay: movimento simultaneo, con i colpi a meta' corsa.
+# I frame si incatenano senza pause (i traccianti sopravvivono al cambio
+# frame per conto loro); solo l'ultimo lascia una coda per gli esiti.
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
 	replay_t += delta
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
-	var move_t: float = REPLAY_MOVE_T if has_moves else 0.4
+	var has_fx: bool = not f["shots"].is_empty() or not f["booms"].is_empty()
+	var move_t: float = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
 	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
-	# I colpi partono a meta' movimento (le esplosioni con loro).
+	# I colpi partono a meta' movimento (esplosioni e suoni con loro).
 	if not replay_shots_done and replay_t >= move_t * 0.5:
 		replay_shots_done = true
 		for s in f["shots"]:
 			map_view.add_tracer(s)
+			_play_sfx(WEAPON_SFX.get(s.get("weapon", ""), "rifle"))
 		for b in f["booms"]:
 			map_view.add_blast(b["hex"])
-	var tail: float = REPLAY_PAUSE_T + (1.2 if not f["shots"].is_empty() else 0.0)
+			_play_sfx(AREA_SFX.get(b["type"], "artillery"))
+		for key in f.get("sfx", []):
+			_play_sfx(key)
+	var last: bool = replay_idx == replay_frames.size() - 1
+	var tail: float = (REPLAY_PAUSE_T + 1.2) if last and has_fx else 0.0
 	if replay_t >= move_t + tail:
 		replay_idx += 1
 		if replay_idx >= replay_frames.size():

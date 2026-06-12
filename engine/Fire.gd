@@ -116,6 +116,7 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	state.shots.append({
 		"from": firer.position, "to": target.position,
 		"hit": any_hit, "side": firer.side, "outcome": outcome,
+		"weapon": weapon,
 	})
 	Replay.shot(state, state.shots.back())
 	state.audio_events.append({"type": "shot", "weapon": weapon, "hex": firer.position})
@@ -270,6 +271,7 @@ static func _resolve_wound(state: GameState, target: Character) -> bool:
 				target.wounds.append(D.Wound.BAD)
 			target.clear_order()
 			state.audio_events.append({"type": "scream", "hex": target.position})
+			Replay.sfx(state, "scream")
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
@@ -306,6 +308,7 @@ static func _resolve_wound_melee(state: GameState, target: Character) -> bool:
 				target.wounds.append(D.Wound.BAD)
 			target.clear_order()
 			state.audio_events.append({"type": "scream", "hex": target.position})
+			Replay.sfx(state, "scream")
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
