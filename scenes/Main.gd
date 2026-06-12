@@ -570,7 +570,7 @@ func _hexes_of(chars: Array) -> Array[Vector2i]:
 func _passable_neighbors(c: Character) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for n in Move.neighbors(state, c.position):
-		if Move.is_passable(state, n):
+		if Move.can_enter(state, c, n):
 			out.append(n)
 	return out
 

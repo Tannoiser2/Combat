@@ -155,10 +155,18 @@ func characters_of_team(team: String) -> Array[Character]:
 
 # Personaggio in una data cella, o null.
 func character_at(col: int, row: int) -> Character:
+	# Preferisce un personaggio VIVO: i corpi e le esche rivelate restano
+	# nell'array (gli indici del replay non cambiano mai) e farebbero da
+	# schermo a chi entra nel loro hex (es. il disperso di Charlie Team
+	# che spawna sull'esca: senza questo, il click non lo trova).
+	var fallback: Character = null
 	for c in characters:
 		if c.position.x == col and c.position.y == row:
-			return c
-	return null
+			if not c.is_dead():
+				return c
+			if fallback == null:
+				fallback = c
+	return fallback
 
 
 # Team nemici con almeno un personaggio Alerted vivo (SOP step 3a).

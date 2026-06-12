@@ -88,6 +88,19 @@ static func is_passable(state: GameState, hex: Vector2i) -> bool:
 	return occ == null or occ.is_dead()
 
 
+# Percorribilita' per UN mover specifico: come is_passable, ma chi sta
+# caricando (Charge/Melee) puo' entrare nell'hex di un avversario vivo -
+# e' l'assalto che porta alla mischia nello stesso hex (Rule 15).
+static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool:
+	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
+		return false
+	var occ := state.character_at(hex.x, hex.y)
+	if occ == null or occ.is_dead():
+		return true
+	return occ.side != mover.side and mover.has_order \
+		and mover.order in [D.Order.CHARGE, D.Order.MELEE]
+
+
 # L'ordine fa avanzare (true) o ritirare (false)?
 static func advances(order: int) -> bool:
 	return order in TOWARD_ORDERS
@@ -118,7 +131,7 @@ static func _commit_step(state: GameState, mover: Character, dest: Vector2i) -> 
 # Passo verso un hex scelto (deve essere adiacente e libero). Per il
 # movimento guidato dal giocatore. Ritorna true se si e' mosso.
 static func step_to(state: GameState, mover: Character, dest: Vector2i) -> bool:
-	if dest in neighbors(state, mover.position) and is_passable(state, dest):
+	if dest in neighbors(state, mover.position) and can_enter(state, mover, dest):
 		_commit_step(state, mover, dest)
 		return true
 	return false
@@ -130,7 +143,7 @@ static func step(state: GameState, mover: Character, target_pos: Vector2i, away:
 	var best := Vector2i(-99, -99)
 	var best_score := 0
 	for n in neighbors(state, mover.position):
-		if not is_passable(state, n):
+		if not can_enter(state, mover, n):
 			continue
 		var delta := cur - Spotting.hex_distance(n, target_pos)  # >0 = avvicina
 		var score := -delta if away else delta
