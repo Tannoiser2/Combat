@@ -23,6 +23,11 @@ const DATA := {
 	"StG 44": {"max_range": 66, "rof": 3, "flags": [],
 		"rof_bands": [[13, 3], [66, 1]],
 		"bands": [[1, 2], [3, 1], [13, 0], [22, -2], [33, -4], [66, -6]]},
+	# Coltello da lancio del Knife Expert (Rule 24): ROF 1, gittata 2; il WS
+	# (= TQ - gittata) lo calcola Fire._compute_ws dal flag "knife". "pistol"
+	# = niente consumo munizioni.
+	"Thrown Knife": {"max_range": 2, "rof": 1, "flags": ["knife", "pistol"],
+		"bands": [[2, 0]]},
 	"BAR": {"max_range": 150, "rof": 2, "flags": ["heavy"],
 		"bands": [[1, 2], [3, 1], [12, 0], [30, -2], [50, -4], [80, -6], [150, -8]]},
 	"M1911": {"max_range": 7, "rof": 1, "flags": ["pistol"],

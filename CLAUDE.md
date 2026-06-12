@@ -73,9 +73,13 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    dannosa; vs Tough si annullano) in Fire._draw_wound; Eagle Eyes (+1 TQ
    spotting, cap 8) in Spotting.attempt; Sniper (+2 WS in Aimed Fire, non
    all'impulso 2) in Fire._compute_ws; Knife Expert (+1 TQ in mischia) in
-   TurnSequence._melee_attack_tq. Test deterministici in Main._test_ss_skills.
-   DA FARE: il coltello da lancio del Knife Expert (gittata 2, WS = TQ-gittata)
-   come attacco a distanza; assegnare le skill ai nemici degli scenari Vol. 2.
+   TurnSequence._melee_attack_tq. Coltello da lancio del Knife Expert: arma
+   "Thrown Knife" (Weapons.DATA, flag "knife"; ROF 1, gittata 2, WS = TQ-gittata
+   calcolato in Fire._compute_ws), lanciata via Fire.throw_knife (rivela il
+   lanciatore solo se NON in copertura, Rule 24). I nemici NON lo usano per il
+   tiro (non e' nei weapon_skills, l'AI usa l'arma da fuoco): per regola la skill
+   serve loro solo per il +1 TQ in mischia. Test in Main._test_ss_skills e
+   _test_knife. DA FARE: assegnare le skill ai nemici degli scenari Vol. 2.
 2. FATTO (3 armi): Rule 26. In Weapons.DATA: "M1 Thompson" (max 16, ROF 3),
    "M1903 Springfield" (max 55, ROF 1, flag slow+scoped, +1 in Aimed oltre 3
    hex via Fire._compute_ws), "StG 44" (max 66, ROF 3 entro 13 hex / ROF 1

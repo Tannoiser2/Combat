@@ -80,6 +80,7 @@ const WEAPON_SFX := {
 	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
 	"M1 Thompson": "thompson", "StG 44": "stg44",
 	"M1903 Springfield": "springfield",
+	"Thrown Knife": "throw",
 	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
@@ -1546,6 +1547,75 @@ func _test_rules() -> int:
 	fails += _test_weapons()
 	fails += _test_weather()
 	fails += _test_terrain()
+	fails += _test_knife()
+	return fails
+
+
+# Coltello da lancio del Knife Expert (Rule 24): WS = TQ - gittata, gittata 2,
+# e "flip" (rivelazione) solo se NON in copertura.
+func _test_knife() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 4
+	var ke := Character.new("ke", "Knife", Domain.Side.FRIENDLY, "Able")
+	ke.troop_quality = 7
+	ke.skills = [Character.SKILL_KNIFE_EXPERT]
+	ke.position = Vector2i(0, 0)
+	var t1 := Character.new("t1", "T1", Domain.Side.ENEMY, "Red")
+	t1.troop_quality = 5
+	t1.position = Vector2i(0, 1)  # dist 1
+	var t2 := Character.new("t2", "T2", Domain.Side.ENEMY, "Red")
+	t2.troop_quality = 5
+	t2.position = Vector2i(0, 2)  # dist 2
+	var t3 := Character.new("t3", "T3", Domain.Side.ENEMY, "Red")
+	t3.troop_quality = 5
+	t3.position = Vector2i(0, 3)  # dist 3 (fuori gittata)
+	# WS = TQ - gittata (+1 dell'open, no-order): 7-1+1=7, 7-2+1=6.
+	if Fire._compute_ws(st, ke, t1, "Thrown Knife")["ws"] != 7 \
+			or Fire._compute_ws(st, ke, t2, "Thrown Knife")["ws"] != 6:
+		print("TEST coltello: WS = TQ - gittata errato")
+		fails += 1
+	# Gittata massima 2 hex.
+	if not Fire.can_fire(st, ke, t2, "Thrown Knife") \
+			or Fire.can_fire(st, ke, t3, "Thrown Knife"):
+		print("TEST coltello: gittata massima errata")
+		fails += 1
+	# Senza la skill non si lancia.
+	var plain := Character.new("pl", "Plain", Domain.Side.FRIENDLY, "Able")
+	plain.troop_quality = 7
+	plain.position = Vector2i(0, 0)
+	if Fire.throw_knife(st, plain, t1):
+		print("TEST coltello: lancio senza skill")
+		fails += 1
+	# Flip: lanciando allo scoperto il nemico si rivela...
+	var st2 := GameState.new()
+	st2.rng.seed = 4
+	var keo := Character.new("keo", "KEo", Domain.Side.ENEMY, "Red")
+	keo.troop_quality = 7
+	keo.skills = [Character.SKILL_KNIFE_EXPERT]
+	keo.position = Vector2i(0, 0)
+	var ft := Character.new("ft", "FT", Domain.Side.FRIENDLY, "Able")
+	ft.troop_quality = 5
+	ft.position = Vector2i(0, 1)
+	st2.characters = [keo, ft]
+	if not Fire.throw_knife(st2, keo, ft) or not keo.known:
+		print("TEST coltello: allo scoperto dovrebbe rivelarsi")
+		fails += 1
+	# ...ma lanciando da copertura resta nascosto.
+	var st3 := GameState.new()
+	st3.rng.seed = 4
+	st3.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var kec := Character.new("kec", "KEc", Domain.Side.ENEMY, "Red")
+	kec.troop_quality = 7
+	kec.skills = [Character.SKILL_KNIFE_EXPERT]
+	kec.position = Vector2i(0, 0)
+	var ft2 := Character.new("ft2", "FT2", Domain.Side.FRIENDLY, "Able")
+	ft2.troop_quality = 5
+	ft2.position = Vector2i(0, 1)
+	st3.characters = [kec, ft2]
+	if not Fire.throw_knife(st3, kec, ft2) or kec.known:
+		print("TEST coltello: in copertura dovrebbe restare nascosto")
+		fails += 1
 	return fails
 
 

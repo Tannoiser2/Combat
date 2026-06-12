@@ -129,6 +129,33 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		"outcome": outcome, "hex": firer.position})
 
 
+# Coltello da lancio del Knife Expert (Rule 24): ROF 1, gittata 2,
+# WS = TQ - gittata. Lanciando da un hex con copertura il lanciatore NON si
+# rivela (resta nascosto); altrimenti si rivela ("flip"). E' un'azione
+# esplicita (giocatore/campagna): i nemici usano la skill solo per il +1 TQ
+# in mischia, quindi l'AI non chiama mai questa funzione. Ritorna true se
+# il lancio e' avvenuto.
+static func throw_knife(state: GameState, attacker: Character, target: Character) -> bool:
+	if not attacker.has_skill(Character.SKILL_KNIFE_EXPERT):
+		return false
+	if not can_fire(state, attacker, target, "Thrown Knife"):
+		return false
+	fire_action(state, attacker, target, "Thrown Knife")
+	if not _in_cover(state, attacker):
+		if attacker.side == D.Side.ENEMY:
+			attacker.known = true
+		else:
+			attacker.spotted = true
+	return true
+
+
+# Il personaggio e' in copertura (terreno o hexside) nel suo hex?
+static func _in_cover(state: GameState, c: Character) -> bool:
+	var hex := state.hex_at(c.position.x, c.position.y)
+	return (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
+		or state.hex_has_hexside(c.position)
+
+
 # WS finale del tiro per la sola fascia di scelta del bersaglio (helper di
 # test/UI): solo il valore, senza tirare il dado. Usa la prima arma del
 # tiratore.
@@ -148,8 +175,16 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		if target.has_order else NO_ORDER_GROUP
 	var suppressive := firer.has_order and firer.order == D.Order.SUPPRESSIVE_FIRE
 
-	var ws: int = firer.weapon_skills[weapon]
-	var bits: Array[String] = ["%d base %s" % [ws, weapon]]
+	# WS base: dalle skill d'arma, oppure TQ - gittata per il coltello da
+	# lancio del Knife Expert (Rule 24).
+	var ws: int
+	var bits: Array[String]
+	if "knife" in Weapons.info(weapon)["flags"]:
+		ws = Checks.effective_tq(firer) - dist
+		bits = ["%d coltello (TQ %d - gittata %d)" % [ws, Checks.effective_tq(firer), dist]]
+	else:
+		ws = firer.weapon_skills[weapon]
+		bits = ["%d base %s" % [ws, weapon]]
 	var m: int = int(Weapons.range_ws_modifier(weapon, dist))
 	if m != 0:
 		bits.append("%+d gittata %d hex" % [m, dist])

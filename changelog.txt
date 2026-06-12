@@ -1,3 +1,9 @@
+v0.14 — 2026-06-12
+- Volume 2, Rule 24: completato il Knife Expert
+  - coltello da lancio (gittata 2, WS = TQ - gittata, ROF 1)
+  - lanciando da copertura il personaggio resta nascosto
+  - i nemici lo usano solo per il +1 TQ in mischia (come da regola)
+
 v0.13 — 2026-06-12
 - Volume 2, Rule 27: nuovo terreno
   - Fontana (terreno accidentato, ostacolo 1/2, blocca la LOS bassa)
