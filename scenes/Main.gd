@@ -366,9 +366,10 @@ func _mission_card(menu: CanvasLayer, sid: String) -> Button:
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	txt.add_child(name)
 	var meta := Label.new()
-	meta.text = "%s - %d turni - %d uomini" % [sc["map"].capitalize(), sc["turns"],
-		(Scenario.FULL_SQUAD.size() if sc.get("squad_full", false)
-			else sc.get("friendly", []).size())]
+	var n_men: int = (Scenario.FULL_SQUAD.size() if sc.get("squad_full", false)
+		else Scenario.FULL_SQUAD_VOL2.size() if sc.get("squad_vol2", false)
+		else sc.get("friendly", []).size())
+	meta.text = "%s - %d turni - %d uomini" % [sc["map"].capitalize(), sc["turns"], n_men]
 	meta.add_theme_font_size_override("font_size", 12)
 	meta.modulate = Color(0.7, 0.72, 0.6)
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
