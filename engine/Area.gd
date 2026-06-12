@@ -21,14 +21,49 @@ extends RefCounted
 
 const D := preload("res://engine/Domain.gd")
 
-enum Type { GRENADE, SMOKE, MORTAR_60, MORTAR_81, ARTILLERY_105, ILLUM, C4 }
+enum Type { GRENADE, SMOKE, MORTAR_60, MORTAR_81, ARTILLERY_105, ILLUM, C4,
+	FIRE, RAGING_FIRE }
 
 const NAMES := {
 	Type.GRENADE: "Granata", Type.SMOKE: "Fumo",
 	Type.MORTAR_60: "Mortaio 60mm", Type.MORTAR_81: "Mortaio 81mm",
 	Type.ARTILLERY_105: "Artiglieria 105mm", Type.ILLUM: "Illuminazione",
-	Type.C4: "Carica C4",
+	Type.C4: "Carica C4", Type.FIRE: "Incendio", Type.RAGING_FIRE: "Incendio furioso",
 }
+
+# Incendi (Rule 29): tabelle d10 <= valore, solo per il terreno infiammabile.
+# Kindling = accensione dopo artiglieria/mortaio; Growth = un incendio
+# divampa (furioso); Spread = un furioso si propaga sottovento.
+const KINDLING := {
+	D.Terrain.TREES: 2, D.Terrain.BUILDING: 1, D.Terrain.HEDGEROW: 3,
+	D.Terrain.BOCAGE: 2, D.Terrain.LONG_GRASS: 3, D.Terrain.ORCHARD: 2, D.Terrain.LOGS: 2,
+}
+const FIRE_GROWTH := {
+	D.Terrain.TREES: 2, D.Terrain.BUILDING: 2, D.Terrain.HEDGEROW: 3,
+	D.Terrain.BOCAGE: 3, D.Terrain.LONG_GRASS: 4, D.Terrain.ORCHARD: 3, D.Terrain.LOGS: 2,
+}
+const FIRE_SPREAD := {
+	D.Terrain.TREES: 2, D.Terrain.BUILDING: 1, D.Terrain.HEDGEROW: 2,
+	D.Terrain.BOCAGE: 2, D.Terrain.LONG_GRASS: 3, D.Terrain.ORCHARD: 3, D.Terrain.LOGS: 1,
+}
+
+
+# Il terreno puo' prendere fuoco (Rule 29.2)?
+static func burnable(terrain: int) -> bool:
+	return KINDLING.has(terrain)
+
+
+# Tipo di incendio nell'hex (Type.FIRE / Type.RAGING_FIRE) o -1.
+static func fire_at(state: GameState, hex: Vector2i) -> int:
+	for m in state.area_markers:
+		if m["hex"] == hex and m["type"] in [Type.FIRE, Type.RAGING_FIRE]:
+			return m["type"]
+	return -1
+
+
+static func _terrain_at(state: GameState, hex: Vector2i) -> int:
+	var h := state.hex_at(hex.x, hex.y)
+	return h.terrain if h != null else D.Terrain.OPEN_LEVEL_0
 
 # Potenza: [danno nell'hex, danno negli adiacenti]
 const POWER := {
@@ -77,6 +112,21 @@ static func smoke_level(state: GameState, hex: Vector2i) -> int:
 	return level
 
 
+# Penalita' al WS/LOS (numero di fumo, negativo) di fumo e incendi nell'hex.
+# Fumo pieno -4 / dissolvenza -2; Incendio -3, Incendio furioso -4 (Rule 29.2):
+# il fuoco genera fumo, e in questo modello l'hex stesso lo emette.
+static func smoke_penalty(state: GameState, hex: Vector2i) -> int:
+	var p := 0
+	for m in state.area_markers:
+		if m["hex"] != hex:
+			continue
+		match m["type"]:
+			Type.SMOKE: p -= (4 if m["turns_left"] >= 2 else 2)
+			Type.FIRE: p -= 3
+			Type.RAGING_FIRE: p -= 4
+	return p
+
+
 # L'hex e' illuminato (scenari notturni)?
 static func illuminated(state: GameState, hex: Vector2i) -> bool:
 	for m in state.area_markers:
@@ -86,14 +136,22 @@ static func illuminated(state: GameState, hex: Vector2i) -> bool:
 	return false
 
 
-# End Phase: esplosioni, dissolvenza fumo, rimozione.
+# End Phase: incendi, esplosioni, dissolvenza fumo, rimozione.
 static func end_phase(state: GameState) -> void:
 	var last_turn := state.turn >= state.max_turns
+	# Incendi gia' presenti (Rule 29): danno, crescita, propagazione.
+	_process_fires(state)
 	var keep: Array = []
 	for m in state.area_markers:
 		var t: int = m["type"]
+		if t in [Type.FIRE, Type.RAGING_FIRE]:
+			keep.append(m)  # gestiti da _process_fires; restano finche' non spenti
+			continue
 		if t in [Type.GRENADE, Type.MORTAR_60, Type.MORTAR_81, Type.ARTILLERY_105]:
 			_explode(state, m)
+			# L'artiglieria/mortaio puo' accendere il terreno (Rule 29.1).
+			if t != Type.GRENADE:
+				_try_kindle(state, m["hex"], keep)
 			continue  # esploso: via
 		if t == Type.C4:
 			# Esplode con 0-2 su 1D10 (non nel turno in cui e' piazzata),
@@ -118,6 +176,69 @@ static func end_phase(state: GameState) -> void:
 			state.log_event("%s in %02d.%02d si dissolve" % [
 				NAMES[t], m["hex"].x, m["hex"].y])
 	state.area_markers = keep
+
+
+# Incendi del turno: danno a chi e' nelle fiamme, crescita (incendio ->
+# furioso, o spento col 9), propagazione del furioso sottovento (Rule 29).
+# Non si processa il fuoco nel turno in cui e' nato.
+static func _process_fires(state: GameState) -> void:
+	var new_fires: Array = []
+	var heavy_rain := state.weather == Weather.Type.HEAVY_RAIN
+	for m in state.area_markers:
+		if m["type"] not in [Type.FIRE, Type.RAGING_FIRE]:
+			continue
+		if int(m["placed_turn"]) >= state.turn:
+			continue  # appena nato: niente effetti questo turno
+		var hex: Vector2i = m["hex"]
+		var terrain := _terrain_at(state, hex)
+		# Danno: chi resta nell'hex pesca una ferita (due se furioso).
+		var draws := 2 if m["type"] == Type.RAGING_FIRE else 1
+		for c in state.characters:
+			if c.is_dead() or c.position != hex:
+				continue
+			state.log_event("%s e' tra le fiamme in %02d.%02d!" % [c.display_name, hex.x, hex.y])
+			for i in range(draws):
+				if not c.is_dead():
+					Fire._resolve_wound(state, null, c)
+		if m["type"] == Type.FIRE:
+			var roll := Checks.roll_d10(state.rng)
+			if roll == 9:
+				m["extinguished"] = true
+				state.log_event("L'incendio in %02d.%02d si spegne" % [hex.x, hex.y])
+			elif roll <= int(FIRE_GROWTH.get(terrain, 0)):
+				m["type"] = Type.RAGING_FIRE
+				state.log_event("L'incendio in %02d.%02d divampa furioso!" % [hex.x, hex.y])
+		elif state.wind != Vector3i.ZERO:
+			# Furioso: prova a propagarsi all'hex sottovento se infiammabile.
+			var dest := Move.from_cube(Move.to_cube(hex) + state.wind)
+			var dt := _terrain_at(state, dest)
+			if state.map.has(GameState.hex_key(dest.x, dest.y)) and burnable(dt) \
+					and fire_at(state, dest) < 0:
+				var roll2 := Checks.roll_d10(state.rng) + (1 if heavy_rain else 0)
+				if roll2 <= int(FIRE_SPREAD.get(dt, 0)):
+					new_fires.append({"type": Type.FIRE, "hex": dest,
+						"placed_turn": state.turn, "turns_left": 99})
+					state.log_event("L'incendio si propaga a %02d.%02d!" % [dest.x, dest.y])
+	# Rimuovi gli spenti, aggiungi i propagati.
+	var kept: Array = []
+	for m in state.area_markers:
+		if not m.get("extinguished", false):
+			kept.append(m)
+	kept.append_array(new_fires)
+	state.area_markers = kept
+
+
+# Tentativo di accensione di un hex colpito da artiglieria/mortaio (Rule 29.1):
+# d10 (+1 con pioggia battente) <= valore Kindling del terreno -> Incendio.
+static func _try_kindle(state: GameState, hex: Vector2i, into: Array) -> void:
+	var terrain := _terrain_at(state, hex)
+	if not burnable(terrain) or fire_at(state, hex) >= 0:
+		return
+	var roll := Checks.roll_d10(state.rng) + (1 if state.weather == Weather.Type.HEAVY_RAIN else 0)
+	if roll <= int(KINDLING.get(terrain, 0)):
+		into.append({"type": Type.FIRE, "hex": hex,
+			"placed_turn": state.turn, "turns_left": 99})
+		state.log_event("Un incendio divampa in %02d.%02d!" % [hex.x, hex.y])
 
 
 static func _explode(state: GameState, m: Dictionary) -> void:
@@ -160,7 +281,8 @@ static func _blast_check(state: GameState, c: Character, power: int) -> void:
 	state.log_event("  %s e' investito dall'esplosione" % c.display_name)
 	c.known = true
 	var dead_before := c.is_dead()
-	Fire._resolve_wound(state, c)
+	# Esplosione: nessun tiratore (firer null), ma Tough del bersaglio vale.
+	Fire._resolve_wound(state, null, c)
 	if c.is_dead() and not dead_before:
 		state.audio_events.append({"type": "scream", "hex": c.position})
 		Replay.sfx(state, "scream")

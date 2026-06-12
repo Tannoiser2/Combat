@@ -1,3 +1,62 @@
+v0.16 — 2026-06-12
+- Volume 2, Rule 30: medici addestrati
+  - disarmati: mai fuoco, granate, carica o mischia
+  - +2 alla TQ quando prestano soccorso (Medical Aid)
+  - se un avversario entra nel loro hex, fuggono di 1 hex
+  - ruolo "Medic" assegnabile dagli scenari (entrambi i lati)
+
+v0.15 — 2026-06-12
+- Volume 2, Rule 29: incendi
+  - artiglieria e mortai possono incendiare il terreno infiammabile
+  - l'incendio puo' divampare (furioso) e propagarsi sottovento
+  - chi resta tra le fiamme si ferisce; gli hex in fiamme bloccano
+    movimento e LOS e generano fumo
+  - la pioggia battente rende piu' difficile accendere/propagare
+
+v0.14 — 2026-06-12
+- Volume 2, Rule 24: completato il Knife Expert
+  - coltello da lancio (gittata 2, WS = TQ - gittata, ROF 1)
+  - lanciando da copertura il personaggio resta nascosto
+  - i nemici lo usano solo per il +1 TQ in mischia (come da regola)
+
+v0.13 — 2026-06-12
+- Volume 2, Rule 27: nuovo terreno
+  - Fontana (terreno accidentato, ostacolo 1/2, blocca la LOS bassa)
+  - Edificio fortificato (come edificio, ma non si puo' caricare chi e' dentro)
+  - Trincea (trattata come una depressione)
+  - Filo spinato e abbazia: rimandati a una slice dedicata
+
+v0.12 — 2026-06-12
+- Volume 2, Rule 28: meteo e condizioni del terreno
+  - Pioggia (-1 WS oltre 2 hex), Pioggia battente (-1 WS, visibilita' 2d6,
+    puo' diventare fango), Foschia (-1 WS, visibilita' 1d6+4), Nebbia
+    (-2 WS, visibilita' 1d6)
+  - oltre la visibilita' massima la LOS e' bloccata
+  - Fango/Neve: niente Sprint (nemici ridotti a Evade); Neve alta:
+    niente Sprint/Evade/Run&Gun (ridotti a Sneak)
+  - Winter Camouflage: -1 a essere individuati sulla neve
+  - il meteo si imposta da scenario ("weather"/"ground")
+- Suoni dedicati per le armi nuove: Thompson, Springfield M1903, StG 44
+  (assemblati da campioni CC0)
+
+v0.11 — 2026-06-12
+- Volume 2, Rule 26: nuove armi
+  - M1 Thompson (gittata 16, ROF 3): sostituibile al Grease Gun
+  - M1903 Springfield: fucile col mirino, Slow, +1 in Aimed oltre 3 hex
+  - StG 44: ROF 3 entro 13 hex, ROF 1 oltre (gittata fino a 66)
+  - una pedina di scenario puo' sostituire l'arma del ruolo
+
+v0.10 — 2026-06-12
+- Volume 2, Rule 24: skill dei nemici Elite SS
+  - Dodge / Dodge-2: -1 / -2 al WS di chi spara se l'SS e' in Evade
+  - Tough: ferito, pesca 2 carte e subisce la meno grave
+  - Deadly: quando spara, pesca 2 e applica la piu' grave
+    (Deadly contro Tough si annullano)
+  - Eagle Eyes: +1 alla TQ nello spotting (max 8)
+  - Sniper: +2 al WS in Aimed Fire (non all'impulso 2)
+  - Knife Expert: +1 alla TQ in mischia
+  - gli scenari possono dichiarare le skill per ruolo o per pedina
+
 v0.9 — 2026-06-12
 - Suoni: spari, raffiche, esplosioni, mischia e urla (asset CC0)
 - I suoni funzionano anche nel replay

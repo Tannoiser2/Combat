@@ -84,6 +84,8 @@ static func neighbors(state: GameState, h: Vector2i) -> Array[Vector2i]:
 static func is_passable(state: GameState, hex: Vector2i) -> bool:
 	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
 		return false
+	if Area.fire_at(state, hex) >= 0:
+		return false  # Rule 29.2: non si entra in un hex in fiamme
 	var occ := state.character_at(hex.x, hex.y)
 	return occ == null or occ.is_dead()
 
@@ -94,11 +96,21 @@ static func is_passable(state: GameState, hex: Vector2i) -> bool:
 static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool:
 	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
 		return false
+	if Area.fire_at(state, hex) >= 0:
+		return false  # Rule 29.2: nemmeno la carica entra nelle fiamme
 	var occ := state.character_at(hex.x, hex.y)
 	if occ == null or occ.is_dead():
 		return true
-	return occ.side != mover.side and mover.has_order \
-		and mover.order in [D.Order.CHARGE, D.Order.MELEE]
+	if occ.side == mover.side or not mover.has_order \
+			or mover.order not in [D.Order.CHARGE, D.Order.MELEE]:
+		return false
+	# Edificio fortificato (Rule 27.2): non si carica un occupante al suo
+	# interno (vale per entrambi i lati - il giocatore non entra, il nemico
+	# non ci prova).
+	var h := state.hex_at(hex.x, hex.y)
+	if h != null and h.terrain == D.Terrain.FORTIFIED_BUILDING:
+		return false
+	return true
 
 
 # L'ordine fa avanzare (true) o ritirare (false)?
@@ -187,7 +199,23 @@ static func compass_step(state: GameState, mover: Character, dirs: Array[int]) -
 # la BUSSOLA (Rule 9.3); Charge e Berserk puntano il nemico piu' vicino;
 # senza direzione si ripiega su verso/lontano dal nemico.
 # Ritorna il numero di passi effettuati.
+# Un compagno dello stesso lato nell'hex tiene giu' il filo spinato con un
+# ordine Hide: in quel caso le restrizioni del filo non si applicano (Rule 27.7).
+static func wire_hide_exempt(state: GameState, mover: Character) -> bool:
+	for c in state.characters:
+		if c != mover and not c.is_dead() and c.position == mover.position \
+				and c.side == mover.side and c.has_order and c.order == D.Order.HIDE:
+			return true
+	return false
+
+
 static func move_character(state: GameState, mover: Character, hexes: int) -> int:
+	# Filo spinato (Rule 27.7): per USCIRE serve un TQC (fallito = resta
+	# impigliato), salvo che un compagno nell'hex sia in Hide.
+	if state.has_wire(mover.position) and not wire_hide_exempt(state, mover):
+		if not Checks.troop_quality_check(mover, state.rng)["passed"]:
+			state.log_event("%s e' impigliato nel filo spinato (TQC fallito)" % mover.display_name)
+			return 0
 	var dirs := parse_dirs(mover.order_move)
 	var use_compass: bool = mover.side == D.Side.ENEMY and not dirs.is_empty() \
 		and state.compass.size() == 7 and mover.order != D.Order.CHARGE

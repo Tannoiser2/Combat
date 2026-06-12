@@ -78,6 +78,9 @@ var _sfx: Dictionary = {}
 const WEAPON_SFX := {
 	"M1 Garand": "garand", "KAR 98K": "kar98", "Rifle": "kar98",
 	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
+	"M1 Thompson": "thompson", "StG 44": "stg44",
+	"M1903 Springfield": "springfield",
+	"Thrown Knife": "throw",
 	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
@@ -165,6 +168,7 @@ func _load_sfx() -> void:
 	_sfx.clear()
 	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
+			"thompson", "springfield", "stg44",
 			"kill", "wound", "suppress", "miss", "throw"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
@@ -1538,6 +1542,761 @@ func _test_rules() -> int:
 	Move.step_to(st, atk, Vector2i(10, 12))
 	if st.replay.is_empty() or st.replay[0]["moves"].values()[0].size() != 3:
 		print("TEST replay: passi non registrati")
+		fails += 1
+	fails += _test_ss_skills()
+	fails += _test_weapons()
+	fails += _test_weather()
+	fails += _test_terrain()
+	fails += _test_knife()
+	fails += _test_fire()
+	fails += _test_medic()
+	fails += _test_wire()
+	fails += _test_abbey()
+	return fails
+
+
+# Abbazia (Volume 2, Rule 27.5).
+func _test_abbey() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	var firer := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 2)
+	# Da fuori non si colpisce un hex interno...
+	if Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST abbazia: l'interno non e' immune da fuori")
+		fails += 1
+	# ...ma da dentro l'abbazia si'.
+	st.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.ABBEY_EXTERIOR
+	if not Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST abbazia: da dentro dovrebbe poter colpire l'interno")
+		fails += 1
+	# Copertura dipendente dal tiratore: bersaglio esterno in Hide (gruppo 0).
+	var st2 := GameState.new()
+	st2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	var sh := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	sh.troop_quality = 6
+	sh.weapon_skills = {"M1 Garand": 6}
+	sh.position = Vector2i(0, 0)
+	var hid := Character.new("h", "H", Domain.Side.ENEMY, "Red")
+	hid.troop_quality = 5
+	hid.position = Vector2i(0, 2)
+	hid.set_order(Domain.Order.HIDE)
+	var ws_out: int = Fire._compute_ws(st2, sh, hid, "M1 Garand")["ws"]
+	st2.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.ABBEY_EXTERIOR
+	var ws_in: int = Fire._compute_ws(st2, sh, hid, "M1 Garand")["ws"]
+	if ws_in - ws_out != 2:  # -5 (fuori) vs -3 (dentro) sul gruppo Hide
+		print("TEST abbazia: copertura tiratore-dipendente errata (%d vs %d)" % [ws_in, ws_out])
+		fails += 1
+	# -1 per ogni hex d'abbazia attraversato.
+	var st3 := GameState.new()
+	st3.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	st3.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	if Fire._abbey_hexes_crossed(st3, Vector2i(0, 0), Vector2i(0, 3)) != 2:
+		print("TEST abbazia: conteggio hex attraversati errato")
+		fails += 1
+	# LOS: dentro l'abbazia non e' bloccata; da fuori il muro esterno blocca.
+	var st4 := GameState.new()
+	st4.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	st4.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	st4.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	if not LOS.clear_positions(st4, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST abbazia: LOS interna dovrebbe essere libera")
+		fails += 1
+	st4.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.OPEN_LEVEL_0  # osservatore fuori
+	if LOS.clear_positions(st4, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST abbazia: il muro esterno dovrebbe bloccare da fuori")
+		fails += 1
+	return fails
+
+
+# Filo spinato (Volume 2, Rule 27.7).
+func _test_wire() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var firer := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 2)
+	# -1 al WS sparando dal filo spinato.
+	var ws_open: int = Fire._compute_ws(st, firer, tgt, "M1 Garand")["ws"]
+	st.map[GameState.hex_key(0, 0)].wire = true
+	var ws_wire: int = Fire._compute_ws(st, firer, tgt, "M1 Garand")["ws"]
+	if ws_open - ws_wire != 1:
+		print("TEST filo spinato: -1 al WS dall'interno errato")
+		fails += 1
+	# Ordine di movimento nemico (non Sneak) -> Sneak.
+	var en := Character.new("en", "En", Domain.Side.ENEMY, "Red")
+	en.troop_quality = 5
+	en.position = Vector2i(0, 0)
+	st.characters = [en]
+	TurnSequence._set_enemy_order(st, en, Domain.Order.RUN_AND_GUN, "3")
+	if en.order != Domain.Order.SNEAK:
+		print("TEST filo spinato: ordine di movimento non ridotto a Sneak")
+		fails += 1
+	# legal_orders del giocatore: niente Sprint dall'interno, Sneak si'.
+	var fr := Character.new("fr", "Fr", Domain.Side.FRIENDLY, "Able")
+	fr.troop_quality = 6
+	fr.position = Vector2i(0, 0)
+	st.characters = [fr]
+	var orders := TurnSequence.legal_orders(st, fr)
+	if Domain.Order.SPRINT in orders or Domain.Order.SNEAK not in orders:
+		print("TEST filo spinato: legal_orders non filtra il movimento")
+		fails += 1
+	# Auto-Hide: in un hex con 2 nemici, il TQ piu' basso passa in Hide.
+	var a := Character.new("a", "A", Domain.Side.ENEMY, "Red")
+	a.troop_quality = 6
+	a.position = Vector2i(0, 0)
+	var b := Character.new("b", "B", Domain.Side.ENEMY, "Red")
+	b.troop_quality = 3
+	b.position = Vector2i(0, 0)
+	st.characters = [a, b]
+	TurnSequence._wire_auto_hide(st)
+	if b.order != Domain.Order.HIDE or a.has_order:
+		print("TEST filo spinato: auto-Hide del TQ piu' basso errato")
+		fails += 1
+	# TQC per uscire: fallendo si resta impigliati (nessun movimento).
+	var seed := 1
+	while true:
+		var probe := RandomNumberGenerator.new()
+		probe.seed = seed
+		if probe.randi_range(0, 9) > 3:  # > TQ 3 -> TQC fallito
+			break
+		seed += 1
+	var sw := GameState.new()
+	sw.rng.seed = seed
+	for col in range(3, 9):
+		for row in range(3, 12):
+			sw.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	sw.map[GameState.hex_key(5, 5)].wire = true
+	var stuck := Character.new("st", "St", Domain.Side.ENEMY, "Red")
+	stuck.troop_quality = 3
+	stuck.position = Vector2i(5, 5)
+	stuck.set_order(Domain.Order.SNEAK)
+	var prey := Character.new("pr", "Pr", Domain.Side.FRIENDLY, "Able")
+	prey.troop_quality = 6
+	prey.position = Vector2i(5, 9)
+	sw.characters = [stuck, prey]
+	if Move.move_character(sw, stuck, 1) != 0 or stuck.position != Vector2i(5, 5):
+		print("TEST filo spinato: il TQC d'uscita fallito non trattiene")
+		fails += 1
+	return fails
+
+
+# Medici addestrati (Volume 2, Rule 30).
+func _test_medic() -> int:
+	var fails := 0
+	# Medico disarmato: nessun bersaglio di fuoco possibile.
+	var st := GameState.new()
+	var medic := Character.new("md", "Doc", Domain.Side.FRIENDLY, "Able")
+	medic.troop_quality = 5
+	medic.is_medic = true
+	medic.position = Vector2i(5, 5)
+	var foe := Character.new("fo", "Foe", Domain.Side.ENEMY, "Red")
+	foe.troop_quality = 5
+	foe.known = true
+	foe.position = Vector2i(5, 6)
+	st.characters = [medic, foe]
+	if not TurnSequence.valid_fire_targets(st, medic).is_empty():
+		print("TEST medico: disarmato non puo' sparare")
+		fails += 1
+	# legal_orders: niente fuoco/mischia, ma Medical Aid si'.
+	var orders := TurnSequence.legal_orders(st, medic)
+	if Domain.Order.AIMED_FIRE in orders or Domain.Order.CHARGE in orders \
+			or Domain.Order.MEDICAL_AID not in orders:
+		print("TEST medico: legal_orders non filtra il combattimento")
+		fails += 1
+	# Enemy medic: un ordine di fuoco diventa Medical Aid.
+	var emed := Character.new("em", "Sani", Domain.Side.ENEMY, "Red")
+	emed.troop_quality = 5
+	emed.is_medic = true
+	TurnSequence._set_enemy_order(st, emed, Domain.Order.AIMED_FIRE)
+	if emed.order != Domain.Order.MEDICAL_AID:
+		print("TEST medico: ordine di fuoco non convertito in cura")
+		fails += 1
+	# +2 TQ alla cura: con un tiro che passa solo grazie al +2.
+	var seed := 1
+	var roll := 0
+	while true:
+		var probe := RandomNumberGenerator.new()
+		probe.seed = seed
+		roll = probe.randi_range(0, 9)
+		if roll >= 2:
+			break
+		seed += 1
+	for as_medic in [true, false]:
+		var sm := GameState.new()
+		sm.rng.seed = seed
+		var doc := Character.new("d2", "D2", Domain.Side.FRIENDLY, "Able")
+		doc.troop_quality = roll - 1  # senza +2 il tiro fallisce
+		doc.is_medic = as_medic
+		doc.position = Vector2i(2, 2)
+		var hurt := Character.new("hu", "Hurt", Domain.Side.FRIENDLY, "Able")
+		hurt.troop_quality = 6
+		hurt.position = Vector2i(2, 3)
+		hurt.wounds = [Domain.Wound.LIGHT]
+		sm.characters = [doc, hurt]
+		TurnSequence._do_medic(sm, doc)
+		var cured := hurt.wounds.is_empty()
+		if cured != as_medic:
+			print("TEST medico: +2 TQ alla cura errato (medic=%s, curato=%s)" % [as_medic, cured])
+			fails += 1
+	# Mai mischia: se un avversario entra nel suo hex, il medico fugge.
+	var sf := GameState.new()
+	sf.rng.seed = 9
+	for col in range(3, 8):
+		for row in range(3, 8):
+			sf.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var doc2 := Character.new("d3", "D3", Domain.Side.FRIENDLY, "Able")
+	doc2.troop_quality = 5
+	doc2.is_medic = true
+	doc2.position = Vector2i(5, 5)
+	var att := Character.new("at", "Att", Domain.Side.ENEMY, "Red")
+	att.troop_quality = 6
+	att.position = Vector2i(5, 5)
+	att.set_order(Domain.Order.CHARGE)
+	sf.characters = [doc2, att]
+	TurnSequence._do_melee(sf, att)
+	if doc2.position == Vector2i(5, 5) or not doc2.wounds.is_empty():
+		print("TEST medico: dovrebbe fuggire dalla mischia illeso")
+		fails += 1
+	# Rule 30.1: alla caduta del medico friendly, i compagni con LOS reagiscono.
+	var sk := GameState.new()
+	sk.rng.seed = 2
+	var kia := -1
+	for s in FriendlyCards.CARDS:
+		if FriendlyCards.wound_of(s) == FriendlyCards.WoundDraw.KIA:
+			kia = s
+			break
+	sk.friendly_deck = [kia, kia]
+	var mdead := Character.new("mm", "MM", Domain.Side.FRIENDLY, "Able")
+	mdead.troop_quality = 5
+	mdead.is_medic = true
+	mdead.position = Vector2i(0, 0)
+	var witness := Character.new("wi", "Wi", Domain.Side.FRIENDLY, "Able")
+	witness.troop_quality = 8  # cosi' la reazione cambia sempre il morale
+	witness.position = Vector2i(0, 1)
+	sk.characters = [mdead, witness]
+	Fire._resolve_wound(sk, null, mdead)
+	if not mdead.is_dead() or witness.morale == Domain.Morale.NORMAL:
+		print("TEST medico: nessuna reazione alla caduta del medico")
+		fails += 1
+	# Rule 30.2: micro-AI del medico nemico (Hide / Medical Aid / Evade).
+	var sa := GameState.new()
+	var emedic := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	emedic.troop_quality = 5
+	emedic.is_medic = true
+	emedic.position = Vector2i(5, 5)
+	sa.characters = [emedic]
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.HIDE:
+		print("TEST medico nemico: senza feriti dovrebbe fare Hide")
+		fails += 1
+	var w1 := Character.new("w1", "W1", Domain.Side.ENEMY, "Red")
+	w1.troop_quality = 5
+	w1.position = Vector2i(5, 6)  # adiacente
+	w1.wounds = [Domain.Wound.LIGHT]
+	sa.characters = [emedic, w1]
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.MEDICAL_AID:
+		print("TEST medico nemico: ferito adiacente -> Medical Aid")
+		fails += 1
+	w1.position = Vector2i(5, 8)  # dist 3 (entro 4)
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.EVADE:
+		print("TEST medico nemico: ferito vicino -> si muove (Evade)")
+		fails += 1
+	return fails
+
+
+# Incendi (Volume 2, Rule 29).
+func _test_fire() -> int:
+	var fails := 0
+	# Solo il terreno infiammabile prende fuoco.
+	if not Area.burnable(Domain.Terrain.TREES) or Area.burnable(Domain.Terrain.OPEN_LEVEL_0):
+		print("TEST incendio: tabella infiammabilita' errata")
+		fails += 1
+	# fire_at / smoke_penalty / passabilita'.
+	var st := GameState.new()
+	st.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	if Area.fire_at(st, Vector2i(3, 3)) != Area.Type.FIRE \
+			or Area.smoke_penalty(st, Vector2i(3, 3)) != -3:
+		print("TEST incendio: fire_at/smoke_penalty errati")
+		fails += 1
+	if Move.is_passable(st, Vector2i(3, 3)):
+		print("TEST incendio: l'hex in fiamme non e' passabile")
+		fails += 1
+	var charger := Character.new("ch", "Ch", Domain.Side.FRIENDLY, "Able")
+	charger.position = Vector2i(3, 2)
+	charger.set_order(Domain.Order.CHARGE)
+	if Move.can_enter(st, charger, Vector2i(3, 3)):
+		print("TEST incendio: nemmeno la carica entra nelle fiamme")
+		fails += 1
+	st.area_markers[0]["type"] = Area.Type.RAGING_FIRE
+	if Area.smoke_penalty(st, Vector2i(3, 3)) != -4 \
+			or Area.fire_at(st, Vector2i(3, 3)) != Area.Type.RAGING_FIRE:
+		print("TEST incendio: furioso = -4")
+		fails += 1
+	# Chi resta nelle fiamme pesca una ferita (non nel turno in cui nasce).
+	var st2 := GameState.new()
+	st2.rng.seed = 1
+	st2.max_turns = 10
+	st2.turn = 2
+	st2.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st2.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	var victim := Character.new("v", "V", Domain.Side.FRIENDLY, "Able")
+	victim.troop_quality = 6
+	victim.position = Vector2i(3, 3)
+	st2.characters = [victim]
+	st2.friendly_deck = [17]  # carta con Light Wound
+	Area.end_phase(st2)
+	if victim.wounds.is_empty():
+		print("TEST incendio: chi e' nel fuoco non e' ferito")
+		fails += 1
+	# Un incendio appena nato non ferisce nello stesso turno.
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	st3.max_turns = 10
+	st3.turn = 1
+	st3.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st3.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	var v3 := Character.new("v3", "V3", Domain.Side.FRIENDLY, "Able")
+	v3.troop_quality = 6
+	v3.position = Vector2i(3, 3)
+	st3.characters = [v3]
+	st3.friendly_deck = [17]
+	Area.end_phase(st3)
+	if not v3.wounds.is_empty():
+		print("TEST incendio: il fuoco appena nato non dovrebbe ferire")
+		fails += 1
+	return fails
+
+
+# Coltello da lancio del Knife Expert (Rule 24): WS = TQ - gittata, gittata 2,
+# e "flip" (rivelazione) solo se NON in copertura.
+func _test_knife() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 4
+	var ke := Character.new("ke", "Knife", Domain.Side.FRIENDLY, "Able")
+	ke.troop_quality = 7
+	ke.skills = [Character.SKILL_KNIFE_EXPERT]
+	ke.position = Vector2i(0, 0)
+	var t1 := Character.new("t1", "T1", Domain.Side.ENEMY, "Red")
+	t1.troop_quality = 5
+	t1.position = Vector2i(0, 1)  # dist 1
+	var t2 := Character.new("t2", "T2", Domain.Side.ENEMY, "Red")
+	t2.troop_quality = 5
+	t2.position = Vector2i(0, 2)  # dist 2
+	var t3 := Character.new("t3", "T3", Domain.Side.ENEMY, "Red")
+	t3.troop_quality = 5
+	t3.position = Vector2i(0, 3)  # dist 3 (fuori gittata)
+	# WS = TQ - gittata (+1 dell'open, no-order): 7-1+1=7, 7-2+1=6.
+	if Fire._compute_ws(st, ke, t1, "Thrown Knife")["ws"] != 7 \
+			or Fire._compute_ws(st, ke, t2, "Thrown Knife")["ws"] != 6:
+		print("TEST coltello: WS = TQ - gittata errato")
+		fails += 1
+	# Gittata massima 2 hex.
+	if not Fire.can_fire(st, ke, t2, "Thrown Knife") \
+			or Fire.can_fire(st, ke, t3, "Thrown Knife"):
+		print("TEST coltello: gittata massima errata")
+		fails += 1
+	# Senza la skill non si lancia.
+	var plain := Character.new("pl", "Plain", Domain.Side.FRIENDLY, "Able")
+	plain.troop_quality = 7
+	plain.position = Vector2i(0, 0)
+	if Fire.throw_knife(st, plain, t1):
+		print("TEST coltello: lancio senza skill")
+		fails += 1
+	# Flip: lanciando allo scoperto il nemico si rivela...
+	var st2 := GameState.new()
+	st2.rng.seed = 4
+	var keo := Character.new("keo", "KEo", Domain.Side.ENEMY, "Red")
+	keo.troop_quality = 7
+	keo.skills = [Character.SKILL_KNIFE_EXPERT]
+	keo.position = Vector2i(0, 0)
+	var ft := Character.new("ft", "FT", Domain.Side.FRIENDLY, "Able")
+	ft.troop_quality = 5
+	ft.position = Vector2i(0, 1)
+	st2.characters = [keo, ft]
+	if not Fire.throw_knife(st2, keo, ft) or not keo.known:
+		print("TEST coltello: allo scoperto dovrebbe rivelarsi")
+		fails += 1
+	# ...ma lanciando da copertura resta nascosto.
+	var st3 := GameState.new()
+	st3.rng.seed = 4
+	st3.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var kec := Character.new("kec", "KEc", Domain.Side.ENEMY, "Red")
+	kec.troop_quality = 7
+	kec.skills = [Character.SKILL_KNIFE_EXPERT]
+	kec.position = Vector2i(0, 0)
+	var ft2 := Character.new("ft2", "FT2", Domain.Side.FRIENDLY, "Able")
+	ft2.troop_quality = 5
+	ft2.position = Vector2i(0, 1)
+	st3.characters = [kec, ft2]
+	if not Fire.throw_knife(st3, kec, ft2) or kec.known:
+		print("TEST coltello: in copertura dovrebbe restare nascosto")
+		fails += 1
+	return fails
+
+
+# Nuovo terreno del Volume 2 (Rule 27): Fountain, Fortified Building, Trench.
+func _test_terrain() -> int:
+	var fails := 0
+	# Le righe dei chart esistono con i valori letti dalle tabelle.
+	if Fire.WS_MOD[Domain.Terrain.FOUNTAIN][0] != -2 \
+			or Fire.WS_MOD[Domain.Terrain.FORTIFIED_BUILDING][0] != -5 \
+			or Fire.WS_MOD[Domain.Terrain.TRENCH] != Fire.WS_MOD[Domain.Terrain.DEPRESSION]:
+		print("TEST terreno: WS_MOD errati")
+		fails += 1
+	if Spotting.TERRAIN_MOD[Domain.Terrain.FORTIFIED_BUILDING] != Spotting.TERRAIN_MOD[Domain.Terrain.BUILDING] \
+			or Spotting.TERRAIN_MOD[Domain.Terrain.FOUNTAIN][0] != -2:
+		print("TEST terreno: TERRAIN_MOD errati")
+		fails += 1
+	for t in [Domain.Terrain.FOUNTAIN, Domain.Terrain.FORTIFIED_BUILDING, Domain.Terrain.TRENCH]:
+		if not Domain.terrain_gives_cover(t):
+			print("TEST terreno: %d non da' copertura" % t)
+			fails += 1
+	# Fountain (ostacolo 1/2) blocca la LOS fra due unita' a livello del suolo.
+	var st := GameState.new()
+	for k in [[0, 0], [0, 1], [0, 2]]:
+		st.map[GameState.hex_key(k[0], k[1])] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	if not LOS.clear_positions(st, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST fountain: aperto dovrebbe essere libero")
+		fails += 1
+	st.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.FOUNTAIN)
+	if LOS.clear_positions(st, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST fountain: dovrebbe bloccare la LOS")
+		fails += 1
+	# Fortified Building: la carica non puo' entrare nell'hex dell'occupante.
+	var st2 := GameState.new()
+	st2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.FORTIFIED_BUILDING)
+	st2.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var mover := Character.new("m", "M", Domain.Side.FRIENDLY, "Able")
+	mover.position = Vector2i(0, 0)
+	mover.set_order(Domain.Order.CHARGE)
+	var e1 := Character.new("e1", "E1", Domain.Side.ENEMY, "Red")
+	e1.troop_quality = 5
+	e1.position = Vector2i(0, 1)
+	var e2 := Character.new("e2", "E2", Domain.Side.ENEMY, "Red")
+	e2.troop_quality = 5
+	e2.position = Vector2i(0, 2)
+	st2.characters = [mover, e1, e2]
+	if Move.can_enter(st2, mover, Vector2i(0, 1)):
+		print("TEST fortified: la carica non dovrebbe entrare")
+		fails += 1
+	if not Move.can_enter(st2, mover, Vector2i(0, 2)):
+		print("TEST fortified: la carica in un edificio normale e' lecita")
+		fails += 1
+	# Trench trattata come Depression: chi e' in trincea con ordine Hide
+	# e' fuori LOS da lontano (come una depressione), non in aperto.
+	var st3 := GameState.new()
+	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.TRENCH)
+	var hider := Character.new("h", "H", Domain.Side.ENEMY, "Red")
+	hider.position = Vector2i(5, 5)
+	hider.set_order(Domain.Order.HIDE)
+	var seer := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	seer.position = Vector2i(5, 10)
+	if LOS.clear(st3, seer, hider):
+		print("TEST trench: in trincea con Hide dovrebbe essere nascosto")
+		fails += 1
+	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	if not LOS.clear(st3, seer, hider):
+		print("TEST trench: in aperto dovrebbe essere visibile")
+		fails += 1
+	return fails
+
+
+# Meteo e condizioni del terreno (Volume 2, Rule 28).
+func _test_weather() -> int:
+	var fails := 0
+	# Malus al WS oltre i 2 hex (mappa vuota = niente edifici).
+	var st := GameState.new()
+	var a := Character.new("a", "A", Domain.Side.FRIENDLY, "Able")
+	a.position = Vector2i(0, 0)
+	var b := Character.new("b", "B", Domain.Side.ENEMY, "Red")
+	st.weather = Weather.Type.RAIN
+	b.position = Vector2i(0, 3)  # dist 3 (> 2)
+	if Weather.ws_modifier(st, a, b, 3) != -1:
+		print("TEST meteo: pioggia -1 oltre 2 hex errato")
+		fails += 1
+	if Weather.ws_modifier(st, a, b, 2) != 0:
+		print("TEST meteo: malus applicato entro 2 hex")
+		fails += 1
+	st.weather = Weather.Type.FOG
+	if Weather.ws_modifier(st, a, b, 3) != -2:
+		print("TEST meteo: nebbia -2 errato")
+		fails += 1
+	# Stesso edificio: nessun malus.
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	st.map[GameState.hex_key(0, 3)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	st.weather = Weather.Type.RAIN
+	if Weather.ws_modifier(st, a, b, 3) != 0:
+		print("TEST meteo: edificio non esenta dal malus")
+		fails += 1
+	# Limite di visibilita': oltre il raggio niente LOS.
+	var st2 := GameState.new()
+	st2.max_los = 3
+	if LOS.clear_positions(st2, Vector2i(0, 0), Vector2i(0, 4), 0, 0, false):
+		print("TEST visibilita': LOS non bloccata oltre il raggio")
+		fails += 1
+	if not LOS.clear_positions(st2, Vector2i(0, 0), Vector2i(0, 3), 0, 0, false):
+		print("TEST visibilita': LOS bloccata entro il raggio")
+		fails += 1
+	# Demozione degli ordini per condizione del terreno.
+	if Weather.demote_order(Weather.Ground.MUD, Domain.Order.SPRINT) != Domain.Order.EVADE \
+			or Weather.demote_order(Weather.Ground.MUD, Domain.Order.AIMED_FIRE) != Domain.Order.AIMED_FIRE:
+		print("TEST fango: demozione Sprint errata")
+		fails += 1
+	if Weather.demote_order(Weather.Ground.DEEP_SNOW, Domain.Order.EVADE) != Domain.Order.SNEAK \
+			or Weather.demote_order(Weather.Ground.DEEP_SNOW, Domain.Order.RUN_AND_GUN) != Domain.Order.SNEAK \
+			or Weather.demote_order(Weather.Ground.NONE, Domain.Order.SPRINT) != Domain.Order.SPRINT:
+		print("TEST neve alta: demozione errata")
+		fails += 1
+	# legal_orders esclude lo Sprint sul fango.
+	var st3 := GameState.new()
+	st3.ground = Weather.Ground.MUD
+	var fc := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	fc.troop_quality = 6
+	fc.position = Vector2i(5, 5)
+	st3.characters = [fc]
+	var orders := TurnSequence.legal_orders(st3, fc)
+	if Domain.Order.SPRINT in orders or Domain.Order.HIDE not in orders:
+		print("TEST fango: legal_orders non filtra lo Sprint")
+		fails += 1
+	# Winter Camouflage: -1 a essere individuato sulla neve.
+	var st4 := GameState.new()
+	st4.ground = Weather.Ground.SNOW
+	st4.rng.seed = 3
+	var spot := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	spot.troop_quality = 6
+	spot.position = Vector2i(0, 0)
+	var camo := Character.new("c", "C", Domain.Side.ENEMY, "Red")
+	camo.troop_quality = 5
+	camo.position = Vector2i(0, 2)
+	camo.skills = [Character.SKILL_WINTER_CAMO]
+	var plain := Character.new("p", "P", Domain.Side.ENEMY, "Red")
+	plain.troop_quality = 5
+	plain.position = Vector2i(0, 2)
+	var th_camo: int = Spotting.attempt(st4, spot, camo)["threshold"]
+	var th_plain: int = Spotting.attempt(st4, spot, plain)["threshold"]
+	if th_camo - th_plain != -1:
+		print("TEST Winter Camo: -1 allo spotting errato (%d vs %d)" % [th_camo, th_plain])
+		fails += 1
+	# Limite di visibilita' tirato: fasce d10 corrette.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for i in range(60):
+		var f := Weather.roll_max_los(Weather.Type.FOG, rng)
+		var mi := Weather.roll_max_los(Weather.Type.MIST, rng)
+		var hr := Weather.roll_max_los(Weather.Type.HEAVY_RAIN, rng)
+		if f < 1 or f > 6 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
+			print("TEST visibilita': fasce di tiro fuori range")
+			fails += 1
+			break
+	if Weather.roll_max_los(Weather.Type.CLEAR, rng) != 0:
+		print("TEST visibilita': il sereno non e' illimitato")
+		fails += 1
+	# Pioggia battente -> fango col 9; con pioggia normale mai.
+	var st5 := GameState.new()
+	st5.rng.seed = 1
+	st5.weather = Weather.Type.HEAVY_RAIN
+	var became := false
+	for i in range(400):
+		if Weather.maybe_make_mud(st5):
+			became = true
+			break
+	if not became or st5.ground != Weather.Ground.MUD:
+		print("TEST pioggia battente: il fango non si forma")
+		fails += 1
+	var st6 := GameState.new()
+	st6.rng.seed = 1
+	st6.weather = Weather.Type.RAIN
+	for i in range(50):
+		if Weather.maybe_make_mud(st6):
+			print("TEST pioggia normale: fango non previsto")
+			fails += 1
+			break
+	return fails
+
+
+# Nuove armi del Volume 2 (Rule 26): fasce di gittata, ROF variabile dello
+# StG 44 e bonus del mirino del Springfield M1903.
+func _test_weapons() -> int:
+	var fails := 0
+	# Thompson: gittata 16, fasce come da chart.
+	if Weapons.range_ws_modifier("M1 Thompson", 6) != 0 \
+			or Weapons.range_ws_modifier("M1 Thompson", 16) != -4 \
+			or Weapons.range_ws_modifier("M1 Thompson", 17) != null:
+		print("TEST Thompson: fasce di gittata errate")
+		fails += 1
+	# StG 44: ROF 3 entro 13 hex, ROF 1 oltre; fasce fino a -6 a 66 hex.
+	if Weapons.rof_at("StG 44", 13) != 3 or Weapons.rof_at("StG 44", 14) != 1:
+		print("TEST StG 44: ROF per gittata errato")
+		fails += 1
+	if Weapons.range_ws_modifier("StG 44", 66) != -6 \
+			or Weapons.range_ws_modifier("StG 44", 67) != null:
+		print("TEST StG 44: fasce di gittata errate")
+		fails += 1
+	# Armi a ROF fisso: rof_at restituisce il ROF nominale.
+	if Weapons.rof_at("M1 Garand", 30) != 1 or Weapons.rof_at("M1 Thompson", 20) != 3:
+		print("TEST rof_at: ROF fisso errato")
+		fails += 1
+	# M1903 Springfield: mirino +1 in Aimed Fire oltre i 3 hex (stesse fasce
+	# del KAR 98K, cosi' la differenza isola il solo bonus del mirino).
+	var st := GameState.new()
+	st.rng.seed = 11
+	Boards.fill(st, "farmhouse")
+	st.impulse = 1
+	var scoped := Character.new("sc", "Scoped", Domain.Side.FRIENDLY, "Able")
+	scoped.troop_quality = 6
+	scoped.weapon_skills = {"M1903 Springfield": 6}
+	scoped.position = Vector2i(10, 10)
+	scoped.set_order(Domain.Order.AIMED_FIRE)
+	var plain := Character.new("pl", "Plain", Domain.Side.FRIENDLY, "Able")
+	plain.troop_quality = 6
+	plain.weapon_skills = {"KAR 98K": 6}
+	plain.position = Vector2i(10, 10)
+	plain.set_order(Domain.Order.AIMED_FIRE)
+	var far := Character.new("fa", "Far", Domain.Side.ENEMY, "Red")
+	far.position = Vector2i(10, 15)  # dist 5 (> 3 hex)
+	var near := Character.new("ne", "Near", Domain.Side.ENEMY, "Red")
+	near.position = Vector2i(10, 12)  # dist 2 (<= 3 hex)
+	if Fire._fire_ws(st, scoped, far) - Fire._fire_ws(st, plain, far) != 1:
+		print("TEST mirino: +1 mancante oltre 3 hex")
+		fails += 1
+	if Fire._fire_ws(st, scoped, near) - Fire._fire_ws(st, plain, near) != 0:
+		print("TEST mirino: bonus errato entro 3 hex")
+		fails += 1
+	return fails
+
+
+# Skill dei nemici Elite SS (Rule 24).
+# Serial 1 = Close Call (lieve, severita' 0), serial 33 = Bad Wound (severita' 2).
+func _test_ss_skills() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 7
+	Boards.fill(st, "farmhouse")
+	var plain_shooter := Character.new("ps", "PS", Domain.Side.FRIENDLY, "Able")
+	var deadly := Character.new("de", "Deadly", Domain.Side.FRIENDLY, "Able")
+	deadly.skills = [Character.SKILL_DEADLY]
+	var plain_tgt := Character.new("pt", "PT", Domain.Side.ENEMY, "Red")
+	plain_tgt.troop_quality = 7
+	var tough := Character.new("to", "Tough", Domain.Side.ENEMY, "Red")
+	tough.troop_quality = 7
+	tough.skills = [Character.SKILL_TOUGH]
+
+	# Deadly: pesca 2 (33 e 1), applica la peggiore -> 33.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, deadly, plain_tgt) != 33:
+		print("TEST Deadly: non applica la ferita peggiore")
+		fails += 1
+	# Tough: pesca 2 (33 e 1), applica la meno grave -> 1.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, plain_shooter, tough) != 1:
+		print("TEST Tough: non applica la ferita meno grave")
+		fails += 1
+	# Deadly vs Tough si annullano: una sola pescata (33), il 1 resta nel mazzo.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, deadly, tough) != 33 or st.friendly_deck != [1]:
+		print("TEST Deadly vs Tough: non si annullano")
+		fails += 1
+
+	# Eagle Eyes: +1 alla TQ effettiva nello spotting, con cap a 8.
+	var sp_a := Character.new("sa", "SA", Domain.Side.FRIENDLY, "Able")
+	sp_a.troop_quality = 5
+	sp_a.position = Vector2i(10, 10)
+	var sp_b := Character.new("sb", "SB", Domain.Side.FRIENDLY, "Able")
+	sp_b.troop_quality = 5
+	sp_b.skills = [Character.SKILL_EAGLE_EYES]
+	sp_b.position = Vector2i(10, 10)
+	var tgt := Character.new("et", "ET", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(10, 11)
+	st.characters = [sp_a, sp_b, tgt]
+	var th_a: int = Spotting.attempt(st, sp_a, tgt)["threshold"]
+	tgt.known = false
+	var th_b: int = Spotting.attempt(st, sp_b, tgt)["threshold"]
+	tgt.known = false
+	if th_a < 0 or th_b - th_a != 1:
+		print("TEST Eagle Eyes: bonus +1 errato (%d vs %d)" % [th_b, th_a])
+		fails += 1
+	# Cap a 8: con TQ 8 il bonus non si applica.
+	sp_a.troop_quality = 8
+	sp_b.troop_quality = 8
+	var c_a: int = Spotting.attempt(st, sp_a, tgt)["threshold"]
+	tgt.known = false
+	var c_b: int = Spotting.attempt(st, sp_b, tgt)["threshold"]
+	tgt.known = false
+	if c_b - c_a != 0:
+		print("TEST Eagle Eyes: cap a 8 non rispettato (%d vs %d)" % [c_b, c_a])
+		fails += 1
+
+	# Dodge/-2 abbassa il WS del tiratore se il bersaglio e' in Evade.
+	var firer := Character.new("fi", "Firer", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(10, 10)
+	var evader := Character.new("ev", "Evader", Domain.Side.ENEMY, "Red")
+	evader.troop_quality = 6
+	evader.position = Vector2i(10, 12)
+	evader.set_order(Domain.Order.EVADE)
+	var plain_ev := Character.new("pe", "PlainEv", Domain.Side.ENEMY, "Red")
+	plain_ev.troop_quality = 6
+	plain_ev.position = Vector2i(10, 12)
+	plain_ev.set_order(Domain.Order.EVADE)
+	evader.skills = [Character.SKILL_DODGE_2]
+	st.impulse = 1
+	if Fire._fire_ws(st, firer, plain_ev) - Fire._fire_ws(st, firer, evader) != 2:
+		print("TEST Dodge-2: il malus al WS non vale 2")
+		fails += 1
+
+	# Sniper: +2 WS in Aimed Fire fuori dall'impulso 2.
+	var sniper := Character.new("sn", "Sniper", Domain.Side.ENEMY, "Red")
+	sniper.troop_quality = 6
+	sniper.weapon_skills = {"KAR 98K": 6}
+	sniper.skills = [Character.SKILL_SNIPER]
+	sniper.position = Vector2i(10, 10)
+	sniper.set_order(Domain.Order.AIMED_FIRE)
+	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
+	prey.troop_quality = 6
+	prey.position = Vector2i(10, 12)
+	st.impulse = 1
+	var ws_imp1 := Fire._fire_ws(st, sniper, prey)
+	st.impulse = 2
+	var ws_imp2 := Fire._fire_ws(st, sniper, prey)
+	if ws_imp1 - ws_imp2 != 2:
+		print("TEST Sniper: +2 WS in Aimed Fire (non imp.2) errato")
+		fails += 1
+
+	# Knife Expert: +1 TQ in mischia.
+	var ke := Character.new("ke", "Knife", Domain.Side.ENEMY, "Red")
+	ke.troop_quality = 5
+	ke.skills = [Character.SKILL_KNIFE_EXPERT]
+	if TurnSequence._melee_attack_tq(st, ke) - (TurnSequence._melee_tq(ke)) != 1:
+		print("TEST Knife Expert: +1 TQ in mischia errato")
 		fails += 1
 	return fails
 

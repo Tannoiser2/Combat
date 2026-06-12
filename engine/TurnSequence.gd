@@ -117,6 +117,9 @@ static func enemy_order_phase(state: GameState) -> void:
 	# Ondate di rinforzi del turno, prima di assegnare gli ordini.
 	if not state.scenario_id.is_empty():
 		Scenario.run_waves(state)
+	# Filo spinato (Rule 27.7): in un hex con 2+ nemici, il TQ piu' basso passa
+	# automaticamente in Hide prima di assegnare gli altri ordini.
+	_wire_auto_hide(state)
 	# SOP step 3a: una carta per ogni Enemy Team con almeno un Alerted.
 	state.enemy_cards_in_play.clear()
 	for team in state.enemy_teams_with_alerted():
@@ -125,12 +128,43 @@ static func enemy_order_phase(state: GameState) -> void:
 		state.log_event("Team %s pesca la Enemy Card %d (iniziativa %d)" % [
 			team, serial, EnemyCards.initiative_of(serial)])
 		# SOP step 3b: ordini a tutti gli Alerted del team, ciascuno
-		# secondo il proprio morale e la propria copertura.
+		# secondo il proprio morale e la propria copertura. Salta chi ha gia'
+		# un ordine (es. Hide automatico del filo spinato).
 		for c in state.characters_of_team(team):
-			if c.alerted and not c.is_dead():
+			if c.alerted and not c.is_dead() and not c.has_order:
 				_assign_enemy_order(state, c, serial)
 	# SOP step 3c: completare l'Initiative Order Track.
 	_update_initiative_order(state)
+
+
+# Ordini di movimento (diversi da Sneak) limitati dal filo spinato (Rule 27.7).
+const WIRE_MOVEMENT := [Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
+	Domain.Order.EVADE, Domain.Order.CHARGE]
+
+
+# Filo spinato (Rule 27.7): in ogni hex con filo spinato e 2+ nemici vivi, il
+# personaggio col TQ piu' basso riceve un Hide automatico (il primo trovato a
+# parita' di TQ).
+static func _wire_auto_hide(state: GameState) -> void:
+	var by_hex := {}
+	for c in state.characters:
+		if c.side != Domain.Side.ENEMY or c.is_dead() or not state.has_wire(c.position):
+			continue
+		var k := GameState.hex_key(c.position.x, c.position.y)
+		if not by_hex.has(k):
+			by_hex[k] = []
+		by_hex[k].append(c)
+	for k in by_hex:
+		var group: Array = by_hex[k]
+		if group.size() < 2:
+			continue
+		var lowest: Character = group[0]
+		for c in group:
+			if c.troop_quality < lowest.troop_quality:
+				lowest = c
+		lowest.set_order(Domain.Order.HIDE)
+		lowest.had_first_order = true
+		state.log_event("%s si appiattisce sul filo spinato (Hide automatico)" % lowest.display_name)
 
 
 # L'Initiative Track: ogni Team friendly prende il valore della Friendly
@@ -150,13 +184,84 @@ static func _update_initiative_order(state: GameState) -> void:
 		state.initiative_order.append(e[1])
 
 
+# Assegna un ordine a un Enemy applicando le restrizioni del terreno
+# (Rule 28.2: Sprint -> Evade su fango/neve; Sprint/Evade/Run&Gun -> Sneak su
+# neve alta). La direzione (order_move) si conserva.
+static func _set_enemy_order(state: GameState, c: Character, order: int,
+		move: String = "", grenade: bool = false, charge: bool = false) -> void:
+	var final_order := Weather.demote_order(state.ground, order)
+	# Medico addestrato (Rule 30): mai fuoco/granate/carica/mischia -> cura.
+	if c.is_medic and final_order in MEDIC_FORBIDDEN:
+		final_order = Domain.Order.MEDICAL_AID
+	# Filo spinato (Rule 27.7): gli ordini di movimento (non Sneak) -> Sneak.
+	if final_order in WIRE_MOVEMENT and state.has_wire(c.position) \
+			and not Move.wire_hide_exempt(state, c):
+		final_order = Domain.Order.SNEAK
+	c.set_order(final_order, move, grenade, charge)
+	if final_order != order:
+		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
+			Domain.ORDER_NAMES[order], Weather.GROUND_NAMES[state.ground],
+			Domain.ORDER_NAMES[final_order]])
+
+
+# Il ferito alleato piu' vicino entro `max_d` hex, o null (Rule 30.2).
+static func _nearest_wounded_ally(state: GameState, medic: Character, max_d: int) -> Character:
+	var best: Character = null
+	var bd := 9999
+	for p in state.characters:
+		if p.side != medic.side or p == medic or p.is_dead() or p.wounds.is_empty():
+			continue
+		var d := Spotting.hex_distance(medic.position, p.position)
+		if d <= max_d and d < bd:
+			bd = d
+			best = p
+	return best
+
+
+# Numero di bussola (1..6) che meglio punta da `from` verso `to`.
+static func _compass_toward(state: GameState, from: Vector2i, to: Vector2i) -> int:
+	if state.compass.size() != 7:
+		return 1
+	var delta := Move.to_cube(to) - Move.to_cube(from)
+	var best_k := 1
+	var best_dot := -9999
+	for k in range(1, 7):
+		var d: Vector3i = state.compass[k]
+		var dot := d.x * delta.x + d.y * delta.y + d.z * delta.z
+		if dot > best_dot:
+			best_dot = dot
+			best_k = k
+	return best_k
+
+
+# Micro-AI del medico nemico (Rule 30.2): cura il ferito adiacente, altrimenti
+# si muove (Evade) verso il ferito alleato entro 4 hex, altrimenti Hide.
+static func _assign_medic_order(state: GameState, c: Character) -> void:
+	c.had_first_order = true
+	var ally := _nearest_wounded_ally(state, c, 4)
+	if ally == null:
+		_set_enemy_order(state, c, Domain.Order.HIDE)
+		state.log_event("%s (medico) non vede feriti: Hide" % c.display_name)
+		return
+	if Spotting.hex_distance(c.position, ally.position) <= 1:
+		_set_enemy_order(state, c, Domain.Order.MEDICAL_AID)
+		state.log_event("%s (medico) presta soccorso a %s" % [c.display_name, ally.display_name])
+	else:
+		_set_enemy_order(state, c, Domain.Order.EVADE, str(_compass_toward(state, c.position, ally.position)))
+		state.log_event("%s (medico) raggiunge il ferito %s" % [c.display_name, ally.display_name])
+
+
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
+	# Medico addestrato (Rule 30.2): logica dedicata, ignora il lookup morale.
+	if c.is_medic:
+		_assign_medic_order(state, c)
+		return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
 		var fo := Scenario.first_order(state.scenario_id, state.rng)
 		if not fo.is_empty():
-			c.set_order(fo["order"], fo["move"])
+			_set_enemy_order(state, c, fo["order"], fo["move"])
 			c.had_first_order = true
 			state.log_event("%s (ordine iniziale) -> %s %s" % [
 				c.display_name, Domain.ORDER_NAMES[c.order], c.order_move])
@@ -169,7 +274,7 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 		var bhex := state.hex_at(c.position.x, c.position.y)
 		if bhex != null and bhex.terrain == Domain.Terrain.BUILDING:
 			if Checks.troop_quality_check(c, state.rng)["passed"]:
-				c.set_order(Domain.Order.AIMED_FIRE)
+				_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
 				state.log_event("%s si apposta alla finestra -> Aimed Fire" % c.display_name)
 				return
 	if not EnemyCards.has_table_row(c.morale):
@@ -177,11 +282,11 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 		# stampato sulla carta: il Berserk carica il nemico piu' vicino,
 		# il Rout fugge.
 		if c.morale == Domain.Morale.BERSERK:
-			c.set_order(Domain.Order.CHARGE, EnemyCards.berserk_move(serial), false, true)
+			_set_enemy_order(state, c, Domain.Order.CHARGE, EnemyCards.berserk_move(serial), false, true)
 			state.log_event("%s e' BERSERK -> Charge %s" % [
 				c.display_name, c.order_move])
 		else:  # ROUT
-			c.set_order(Domain.Order.EVADE, EnemyCards.rout_move(serial))
+			_set_enemy_order(state, c, Domain.Order.EVADE, EnemyCards.rout_move(serial))
 			state.log_event("%s e' in ROUT -> fugge %s" % [
 				c.display_name, c.order_move])
 		return
@@ -190,7 +295,7 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	var in_cover := (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
 		or state.hex_has_hexside(c.position)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
-	c.set_order(entry["order"], entry["move"], entry["grenade"], entry["charge"])
+	_set_enemy_order(state, c, entry["order"], entry["move"], entry["grenade"], entry["charge"])
 	var extra := "" if c.order_move.is_empty() else " " + c.order_move
 	if entry["grenade"]:
 		extra += " +Grenade"
@@ -389,7 +494,10 @@ static func _do_medic(state: GameState, medic: Character) -> void:
 		if p.side != medic.side or p == medic or p.is_dead():
 			continue
 		if Spotting.hex_distance(medic.position, p.position) <= 1 and not p.wounds.is_empty():
-			var res := Checks.troop_quality_check(medic, state.rng)
+			# Medico addestrato (Rule 30): +2 TQ al check di Medical Aid.
+			var bonus := 2 if medic.is_medic else 0
+			var roll := Checks.roll_d10(state.rng)
+			var res := {"passed": roll <= Checks.effective_tq(medic) + bonus}
 			# "Medical Marvel": la cura fallita riesce automaticamente.
 			if not res["passed"] and medic.side == Domain.Side.FRIENDLY \
 					and FriendlyCards.use_from_hand(state, FriendlyCards.MEDICAL,
@@ -420,6 +528,29 @@ static func _do_search(state: GameState, searcher: Character) -> void:
 					searcher.display_name, e.display_name])
 
 
+# Ordini vietati a un medico addestrato (Rule 30): mai fuoco, granate,
+# carica o mischia. Se assegnati, diventano Medical Aid (nemico) o sono
+# nascosti dal menu (giocatore).
+const MEDIC_FORBIDDEN := [
+	Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE, Domain.Order.SUPPRESSIVE_FIRE,
+	Domain.Order.GUARD, Domain.Order.CHARGE, Domain.Order.MELEE,
+	Domain.Order.GRENADE, Domain.Order.RIFLE_GRENADE, Domain.Order.SMOKE_GRENADE,
+]
+
+
+# Il medico fugge di 1 hex in direzione 1D6 quando un avversario entra nel
+# suo hex (Rule 30): non combatte mai.
+static func _medic_flee(state: GameState, medic: Character) -> void:
+	var dir: Vector3i = Move.CUBE_DIRS[state.rng.randi_range(0, 5)]
+	var dest := Move.from_cube(Move.to_cube(medic.position) + dir)
+	if Move.is_passable(state, dest):
+		state.log_event("%s (medico) sfugge all'assalto: %02d.%02d -> %02d.%02d" % [
+			medic.display_name, medic.position.x, medic.position.y, dest.x, dest.y])
+		medic.position = dest
+	else:
+		state.log_event("%s (medico) non riesce a fuggire" % medic.display_name)
+
+
 # Ordini "passivi" che in mischia lasciano scoperti (-2 al TQC difensivo).
 const MELEE_PASSIVE := [
 	Domain.Order.HIDE, Domain.Order.RALLY, Domain.Order.RELOAD,
@@ -442,6 +573,19 @@ static func _melee_tq(c: Character) -> int:
 	return Checks.effective_tq(c) + int(MELEE_MORALE_TQ.get(c.morale, 0))
 
 
+# TQ d'attacco in mischia: base + morale (via _melee_tq) piu' i bonus
+# deterministici, ossia Charge all'impulso 4 (Rule 7.08/10.08) e Knife Expert
+# (Rule 24). Esclude la carta Bayonet, che si gioca in modo interattivo.
+static func _melee_attack_tq(state: GameState, attacker: Character) -> int:
+	var bonus := 0
+	if attacker.has_order and attacker.order == Domain.Order.CHARGE \
+			and state.impulse == 4:
+		bonus += 1
+	if attacker.has_skill(Character.SKILL_KNIFE_EXPERT):
+		bonus += 1
+	return _melee_tq(attacker) + bonus
+
+
 # Mischia (Rule 15): solo l'attaccante tira un TQC (modificato da ferite e morale).
 # Successo = pesca carta ferita (senza Duck Back). Fallimento = nessun effetto.
 # La mischia avviene solo nello STESSO esagono. Charge all'impulso 4: +1 TQ.
@@ -461,22 +605,24 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		target.removed = true
 		state.log_event("%s travolge un'esca in mischia" % attacker.display_name)
 		return
+	# Medico addestrato (Rule 30): non entra mai in mischia; se un avversario
+	# arriva nel suo hex, fugge di 1 hex in direzione 1D6.
+	if target.is_medic:
+		_medic_flee(state, target)
+		return
 	# Rout in mischia: l'attaccante in Rota si arrende (Rule 15/17.3).
 	if attacker.morale == Domain.Morale.ROUT:
 		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
 		attacker.set_order(Domain.Order.GUARD)
 		return
-	# "Bayonet!": +2 TQ all'attaccante friendly.
+	# "Bayonet!": +2 TQ all'attaccante friendly (carta, uso interattivo).
 	var atk_bonus := 0
 	if attacker.side == Domain.Side.FRIENDLY \
 			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
 				"%s carica alla baionetta (+2)" % attacker.display_name):
 		atk_bonus = 2
-	# Charge all'impulso 4: +1 TQ (Rule 7.08/10.08).
-	if attacker.has_order and attacker.order == Domain.Order.CHARGE \
-			and state.impulse == 4:
-		atk_bonus += 1
-	var atk_tq := _melee_tq(attacker) + atk_bonus
+	# TQ d'attacco: morale + Charge all'impulso 4 + Knife Expert (Rule 24).
+	var atk_tq := _melee_attack_tq(state, attacker) + atk_bonus
 	var roll := Checks.roll_d10(state.rng)
 	var passed := roll == 0 or (roll != 9 and roll <= atk_tq)
 	state.log_event("%s attacca %s in mischia: TQ %d, tira %d -> %s" % [
@@ -485,7 +631,7 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 	if passed:
 		state.audio_events.append({"type": "melee", "hex": attacker.position})
 		Replay.sfx(state, "melee")
-		Fire._resolve_wound_melee(state, target)
+		Fire._resolve_wound_melee(state, attacker, target)
 	else:
 		state.log_event("  nessun effetto")
 
@@ -502,6 +648,16 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 			break
 	var allowed: Array[int] = []
 	for o in Domain.Order.values():
+		# Condizione del terreno (Rule 28.2): ordini di movimento vietati.
+		if Weather.order_forbidden(state.ground, o):
+			continue
+		# Medico addestrato (Rule 30): niente fuoco/granate/carica/mischia.
+		if c.is_medic and o in MEDIC_FORBIDDEN:
+			continue
+		# Filo spinato (Rule 27.7): per muoversi fuori si usa solo Sneak.
+		if o in WIRE_MOVEMENT and state.has_wire(c.position) \
+				and not Move.wire_hide_exempt(state, c):
+			continue
 		if restrict == "worried" and c.morale in [Domain.Morale.CAUTIOUS, Domain.Morale.SHAKEN] \
 				and o != Domain.Order.HIDE:
 			continue
@@ -662,6 +818,8 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 static func end_phase(state: GameState) -> void:
 	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
 	Area.end_phase(state)
+	# Pioggia battente: puo' trasformare il terreno in fango (Rule 28.1).
+	Weather.maybe_make_mud(state)
 	# Obiettivi di ricognizione raggiunti in questo turno.
 	if not state.scenario_id.is_empty():
 		Scenario.scan_objectives(state)

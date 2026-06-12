@@ -30,6 +30,9 @@ const ROLE := {
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	"BAR Gunner": {"tq": 5, "ldr": 0, "weapon": "BAR", "ws": 5},
 	"MG Gunner": {"tq": 5, "ldr": 0, "weapon": "M1919", "ws": 5},
+	# Medico addestrato (Rule 30): disarmato, +2 TQ alle cure. Vale per
+	# entrambi i lati (lo schiera lo scenario).
+	"Medic": {"tq": 5, "ldr": 0, "weapon": "", "ws": 0, "medic": true},
 	# Pedina-esca: valori minimi, non combatte mai.
 	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
 }
@@ -679,6 +682,22 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.characters.append(mq)
 	# Scenario notturno: -2 al fuoco oltre 2 hex (salvo illuminazione).
 	state.night = bool(sc.get("night", false))
+	# Meteo e condizioni del terreno (Rule 28): chiavi "weather"/"ground"
+	# (nomi in Weather.TYPE_BY_NAME/GROUND_BY_NAME). Il limite di visibilita'
+	# si tira ora a inizio scenario.
+	state.weather = Weather.TYPE_BY_NAME.get(sc.get("weather", "clear"), Weather.Type.CLEAR)
+	state.ground = Weather.GROUND_BY_NAME.get(sc.get("ground", "none"), Weather.Ground.NONE)
+	state.max_los = Weather.roll_max_los(state.weather, state.rng)
+	# Filo spinato (Rule 27.7): overlay sugli hex elencati nella chiave "wire".
+	for wk in sc.get("wire", []):
+		var wp: PackedStringArray = String(wk).split(",")
+		var wh := state.hex_at(int(wp[0]), int(wp[1]))
+		if wh != null:
+			wh.wire = true
+	if state.weather != Weather.Type.CLEAR or state.ground != Weather.Ground.NONE:
+		state.log_event("Meteo: %s, terreno: %s%s" % [
+			Weather.TYPE_NAMES[state.weather], Weather.GROUND_NAMES[state.ground],
+			"" if state.max_los == 0 else " (visibilita' max %d hex)" % state.max_los])
 	# Bussola del nemico (Rule 9.3): ["hex", "hex verso cui punta '1'"];
 	# default: "1" = nord.
 	var dir1 := Vector3i(0, 1, -1)
@@ -765,7 +784,7 @@ static func run_waves(state: GameState) -> void:
 			arrived = true
 			if wave.has("forced"):
 				var parts: PackedStringArray = String(wave["forced"]).split(" ")
-				e.set_order(ORDER_BY_NAME[parts[0]], parts[1])
+				e.set_order(Weather.demote_order(state.ground, ORDER_BY_NAME[parts[0]]), parts[1])
 				e.had_first_order = true
 		if arrived:
 			state.log_event("Arrivano rinforzi nemici al bordo!")
@@ -789,8 +808,22 @@ static func _make(entry: Dictionary, side: int) -> Character:
 		entry["name"], side, entry["team"])
 	c.troop_quality = prof["tq"]
 	c.leadership = prof["ldr"]
-	if not String(prof["weapon"]).is_empty():
-		c.weapon_skills = {prof["weapon"]: prof["ws"]}
+	# L'arma viene dal profilo del ruolo, ma una pedina puo' sostituirla
+	# (Rule 26: es. Thompson al posto del Grease Gun) con "weapon"/"ws".
+	var weapon: String = entry.get("weapon", prof["weapon"])
+	var ws: int = entry.get("ws", prof["ws"])
+	if not weapon.is_empty():
+		c.weapon_skills = {weapon: ws}
+	# Skill SS (Rule 24): dal profilo del ruolo e/o dalla voce di scenario.
+	for s in prof.get("skills", []):
+		c.skills.append(s)
+	for s in entry.get("skills", []):
+		if s not in c.skills:
+			c.skills.append(s)
+	# Medico addestrato (Rule 30): disarmato. Da ruolo ("medic") o pedina.
+	if bool(prof.get("medic", false)) or bool(entry.get("medic", false)):
+		c.is_medic = true
+		c.weapon_skills = {}
 	c.counter = entry.get("counter", "")
 	c.role = entry["role"]
 	c.is_dummy = entry["role"] == "Dummy"

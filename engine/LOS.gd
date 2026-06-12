@@ -20,17 +20,25 @@ const D := preload("res://engine/Domain.gd")
 
 const LOW_ORDERS := [D.Order.SNEAK, D.Order.HIDE, D.Order.RALLY, D.Order.RELOAD]
 
+# Trincea trattata come Depression per la LOS (Rule 27.4 / 27.8).
+const DEPRESSION_LIKE := [D.Terrain.DEPRESSION, D.Terrain.TRENCH]
+
 # Terreni bassi: altezza 1/2 solo con ordini "low" in gioco.
 const LOW_TERRAIN := [
 	D.Terrain.LONG_GRASS, D.Terrain.DEPRESSION, D.Terrain.LOGS,
 	D.Terrain.CRATER, D.Terrain.FIELD, D.Terrain.FOXHOLE,
+	D.Terrain.TRENCH,
 ]
 
 # Altezza del terreno bloccante, in mezzi livelli (chart, colonna HEIGHT).
+# Fountain: ostacolo 1/2 (Rule 27.1). Fortified Building: come Building.
 const HEIGHT2 := {
 	D.Terrain.ROCKS: 1, D.Terrain.BUILDING: 2, D.Terrain.MARSH: 1,
 	D.Terrain.TREES: 2, D.Terrain.HEDGEROW: 1, D.Terrain.BOCAGE: 2,
 	D.Terrain.WALL: 1, D.Terrain.ORCHARD: 2, D.Terrain.RUBBLE: 1,
+	D.Terrain.FOUNTAIN: 1, D.Terrain.FORTIFIED_BUILDING: 2,
+	# Abbazia (Rule 27.5): muri che bloccano dall'esterno (eccezione interna sotto).
+	D.Terrain.ABBEY_EXTERIOR: 2, D.Terrain.ABBEY_INTERIOR: 2,
 }
 
 
@@ -99,13 +107,17 @@ static func _hex_level2_at(state: GameState, pos: Vector2i) -> int:
 
 
 # Altezza efficace di un hex interposto, in mezzi livelli.
-static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool) -> int:
+static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool, both_abbey: bool = false) -> int:
 	var hex := state.hex_at(pos.x, pos.y)
 	if hex == null:
 		return 0
 	var base := hex.level * 2
-	if hex.terrain == D.Terrain.DEPRESSION:
+	if hex.terrain in DEPRESSION_LIKE:
 		return base  # interposta: "exists at level 0"
+	# Abbazia (Rule 27.5): tra due hex d'abbazia la LOS non e' bloccata dai
+	# muri dell'abbazia (vale il -1/hex sul WS, non un blocco).
+	if both_abbey and Domain.is_abbey(hex.terrain):
+		return base
 	if hex.terrain in LOW_TERRAIN:
 		return base + (1 if low_active else 0)
 	return base + int(HEIGHT2.get(hex.terrain, 0))
@@ -134,7 +146,15 @@ static func clear_hexes(state: GameState, a: Vector2i, b: Vector2i) -> bool:
 
 static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 		l1: int, l2: int, low_active: bool) -> bool:
+	# Limite di visibilita' del meteo (Rule 28.1): oltre il raggio, niente LOS.
+	if state.max_los > 0 and Spotting.hex_distance(a, b) > state.max_los:
+		return false
 	var between := hexes_between(a, b)
+	# Abbazia (Rule 27.5): tra due hex d'abbazia i muri non bloccano la LOS.
+	var ha := state.hex_at(a.x, a.y)
+	var hb := state.hex_at(b.x, b.y)
+	var both_abbey := ha != null and hb != null \
+		and Domain.is_abbey(ha.terrain) and Domain.is_abbey(hb.terrain)
 	# H: ostacolo piu' alto; a parita', l'hex piu' lontano dal piu' alto.
 	var t2 := maxi(l1, l2)
 	var s2 := mini(l1, l2)
@@ -143,7 +163,7 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 	var h2 := -1000
 	var h_pos := taller_pos
 	for pos in between:
-		var hh := _hex_height2(state, pos, low_active)
+		var hh := _hex_height2(state, pos, low_active, both_abbey)
 		var farther := Spotting.hex_distance(taller_pos, pos) \
 			>= Spotting.hex_distance(taller_pos, h_pos)
 		if hh > h2 or (hh == h2 and farther):
@@ -194,7 +214,7 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 # Depression contigui sul percorso).
 static func _depression_blocked(state: GameState, unit: Character, other: Character) -> bool:
 	var hex := state.hex_at(unit.position.x, unit.position.y)
-	if hex == null or hex.terrain != D.Terrain.DEPRESSION or not _has_low_order(unit):
+	if hex == null or hex.terrain not in DEPRESSION_LIKE or not _has_low_order(unit):
 		return false
 	var dist := Spotting.hex_distance(unit.position, other.position)
 	if dist <= int(_unit_level2(state, other) / 2.0) + 1:
@@ -202,7 +222,7 @@ static func _depression_blocked(state: GameState, unit: Character, other: Charac
 	var run := 0
 	for pos in hexes_between(unit.position, other.position):
 		var h := state.hex_at(pos.x, pos.y)
-		if h != null and h.terrain == D.Terrain.DEPRESSION:
+		if h != null and h.terrain in DEPRESSION_LIKE:
 			run += 1
 			if run >= 2:
 				return false

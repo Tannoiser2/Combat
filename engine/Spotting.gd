@@ -29,6 +29,11 @@ const ORDER_GROUP := {
 }
 const NO_ORDER_GROUP := 2
 
+# Abbazia (Rule 27.5): spotting di un bersaglio in abbazia, a seconda che
+# l'osservatore sia dentro o fuori. Ultima colonna stimata (manca dal chart).
+const ABBEY_SPOT_OUTSIDE := [-5, -4, -3, -2, -2, -3, -3]
+const ABBEY_SPOT_INSIDE := [-3, -2, -1, 0, 0, 0, 0]
+
 # Righe del chart: terreno del bersaglio -> modificatori per gruppo.
 # I livelli Open usano tutti la riga OPEN; Stream non e' nel chart
 # (trattato come Open, TODO verificare col regolamento).
@@ -53,6 +58,10 @@ const TERRAIN_MOD := {
 	D.Terrain.FIELD: [-3, -2, -1, 0, 0, 0, 0],
 	D.Terrain.RUBBLE: [-5, -4, -3, -1, -2, -2, -2],
 	D.Terrain.FOXHOLE: [-4, -3, -2, -1, -1, -1, -1],
+	# Volume 2, Rule 27 (Spotting Chart). Fortified = Building, Trench = Depression.
+	D.Terrain.FOUNTAIN: [-2, -2, -1, 0, -1, -1, -1],
+	D.Terrain.FORTIFIED_BUILDING: [-5, -4, -3, -2, -1, -2, -2],
+	D.Terrain.TRENCH: [-4, -3, -2, -1, -1, -1, -1],
 }
 
 
@@ -87,6 +96,11 @@ static func target_modifier(state: GameState, target: Character, spotter: Charac
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
 	var group: int = ORDER_GROUP.get(target.order, NO_ORDER_GROUP) \
 		if target.has_order else NO_ORDER_GROUP
+	# Abbazia (Rule 27.5): copertura allo spotting a seconda che l'osservatore
+	# sia dentro o fuori dall'abbazia.
+	if D.is_abbey(terrain):
+		var inside := spotter != null and Fire._in_abbey(state, spotter.position)
+		return (ABBEY_SPOT_INSIDE if inside else ABBEY_SPOT_OUTSIDE)[group]
 	var mod: int = TERRAIN_MOD[terrain][group]
 	if spotter != null:
 		var side := Fire._entry_hexside(state, spotter.position, target.position)
@@ -101,8 +115,16 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	if not LOS.clear(state, spotter, target):
 		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
 	var dist := hex_distance(spotter.position, target.position)
-	var threshold := Checks.effective_tq(spotter) \
+	# Eagle Eyes (Rule 24): +1 alla TQ effettiva per lo spotting, max 8.
+	var tq := Checks.effective_tq(spotter)
+	if spotter.has_skill(Character.SKILL_EAGLE_EYES):
+		tq = mini(tq + 1, 8)
+	var threshold := tq \
 		+ target_modifier(state, target, spotter) + range_modifier(dist)
+	# Winter Camouflage (Rule 28.2): -1 a individuare il bersaglio sulla neve.
+	if target.has_skill(Character.SKILL_WINTER_CAMO) \
+			and state.ground in [Weather.Ground.SNOW, Weather.Ground.DEEP_SNOW]:
+		threshold -= 1
 	var roll := Checks.roll_d10(state.rng)
 	var success := roll <= threshold
 	if success:

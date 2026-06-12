@@ -6,6 +6,18 @@
 class_name Character
 extends RefCounted
 
+# Skill dei nemici Elite SS (Rule 24). Si assegnano in state.characters
+# tramite Character.skills (vedi Scenario._make). Stringhe, non enum, cosi'
+# si leggono nei log e si dichiarano facilmente nelle voci di scenario.
+const SKILL_DODGE := "Dodge"           # -1 WS a chi spara, se il bersaglio e' in Evade
+const SKILL_DODGE_2 := "Dodge-2"       # -2 WS (versione potenziata)
+const SKILL_TOUGH := "Tough"           # ferito: pesca 2, applica la MENO dannosa
+const SKILL_DEADLY := "Deadly"         # quando spara: pesca 2, applica la PIU' dannosa
+const SKILL_EAGLE_EYES := "Eagle Eyes" # +1 TQ in spotting (TQ effettiva max 8)
+const SKILL_SNIPER := "Sniper"         # +2 WS in Aimed Fire (non all'impulso 2)
+const SKILL_KNIFE_EXPERT := "Knife Expert"  # +1 TQ in mischia (+ coltello da lancio)
+const SKILL_WINTER_CAMO := "Winter Camouflage"  # -1 a essere individuato su neve (Rule 28.2)
+
 # Identita'
 var id: String
 var display_name: String
@@ -19,6 +31,7 @@ var counter: String = ""
 var troop_quality: int          # TQ
 var leadership: int = 0         # LDR (0 = nessuna)
 var weapon_skills: Dictionary = {}  # nome arma (String) -> WS (int)
+var skills: Array[String] = []  # skill speciali (Rule 24), vedi le costanti SKILL_*
 
 # Stato dinamico
 var position: Vector2i          # (col, row) sulla griglia
@@ -44,6 +57,9 @@ var no_ammo: bool = false
 
 # Ruolo dello scenario ("Recruit", "NCO", "Officer"...): serve ai VP.
 var role: String = ""
+# Medico addestrato (Rule 30): disarmato, mai fuoco/mischia, +2 TQ alle cure,
+# fugge se un avversario entra nel suo hex. Vale per friendly ed enemy.
+var is_medic: bool = false
 # Pedina-esca (Dummy): nessun valore reale; quando viene individuata si
 # rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
 var is_dummy: bool = false
@@ -59,6 +75,11 @@ func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
 	display_name = p_name
 	side = p_side
 	team = p_team
+
+
+# Possiede una skill speciale (Rule 24)?
+func has_skill(skill: String) -> bool:
+	return skill in skills
 
 
 func set_order(p_order: int, p_move: String = "", p_grenade: bool = false, p_charge: bool = false) -> void:
