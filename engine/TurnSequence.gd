@@ -736,15 +736,26 @@ static func valid_fire_targets(state: GameState, firer: Character) -> Array[Char
 # Fuoco automatico (nemici / demo): bersaglio valido piu' vicino.
 # Estensione G delle Enemy Card: se puo', lancia una granata al posto
 # di sparare quando il bersaglio e' a portata di lancio (3 hex).
+# Rule 30: il nemico evita di sparare al medico amico (TQC+2 per rispettare
+# la convenzione; se passa salta al bersaglio successivo).
 static func _try_fire(state: GameState, firer: Character) -> void:
 	var targets := valid_fire_targets(state, firer)
+	targets.sort_custom(func(a: Character, b: Character) -> bool:
+		return Spotting.hex_distance(firer.position, a.position) \
+			 < Spotting.hex_distance(firer.position, b.position))
 	var best: Character = null
 	var best_dist := 9999
 	for target in targets:
-		var dist := Spotting.hex_distance(firer.position, target.position)
-		if dist < best_dist:
-			best_dist = dist
-			best = target
+		if firer.side == Domain.Side.ENEMY and target.is_medic:
+			var roll := Checks.roll_d10(state.rng)
+			var thr := Checks.effective_tq(firer) + 2
+			if roll <= thr:
+				state.log_event("%s rispetta la convenzione: evita il medico %s (tira %d <= %d)" % [
+					firer.display_name, target.display_name, roll, thr])
+				continue
+		best = target
+		best_dist = Spotting.hex_distance(firer.position, best.position)
+		break
 	if best == null:
 		return
 	if firer.order_grenade and not firer.thrown and best_dist <= 3:

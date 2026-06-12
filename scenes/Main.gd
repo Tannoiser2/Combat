@@ -1819,6 +1819,51 @@ func _test_medic() -> int:
 	if emedic.order != Domain.Order.EVADE:
 		print("TEST medico nemico: ferito vicino -> si muove (Evade)")
 		fails += 1
+	# Rule 30 (convenzione): con TQ+2=9 il nemico evita SEMPRE il medico amico.
+	var sav := GameState.new()
+	sav.rng.seed = 77
+	var ef := Character.new("ef", "Firer", Domain.Side.ENEMY, "Red")
+	ef.troop_quality = 7  # TQ+2=9 >= ogni d10 -> evita sempre
+	ef.weapon_skills = {"Rifle": 5}
+	ef.position = Vector2i(2, 2)
+	ef.set_order(Domain.Order.AIMED_FIRE)
+	var mav := Character.new("mav", "DocAv", Domain.Side.FRIENDLY, "Able")
+	mav.troop_quality = 5
+	mav.is_medic = true
+	mav.position = Vector2i(2, 3)
+	mav.spotted = true
+	sav.characters = [ef, mav]
+	TurnSequence._try_fire(sav, ef)
+	if not mav.wounds.is_empty():
+		print("TEST medico (Rule 30 convenzione): l'AI non dovrebbe sparare al medico (TQ+2=9)")
+		fails += 1
+	# Rule 30 (revenge): la morte del medico porta i Berserk ad eseguire i prigionieri.
+	var rev_seed := 1
+	while true:
+		var probe := RandomNumberGenerator.new()
+		probe.seed = rev_seed
+		if probe.randi_range(0, 9) == 0:
+			break
+		rev_seed += 1
+	var srv := GameState.new()
+	srv.rng.seed = rev_seed
+	var mrev := Character.new("mr", "DocR", Domain.Side.FRIENDLY, "Able")
+	mrev.troop_quality = 5
+	mrev.is_medic = true
+	mrev.position = Vector2i(3, 3)
+	var wrev := Character.new("wr", "WiR", Domain.Side.FRIENDLY, "Able")
+	wrev.troop_quality = 5
+	wrev.morale = Domain.Morale.BOLD  # con roll==0 (+2) -> BERSERK
+	wrev.position = Vector2i(3, 4)  # adiacente al medico (LOS sempre ok)
+	var pris := Character.new("pr", "Prig", Domain.Side.ENEMY, "Red")
+	pris.troop_quality = 5
+	pris.set_order(Domain.Order.GUARD)
+	pris.position = Vector2i(3, 5)  # adiacente al witness
+	srv.characters = [mrev, wrev, pris]
+	Fire._medic_shock(srv, mrev)  # il roll==0 porta wrev a BERSERK
+	if not pris.is_dead():
+		print("TEST medico (Rule 30 revenge): il prigioniero dovrebbe essere giustiziato")
+		fails += 1
 	return fails
 
 
