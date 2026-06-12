@@ -79,15 +79,17 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    lanciatore solo se NON in copertura, Rule 24). I nemici NON lo usano per il
    tiro (non e' nei weapon_skills, l'AI usa l'arma da fuoco): per regola la skill
    serve loro solo per il +1 TQ in mischia. Test in Main._test_ss_skills e
-   _test_knife. DA FARE: assegnare le skill ai nemici degli scenari Vol. 2.
+   _test_knife. Skill distribuite per ruolo in tutti gli scenari Vol.2: Schutze
+   (Knife Expert), NCO (Eagle Eyes), Veteran (Deadly), Officer (Sniper).
 2. FATTO (3 armi): Rule 26. In Weapons.DATA: "M1 Thompson" (max 16, ROF 3),
    "M1903 Springfield" (max 55, ROF 1, flag slow+scoped, +1 in Aimed oltre 3
    hex via Fire._compute_ws), "StG 44" (max 66, ROF 3 entro 13 hex / ROF 1
    oltre via Weapons.rof_at + rof_bands, usato in Fire.fire_action). Una pedina
    di scenario puo' sostituire l'arma del ruolo con "weapon"/"ws" (Scenario._make).
    Bande esatte dal Weapons Chart (repo privato). Test in Main._test_weapons.
-   M2 .50cal aggiunta con la Rule 31-32 (solo veicoli). DA FARE: assegnare
-   Thompson/Springfield a specifici soldati degli scenari Vol. 2 (richiede dati del libro).
+   M2 .50cal aggiunta con la Rule 31-32 (solo veicoli). Armi assegnate in
+   FULL_SQUAD_VOL2: Pvt Hatcher (Able) M1 Thompson, Pvt Holland (Charlie)
+   M1903 Springfield.
 3. FATTO: Meteo e condizioni del terreno (Rule 28) in Weather.gd (class_name,
    enum Type/Ground). state.weather/ground/max_los. Malus WS oltre 2 hex
    (Rain/Heavy Rain/Mist -1, Fog -2; esente se entrambi nello stesso edificio)
