@@ -10,6 +10,23 @@ riferimenti/
 *.pdf
 *.vmod
 
+# Segnalini Vol.2 (da Pedine e Counter.zip nel repo privato) - copyright
+assets/counters/GE-TealTeam-*
+assets/counters/GE-PurpleTeam-*
+assets/counters/US-Able-SSGT-Perez-f.png
+assets/counters/US-Able-Pvt-Butler-f.png
+assets/counters/US-Able-Pvt-Hatcher-f.png
+assets/counters/US-Able-PVT-Peterson-f.png
+assets/counters/US-Baker-Pvt-James-f.png
+assets/counters/US-Baker-Pvt-Moore-f.png
+assets/counters/US-Baker-Pvt-Lewist-f.png
+assets/counters/US-Baker-Pvt-Cruz-f.png
+assets/counters/US-Charlie-Cpl-Diaz-f.png
+assets/counters/US-Charlie-Pvt-Bennett-f.png
+assets/counters/US-Charlie-Pvt-Hall-f.png
+assets/counters/US-Charlie-Pvt-Holland-f.png
+assets/counters/US-Charlie-Pvt-Williams-f.png
+
 # Claude Code
 .claude/worktrees/
 
