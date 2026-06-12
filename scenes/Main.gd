@@ -277,6 +277,15 @@ func _show_scenario_menu() -> void:
 	tag.modulate = Color(0.55, 0.55, 0.50)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	left.add_child(tag)
+	# Changelog della build: cosa c'e' di nuovo, per riconoscere la versione.
+	if FileAccess.file_exists("res://changelog.txt"):
+		var clog := RichTextLabel.new()
+		clog.text = FileAccess.get_file_as_string("res://changelog.txt").strip_edges()
+		clog.custom_minimum_size = Vector2(0, 170)
+		clog.add_theme_font_size_override("normal_font_size", 12)
+		clog.modulate = Color(0.65, 0.65, 0.58)
+		clog.scroll_active = true
+		left.add_child(clog)
 
 	# --- colonna destra: card scorrevoli delle missioni
 	var right := VBoxContainer.new()
