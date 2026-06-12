@@ -8,6 +8,8 @@ v0.12 — 2026-06-12
     niente Sprint/Evade/Run&Gun (ridotti a Sneak)
   - Winter Camouflage: -1 a essere individuati sulla neve
   - il meteo si imposta da scenario ("weather"/"ground")
+- Suoni dedicati per le armi nuove: Thompson, Springfield M1903, StG 44
+  (assemblati da campioni CC0)
 
 v0.11 — 2026-06-12
 - Volume 2, Rule 26: nuove armi

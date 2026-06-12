@@ -181,3 +181,36 @@ throw.ogg
   Repo: github.com/lavenderdotpet/CC0-Public-Domain-Sounds
   License: CC0 1.0 (repo-wide LICENSE + pack _README)
   Processing: trimmed to 1.2s with fade-out, mono 44.1kHz OGG (ffmpeg)
+
+======================================================================
+VOLUME 2 WEAPON SOUNDS (added 2026-06-12)
+======================================================================
+All derived exclusively from CC0 source material and themselves dedicated
+to the public domain (CC0). Bursts assembled from CC0 single shots
+(sequenced at representative rates of fire, with gain/timing variation,
+trimming and peak normalization) via numpy + libsndfile (soundfile).
+
+----------------------------------------------------------------------
+FILE: springfield.ogg  (M1903 Springfield — single deep bolt-action crack)
+SOURCE: bang_05.ogg ("25 CC0 Bang / Firework SFX" pack)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+NOTES:  Trimmed and normalized; kept as a single shot (distinct from the
+        Garand's clip "ping" and the Kar98k's layered mix)
+
+----------------------------------------------------------------------
+FILE: thompson.ogg  (M1 Thompson .45 — heavy snappy burst, 7 rounds ~700 rpm)
+SOURCE: shot_03.ogg ("25 CC0 Bang / Firework SFX" pack)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+NOTES:  Pitched down for .45 heft, sequenced into a 7-round burst
+
+----------------------------------------------------------------------
+FILE: stg44.ogg  (StG 44 — assault-rifle burst, 6 rounds ~600 rpm)
+SOURCE: bang_07.ogg ("25 CC0 Bang / Firework SFX" pack)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+NOTES:  Transient kept (long tail trimmed), sequenced into a 6-round burst
+
+NOTE on vehicles: vehicle/engine and main-gun sounds will be added together
+with the vehicle rules (Rule 31-32), not yet implemented.

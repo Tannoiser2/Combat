@@ -78,8 +78,8 @@ var _sfx: Dictionary = {}
 const WEAPON_SFX := {
 	"M1 Garand": "garand", "KAR 98K": "kar98", "Rifle": "kar98",
 	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
-	"M1 Thompson": "smg", "StG 44": "smg",
-	"M1903 Springfield": "garand",
+	"M1 Thompson": "thompson", "StG 44": "stg44",
+	"M1903 Springfield": "springfield",
 	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
@@ -167,6 +167,7 @@ func _load_sfx() -> void:
 	_sfx.clear()
 	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
+			"thompson", "springfield", "stg44",
 			"kill", "wound", "suppress", "miss", "throw"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
