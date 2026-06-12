@@ -166,7 +166,8 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Sprint altrimenti). Scenario: ruolo "Bazooka Man" (Bazooka M9), chiave "vehicles" lista
    opzionale. MapView: overlay rettangolo + freccia facing + badge hull_damage. Armi aggiunte:
    M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
-   Test in Main._test_vehicles. DA FARE: assegnare veicoli agli scenari Vol.2 che li prevedono.
+   Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
+   s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
 
 ## Bug noti / attenzioni
 
