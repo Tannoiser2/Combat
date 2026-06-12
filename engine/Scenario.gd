@@ -45,6 +45,8 @@ const ROLE := {
 	"Medic": {"tq": 5, "ldr": 0, "weapon": "", "ws": 0, "medic": true},
 	# Pedina-esca: valori minimi, non combatte mai.
 	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
+	# Rule 31-32: porta il bazooka (M9); stat. come rifleman ma arma AT.
+	"Bazooka Man": {"tq": 5, "ldr": 0, "weapon": "Bazooka M9", "ws": 5},
 }
 
 # Zona di schieramento per la fase di deploy. Ritorna gli hex validi.
@@ -1060,6 +1062,31 @@ static func build(state: GameState, scenario_id: String) -> void:
 	# Bombardamento iniziale (se previsto dallo scenario, es. s2).
 	if sc.has("opening_barrage"):
 		_run_opening_barrage(state, sc["opening_barrage"])
+
+	# Veicoli (Rule 31-32): lista opzionale di veicoli schierati nello scenario.
+	# Ogni voce: {"type": "M4A3 Sherman", "team": "Able", "pos": "5,10",
+	#   "facing": 4, "weapon": "", "side": "friendly"/"enemy"}.
+	for ve in sc.get("vehicles", []):
+		var vtype: String = ve["type"]
+		var vdata: Dictionary = VehicleCombat.VEHICLE_DATA.get(vtype, {})
+		var vside_str: String = ve.get("side",
+			"friendly" if int(vdata.get("side", D.Side.FRIENDLY)) == D.Side.FRIENDLY
+			else "enemy")
+		var vside: int = D.Side.FRIENDLY if vside_str == "friendly" else D.Side.ENEMY
+		var vteam: String = ve.get("team", "Able")
+		var vfacing: int = ve.get("facing", 4)
+		var vweapon: String = ve.get("weapon", "")
+		var vc := VehicleCombat.make_vehicle(vtype, vside, vteam, Vector2i(0, 0), vfacing, vweapon)
+		if ve.has("pos"):
+			var vp: PackedStringArray = String(ve["pos"]).split(",")
+			vc.position = Vector2i(int(vp[0]), int(vp[1]))
+		if vside == D.Side.ENEMY:
+			vc.alerted = true
+			vc.known = true   # un veicolo e' sempre visibile (non si nasconde)
+			vc.morale = int(sc.get("enemy_morale", D.Morale.NORMAL))
+		state.characters.append(vc)
+		state.log_event("Veicolo schierato: %s (%s) in %02d.%02d" % [
+			vtype, vteam, vc.position.x, vc.position.y])
 
 	# Mano iniziale (Starting Hand Size).
 	for i in range(state.hand_limit):

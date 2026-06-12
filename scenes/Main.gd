@@ -1553,6 +1553,7 @@ func _test_rules() -> int:
 	fails += _test_medic()
 	fails += _test_wire()
 	fails += _test_abbey()
+	fails += _test_vehicles()
 	return fails
 
 
@@ -2343,6 +2344,107 @@ func _test_ss_skills() -> int:
 	ke.skills = [Character.SKILL_KNIFE_EXPERT]
 	if TurnSequence._melee_attack_tq(st, ke) - (TurnSequence._melee_tq(ke)) != 1:
 		print("TEST Knife Expert: +1 TQ in mischia errato")
+		fails += 1
+	return fails
+
+
+# Veicoli e anticarro (Rule 31-32).
+func _test_vehicles() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 42
+	Boards.fill(st, "farmhouse")
+
+	# make_vehicle: crea un Character con i campi veicolo corretti.
+	var sherman := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 5)
+	if not sherman.is_vehicle or sherman.vehicle_type != "M4A3 Sherman" \
+			or not sherman.weapon_skills.has("75mm L40 HE"):
+		print("TEST veicoli: make_vehicle Sherman errato")
+		fails += 1
+
+	# Veicolo distrutto se hull_damage >= 2.
+	var pz := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(5, 8), 2)
+	if pz.is_dead():
+		print("TEST veicoli: PzIVH non dovrebbe essere morto con hull_damage 0")
+		fails += 1
+	pz.hull_damage = 2
+	if not pz.is_dead():
+		print("TEST veicoli: PzIVH dovrebbe essere distrutto con hull_damage 2")
+		fails += 1
+
+	# hit_face: front se tiratore e' davanti al veicolo.
+	# facing=3 → CUBE_DIRS[2]=(0,1,-1) → fronte verso nord (riga decrescente).
+	pz.hull_damage = 0
+	pz.facing = 3
+	var face_front := VehicleCombat.hit_face(pz, Vector2i(5, 7))  # a nord del PzIVH
+	var face_rear  := VehicleCombat.hit_face(pz, Vector2i(5, 9))  # a sud
+	if face_front != VehicleCombat.Face.FRONT:
+		print("TEST veicoli: hit_face frontale errato (%d)" % face_front)
+		fails += 1
+	if face_rear != VehicleCombat.Face.REAR:
+		print("TEST veicoli: hit_face posteriore errato (%d)" % face_rear)
+		fails += 1
+
+	# can_fire: arma normale non puo' colpire veicolo.
+	var bazooka_man := Character.new("bz", "Bazooka", Domain.Side.FRIENDLY, "Able")
+	bazooka_man.troop_quality = 5
+	bazooka_man.weapon_skills = {"Bazooka M9": 5}
+	bazooka_man.position = Vector2i(5, 5)
+	var rifleman := Character.new("rf", "Rifle", Domain.Side.FRIENDLY, "Able")
+	rifleman.troop_quality = 6
+	rifleman.weapon_skills = {"M1 Garand": 6}
+	rifleman.position = Vector2i(5, 5)
+	pz.hull_damage = 0
+	pz.known = true
+	pz.position = Vector2i(5, 8)
+	st.characters = [bazooka_man, rifleman, pz]
+	if not Fire.can_fire(st, bazooka_man, pz, "Bazooka M9"):
+		print("TEST veicoli: Bazooka M9 non puo' colpire veicolo")
+		fails += 1
+	if Fire.can_fire(st, rifleman, pz, "M1 Garand"):
+		print("TEST veicoli: M1 Garand non dovrebbe colpire veicolo")
+		fails += 1
+
+	# legal_orders: veicolo friendly ha solo gli ordini VEHICLE_ORDERS.
+	var jeep := VehicleCombat.make_vehicle(
+		"Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(6, 5))
+	st.characters = [jeep]
+	var vorders := TurnSequence.legal_orders(st, jeep)
+	if Domain.Order.CHARGE in vorders or Domain.Order.MEDICAL_AID in vorders:
+		print("TEST veicoli: legal_orders veicolo include ordini non ammessi")
+		fails += 1
+	if Domain.Order.AIMED_FIRE not in vorders:
+		print("TEST veicoli: legal_orders veicolo manca Aimed Fire")
+		fails += 1
+
+	# Move.can_enter: veicolo non puo' entrare in BUILDING.
+	var hex_building := Vector2i(4, 4)
+	st.map[GameState.hex_key(hex_building.x, hex_building.y)] = \
+		GameState.MapHex.new(Domain.Terrain.BUILDING)
+	if Move.can_enter(st, jeep, hex_building):
+		print("TEST veicoli: il veicolo non dovrebbe entrare in BUILDING")
+		fails += 1
+
+	# at_fire: un colpo di Bazooka M9 a bruciapelo (rng deterministico)
+	# deve applicare danno al veicolo bersaglio, non a fanteria.
+	var az := GameState.new()
+	az.rng.seed = 1
+	Boards.fill(az, "farmhouse")
+	var bz2 := Character.new("b2", "Bazooka2", Domain.Side.FRIENDLY, "Able")
+	bz2.troop_quality = 6
+	bz2.weapon_skills = {"Bazooka M9": 7}
+	bz2.position = Vector2i(5, 5)
+	bz2.set_order(Domain.Order.AIMED_FIRE)
+	var target_pz := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(5, 6), 5)
+	target_pz.known = true
+	az.characters = [bz2, target_pz]
+	az.rng.seed = 0   # roll = 0 -> nat0 = colpisce sempre
+	var res := VehicleCombat.at_fire(az, bz2, target_pz, "Bazooka M9")
+	if not res["hit"]:
+		print("TEST veicoli: at_fire nat0 non colpisce (res=%s)" % str(res))
 		fails += 1
 	return fails
 

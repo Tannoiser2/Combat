@@ -46,6 +46,36 @@ const DATA := {
 	# invertite rispetto alle armi da fuoco). Damage/Frag TODO.
 	"M7 Grenade Launcher": {"max_range": 25, "rof": 1, "flags": ["grenade"],
 		"bands": [[4, -99], [12, 0], [20, 1], [25, 2]]},
+	# Rule 31-32: armi anticarro (AT) e armi montate sui veicoli.
+	# pen_base + 1d{pen_die} vs armatura del bersaglio.
+	"M2 .50cal": {"max_range": 200, "rof": 4, "flags": ["very_heavy", "belt"],
+		"pen_base": 2, "pen_die": 3,   # 1D3+2 (media 3.5)
+		"bands": [[4, 1], [10, 0], [20, -1], [50, -2], [200, -4]]},
+	"Bazooka M9": {"max_range": 40, "rof": 1, "flags": ["at", "slow"],
+		"pen_base": 7, "pen_die": 6,   # 7+1D6 (media 10.5)
+		"bands": [[1, 2], [3, 1], [8, 0], [12, -2], [20, -4], [30, -6], [40, -8]]},
+	"Panzerfaust 60": {"max_range": 6, "rof": 1, "flags": ["at", "single_use"],
+		"pen_base": 15, "pen_die": 6,  # 15+1D6 (media 18.5)
+		"bands": [[1, 1], [3, 0], [6, -2]]},
+	"Panzerfaust 100": {"max_range": 10, "rof": 1, "flags": ["at", "single_use"],
+		"pen_base": 15, "pen_die": 6,
+		"bands": [[1, 1], [3, 0], [6, -2], [10, -4]]},
+	"75mm L40 HE": {"max_range": 100, "rof": 1, "flags": ["main_gun", "he"],
+		"damage": 4, "frag": 4,
+		"pen_base": 1, "pen_die": 6,   # 1+1D6 vs AFV (solo per AT di emergenza)
+		"bands": [[10, 2], [30, 1], [60, 0], [100, -2]]},
+	"75mm L40 AP": {"max_range": 100, "rof": 1, "flags": ["main_gun", "at"],
+		"pen_base": 6, "pen_die": 6,   # 6+1D6 (media 9.5)
+		"bands": [[10, 2], [30, 1], [60, 0], [100, -2]]},
+	"KwK 7.5cm HE": {"max_range": 100, "rof": 1, "flags": ["main_gun", "he"],
+		"damage": 3, "frag": 4,
+		"pen_base": 1, "pen_die": 6,
+		"bands": [[10, 2], [30, 1], [60, 0], [100, -2]]},
+	"KwK 7.5cm AP": {"max_range": 100, "rof": 1, "flags": ["main_gun", "at"],
+		"pen_base": 9, "pen_die": 6,   # 9+1D6 (media 12.5)
+		"bands": [[10, 2], [30, 1], [60, 0], [100, -2]]},
+	"MG34 Vehicle": {"max_range": 300, "rof": 4, "flags": ["heavy", "belt"],
+		"bands": [[5, 2], [10, 1], [20, 0], [40, -2], [100, -4], [200, -6], [300, -8]]},
 }
 
 # Alias usati nei dati di prova / nomi generici dei personaggi.

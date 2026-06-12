@@ -251,7 +251,33 @@ static func _assign_medic_order(state: GameState, c: Character) -> void:
 		state.log_event("%s (medico) raggiunge il ferito %s" % [c.display_name, ally.display_name])
 
 
+# AI veicolo nemico (Rule 31): avanza verso il nemico piu' vicino e spara
+# se entro gittata utile; altrimenti avanza (RUN_AND_GUN o SPRINT).
+static func _assign_vehicle_order(state: GameState, c: Character) -> void:
+	c.had_first_order = true
+	var target := Move.nearest_enemy(state, c)
+	if target == null:
+		_set_enemy_order(state, c, Domain.Order.SNEAK)
+		return
+	var dist := Spotting.hex_distance(c.position, target.position)
+	# Spara (Aimed Fire) se ha LOS e il bersaglio e' nel raggio dell'arma principale.
+	if dist <= 20 and LOS.clear(state, c, target):
+		_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
+		state.log_event("%s (veicolo) -> Aimed Fire su %s (dist %d)" % [
+			c.display_name, target.display_name, dist])
+	elif dist <= 6:
+		_set_enemy_order(state, c, Domain.Order.RUN_AND_GUN)
+		state.log_event("%s (veicolo) -> Run&Gun verso %s" % [c.display_name, target.display_name])
+	else:
+		_set_enemy_order(state, c, Domain.Order.SPRINT)
+		state.log_event("%s (veicolo) -> Sprint verso %s" % [c.display_name, target.display_name])
+
+
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
+	# Rule 31: veicolo nemico - AI semplificata.
+	if c.is_vehicle:
+		_assign_vehicle_order(state, c)
+		return
 	# Medico addestrato (Rule 30.2): logica dedicata, ignora il lookup morale.
 	if c.is_medic:
 		_assign_medic_order(state, c)
@@ -639,6 +665,14 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 # Ordini assegnabili a un Friendly, filtrati dalle limitazioni attive
 # (carte Worried/Confusion/Can't Think Straight). Per il menu della UI.
 static func legal_orders(state: GameState, c: Character) -> Array[int]:
+	# Rule 31: veicolo ammette solo un sottoinsieme di ordini.
+	if c.is_vehicle:
+		var vok: Array[int] = []
+		for o in VehicleCombat.VEHICLE_ORDERS:
+			if Weather.order_forbidden(state.ground, o):
+				continue
+			vok.append(o)
+		return vok
 	var restrict: String = state.turn_fx.get("restrict", "")
 	var near_enemy := false
 	for e in state.characters:

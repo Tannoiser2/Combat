@@ -98,6 +98,11 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 		return false
 	if Area.fire_at(state, hex) >= 0:
 		return false  # Rule 29.2: nemmeno la carica entra nelle fiamme
+	# Rule 31: i veicoli non entrano in certi terreni.
+	if mover.is_vehicle:
+		var hv := state.hex_at(hex.x, hex.y)
+		if hv != null and hv.terrain in VehicleCombat.VEHICLE_BLOCKED:
+			return false
 	var occ := state.character_at(hex.x, hex.y)
 	if occ == null or occ.is_dead():
 		return true
@@ -210,6 +215,9 @@ static func wire_hide_exempt(state: GameState, mover: Character) -> bool:
 
 
 static func move_character(state: GameState, mover: Character, hexes: int) -> int:
+	# Rule 31: veicolo FAST con MUST_MOVE_2 si muove di 2 hex invece di 1.
+	if mover.is_vehicle and hexes == 2:
+		hexes = VehicleCombat.vehicle_hexes(mover.vehicle_type, true)
 	# Filo spinato (Rule 27.7): per USCIRE serve un TQC (fallito = resta
 	# impigliato), salvo che un compagno nell'hex sia in Hide.
 	if state.has_wire(mover.position) and not wire_hide_exempt(state, mover):

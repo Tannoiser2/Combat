@@ -68,6 +68,13 @@ var removed: bool = false
 var routed_off: bool = false
 # Ha gia' ricevuto il primo ordine? (per gli ordini forzati di scenario)
 var had_first_order: bool = false
+# Veicolo (Rule 31-32): is_vehicle=true per Jeep/Halftrack/carri armati.
+var is_vehicle: bool = false
+var vehicle_type: String = ""   # "Jeep", "M3A1 Halftrack", "M4A3 Sherman", "PzIVH"
+var hull_damage: int = 0        # 0=OK, 1=immobilizzato, 2=distrutto
+var is_buttoned_up: bool = false
+# fire_mode per cannoni principali: "HE" (antipersonnel) o "AP" (anticarro)
+var fire_mode: String = "HE"
 
 
 func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
@@ -121,6 +128,8 @@ func wound_total() -> int:
 func is_dead() -> bool:
 	if removed:
 		return true
+	if is_vehicle:
+		return hull_damage >= 2
 	if side == Domain.Side.ENEMY:
 		return wound_total() >= troop_quality
 	return wound_total() >= troop_quality  # incap o morto: comunque fuori

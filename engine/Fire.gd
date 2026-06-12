@@ -92,6 +92,12 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 	var th := state.hex_at(target.position.x, target.position.y)
 	if th != null and th.terrain == D.Terrain.ABBEY_INTERIOR and not _in_abbey(state, firer.position):
 		return false
+	# Rule 31-32: un bersaglio-veicolo richiede un'arma AT o main_gun.
+	# Le armi normali non lo feriscono (al massimo morale check sull'equipaggio).
+	if target.is_vehicle:
+		var flags: Array = Weapons.info(weapon)["flags"]
+		if not ("at" in flags or "main_gun" in flags):
+			return false
 	return LOS.clear(state, firer, target)
 
 
@@ -112,7 +118,11 @@ static func _abbey_hexes_crossed(state: GameState, a: Vector2i, b: Vector2i) -> 
 
 
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
+# Se il bersaglio e' un veicolo instrada il fuoco AT a VehicleCombat.
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
+	if target.is_vehicle:
+		VehicleCombat.at_fire(state, firer, target, weapon)
+		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var rof := Weapons.rof_at(weapon, dist)
 	var any_hit := false
