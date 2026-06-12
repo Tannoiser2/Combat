@@ -14,6 +14,12 @@ Lingua del progetto: italiano (log, UI, commenti).
   /tmp/godot.zip nelle sessioni precedenti (Godot 4.3 stable linux).
 - Dopo aver aggiunto file con class_name o asset nuovi:
   `godot --headless --path . --import` (rigenera la cache delle classi).
+- ATTENZIONE (headless flaky): se il selftest si BLOCCA (timeout, solo banner)
+  dopo aver modificato i sorgenti, la cache .godot e' desincronizzata. Un Godot
+  ucciso a meta' lascia la cache lockata e i run successivi si appendono a
+  catena. Reset sicuro: `pkill -9 -f Godot; rm -rf .godot;` poi una scansione
+  completa `godot --headless --editor --quit-after 4000 --path .` (deve uscire
+  rc=0) e infine il selftest. Non uccidere Godot a meta' import.
 
 ## Architettura
 
@@ -90,8 +96,16 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    "weather"/"ground". Test in Main._test_weather. NOTA: la notte qui resta
    un malus WS (non un limite LOS), quindi la combinazione notte+meteo "usa il
    minore" non si applica. Veicoli (no Fast/Forward) rimandati con la Rule 31-32.
-4. Nuovo terreno (Rule 27): edifici fortificati, filo spinato,
-   trincee, abbazia, fontane.
+4. PARZIALE: Nuovo terreno (Rule 27). Aggiunti a Domain.Terrain (in coda):
+   FOUNTAIN (rough, ostacolo 1/2 -> HEIGHT2 1), FORTIFIED_BUILDING (come
+   Building: stessi valori spotting, WS propri dal chart, in MC_ONLY; non si
+   puo' caricare l'occupante via Move.can_enter, Rule 27.2), TRENCH (= Depression
+   via LOS.DEPRESSION_LIKE). Valori WS/spotting dai chart del repo privato in
+   Fire.WS_MOD e Spotting.TERRAIN_MOD; cover in Domain.COVER_TERRAINS. Test in
+   Main._test_terrain. DA FARE: filo spinato (Rule 27.7: overlay sul terreno
+   base, -1 WS dal suo interno, solo Sneak per uscire con TQC, no blocco LOS) e
+   abbazia (Rule 27.5: hex interni/esterni con LOS speciale -1/hex). I terreni
+   nuovi non sono ancora piazzati in nessuno scenario (markers da scenario).
 5. Incendi (Rule 29): kindling/growth/spread col vento, generano fumo
    (estende Area.gd).
 6. Medici addestrati (Rule 30).

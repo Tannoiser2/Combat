@@ -53,6 +53,10 @@ const TERRAIN_MOD := {
 	D.Terrain.FIELD: [-3, -2, -1, 0, 0, 0, 0],
 	D.Terrain.RUBBLE: [-5, -4, -3, -1, -2, -2, -2],
 	D.Terrain.FOXHOLE: [-4, -3, -2, -1, -1, -1, -1],
+	# Volume 2, Rule 27 (Spotting Chart). Fortified = Building, Trench = Depression.
+	D.Terrain.FOUNTAIN: [-2, -2, -1, 0, -1, -1, -1],
+	D.Terrain.FORTIFIED_BUILDING: [-5, -4, -3, -2, -1, -2, -2],
+	D.Terrain.TRENCH: [-4, -3, -2, -1, -1, -1, -1],
 }
 
 

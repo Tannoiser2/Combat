@@ -53,6 +53,10 @@ const WS_MOD := {
 	D.Terrain.FIELD: [-3, -1, 0, 0, 0, 0, 0],
 	D.Terrain.RUBBLE: [-5, -3, -2, -2, -2, -2, -2],
 	D.Terrain.FOXHOLE: [-4, -2, 0, 0, -1, -1, -1],
+	# Volume 2, Rule 27 (Order/Terrain Chart). Trench = Depression.
+	D.Terrain.FOUNTAIN: [-2, -2, -2, -1, -1, -1, -1],
+	D.Terrain.FORTIFIED_BUILDING: [-5, -4, -3, -3, -2, -3, -3],
+	D.Terrain.TRENCH: [-4, -2, -1, -1, -1, -1, -1],
 }
 
 # Celle "M" del chart: un bersaglio con ordini Hide/Rally/Reload in
@@ -60,6 +64,7 @@ const WS_MOD := {
 const MC_ONLY := [
 	[D.Terrain.ROCKS, 0], [D.Terrain.BUILDING, 0],
 	[D.Terrain.WALL, 0], [D.Terrain.RUBBLE, 0],
+	[D.Terrain.FORTIFIED_BUILDING, 0],  # Rule 27.2: come Building
 ]
 
 const WOUND_MOD := {D.Wound.LIGHT: -1, D.Wound.BAD: -3}

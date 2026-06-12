@@ -97,8 +97,16 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 	var occ := state.character_at(hex.x, hex.y)
 	if occ == null or occ.is_dead():
 		return true
-	return occ.side != mover.side and mover.has_order \
-		and mover.order in [D.Order.CHARGE, D.Order.MELEE]
+	if occ.side == mover.side or not mover.has_order \
+			or mover.order not in [D.Order.CHARGE, D.Order.MELEE]:
+		return false
+	# Edificio fortificato (Rule 27.2): non si carica un occupante al suo
+	# interno (vale per entrambi i lati - il giocatore non entra, il nemico
+	# non ci prova).
+	var h := state.hex_at(hex.x, hex.y)
+	if h != null and h.terrain == D.Terrain.FORTIFIED_BUILDING:
+		return false
+	return true
 
 
 # L'ordine fa avanzare (true) o ritirare (false)?

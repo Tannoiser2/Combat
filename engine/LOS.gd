@@ -20,17 +20,23 @@ const D := preload("res://engine/Domain.gd")
 
 const LOW_ORDERS := [D.Order.SNEAK, D.Order.HIDE, D.Order.RALLY, D.Order.RELOAD]
 
+# Trincea trattata come Depression per la LOS (Rule 27.4 / 27.8).
+const DEPRESSION_LIKE := [D.Terrain.DEPRESSION, D.Terrain.TRENCH]
+
 # Terreni bassi: altezza 1/2 solo con ordini "low" in gioco.
 const LOW_TERRAIN := [
 	D.Terrain.LONG_GRASS, D.Terrain.DEPRESSION, D.Terrain.LOGS,
 	D.Terrain.CRATER, D.Terrain.FIELD, D.Terrain.FOXHOLE,
+	D.Terrain.TRENCH,
 ]
 
 # Altezza del terreno bloccante, in mezzi livelli (chart, colonna HEIGHT).
+# Fountain: ostacolo 1/2 (Rule 27.1). Fortified Building: come Building.
 const HEIGHT2 := {
 	D.Terrain.ROCKS: 1, D.Terrain.BUILDING: 2, D.Terrain.MARSH: 1,
 	D.Terrain.TREES: 2, D.Terrain.HEDGEROW: 1, D.Terrain.BOCAGE: 2,
 	D.Terrain.WALL: 1, D.Terrain.ORCHARD: 2, D.Terrain.RUBBLE: 1,
+	D.Terrain.FOUNTAIN: 1, D.Terrain.FORTIFIED_BUILDING: 2,
 }
 
 
@@ -104,7 +110,7 @@ static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool) -> i
 	if hex == null:
 		return 0
 	var base := hex.level * 2
-	if hex.terrain == D.Terrain.DEPRESSION:
+	if hex.terrain in DEPRESSION_LIKE:
 		return base  # interposta: "exists at level 0"
 	if hex.terrain in LOW_TERRAIN:
 		return base + (1 if low_active else 0)
@@ -197,7 +203,7 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 # Depression contigui sul percorso).
 static func _depression_blocked(state: GameState, unit: Character, other: Character) -> bool:
 	var hex := state.hex_at(unit.position.x, unit.position.y)
-	if hex == null or hex.terrain != D.Terrain.DEPRESSION or not _has_low_order(unit):
+	if hex == null or hex.terrain not in DEPRESSION_LIKE or not _has_low_order(unit):
 		return false
 	var dist := Spotting.hex_distance(unit.position, other.position)
 	if dist <= int(_unit_level2(state, other) / 2.0) + 1:
@@ -205,7 +211,7 @@ static func _depression_blocked(state: GameState, unit: Character, other: Charac
 	var run := 0
 	for pos in hexes_between(unit.position, other.position):
 		var h := state.hex_at(pos.x, pos.y)
-		if h != null and h.terrain == D.Terrain.DEPRESSION:
+		if h != null and h.terrain in DEPRESSION_LIKE:
 			run += 1
 			if run >= 2:
 				return false

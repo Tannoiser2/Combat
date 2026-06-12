@@ -1545,6 +1545,75 @@ func _test_rules() -> int:
 	fails += _test_ss_skills()
 	fails += _test_weapons()
 	fails += _test_weather()
+	fails += _test_terrain()
+	return fails
+
+
+# Nuovo terreno del Volume 2 (Rule 27): Fountain, Fortified Building, Trench.
+func _test_terrain() -> int:
+	var fails := 0
+	# Le righe dei chart esistono con i valori letti dalle tabelle.
+	if Fire.WS_MOD[Domain.Terrain.FOUNTAIN][0] != -2 \
+			or Fire.WS_MOD[Domain.Terrain.FORTIFIED_BUILDING][0] != -5 \
+			or Fire.WS_MOD[Domain.Terrain.TRENCH] != Fire.WS_MOD[Domain.Terrain.DEPRESSION]:
+		print("TEST terreno: WS_MOD errati")
+		fails += 1
+	if Spotting.TERRAIN_MOD[Domain.Terrain.FORTIFIED_BUILDING] != Spotting.TERRAIN_MOD[Domain.Terrain.BUILDING] \
+			or Spotting.TERRAIN_MOD[Domain.Terrain.FOUNTAIN][0] != -2:
+		print("TEST terreno: TERRAIN_MOD errati")
+		fails += 1
+	for t in [Domain.Terrain.FOUNTAIN, Domain.Terrain.FORTIFIED_BUILDING, Domain.Terrain.TRENCH]:
+		if not Domain.terrain_gives_cover(t):
+			print("TEST terreno: %d non da' copertura" % t)
+			fails += 1
+	# Fountain (ostacolo 1/2) blocca la LOS fra due unita' a livello del suolo.
+	var st := GameState.new()
+	for k in [[0, 0], [0, 1], [0, 2]]:
+		st.map[GameState.hex_key(k[0], k[1])] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	if not LOS.clear_positions(st, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST fountain: aperto dovrebbe essere libero")
+		fails += 1
+	st.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.FOUNTAIN)
+	if LOS.clear_positions(st, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST fountain: dovrebbe bloccare la LOS")
+		fails += 1
+	# Fortified Building: la carica non puo' entrare nell'hex dell'occupante.
+	var st2 := GameState.new()
+	st2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.FORTIFIED_BUILDING)
+	st2.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var mover := Character.new("m", "M", Domain.Side.FRIENDLY, "Able")
+	mover.position = Vector2i(0, 0)
+	mover.set_order(Domain.Order.CHARGE)
+	var e1 := Character.new("e1", "E1", Domain.Side.ENEMY, "Red")
+	e1.troop_quality = 5
+	e1.position = Vector2i(0, 1)
+	var e2 := Character.new("e2", "E2", Domain.Side.ENEMY, "Red")
+	e2.troop_quality = 5
+	e2.position = Vector2i(0, 2)
+	st2.characters = [mover, e1, e2]
+	if Move.can_enter(st2, mover, Vector2i(0, 1)):
+		print("TEST fortified: la carica non dovrebbe entrare")
+		fails += 1
+	if not Move.can_enter(st2, mover, Vector2i(0, 2)):
+		print("TEST fortified: la carica in un edificio normale e' lecita")
+		fails += 1
+	# Trench trattata come Depression: chi e' in trincea con ordine Hide
+	# e' fuori LOS da lontano (come una depressione), non in aperto.
+	var st3 := GameState.new()
+	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.TRENCH)
+	var hider := Character.new("h", "H", Domain.Side.ENEMY, "Red")
+	hider.position = Vector2i(5, 5)
+	hider.set_order(Domain.Order.HIDE)
+	var seer := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	seer.position = Vector2i(5, 10)
+	if LOS.clear(st3, seer, hider):
+		print("TEST trench: in trincea con Hide dovrebbe essere nascosto")
+		fails += 1
+	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	if not LOS.clear(st3, seer, hider):
+		print("TEST trench: in aperto dovrebbe essere visibile")
+		fails += 1
 	return fails
 
 

@@ -102,6 +102,8 @@ enum Terrain {
 	ROCKS, BUILDING, TREES, MARSH, HEDGEROW, WALL,
 	LONG_GRASS, DEPRESSION, STREAM, ORCHARD, LOGS,
 	FIELD, FOXHOLE, RUBBLE, CRATER, BOCAGE,
+	# Volume 2, Rule 27 (nuovi terreni in coda: gli indici esistenti non cambiano)
+	FOUNTAIN, FORTIFIED_BUILDING, TRENCH,
 }
 
 # Nomi leggibili dei terreni per debug/UI
@@ -126,6 +128,9 @@ const TERRAIN_NAMES := {
 	Terrain.RUBBLE: "Rubble",
 	Terrain.CRATER: "Crater",
 	Terrain.BOCAGE: "Bocage",
+	Terrain.FOUNTAIN: "Fountain",
+	Terrain.FORTIFIED_BUILDING: "Fortified Building",
+	Terrain.TRENCH: "Trench",
 }
 
 # Terreni che contano come "In Cover" per le tabelle delle Enemy Card.
@@ -135,6 +140,7 @@ const COVER_TERRAINS := [
 	Terrain.ROCKS, Terrain.BUILDING, Terrain.TREES, Terrain.HEDGEROW,
 	Terrain.WALL, Terrain.DEPRESSION, Terrain.STREAM, Terrain.LOGS,
 	Terrain.FOXHOLE, Terrain.RUBBLE, Terrain.CRATER, Terrain.BOCAGE,
+	Terrain.FOUNTAIN, Terrain.FORTIFIED_BUILDING, Terrain.TRENCH,
 ]
 
 
