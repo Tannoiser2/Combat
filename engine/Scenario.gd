@@ -789,8 +789,12 @@ static func _make(entry: Dictionary, side: int) -> Character:
 		entry["name"], side, entry["team"])
 	c.troop_quality = prof["tq"]
 	c.leadership = prof["ldr"]
-	if not String(prof["weapon"]).is_empty():
-		c.weapon_skills = {prof["weapon"]: prof["ws"]}
+	# L'arma viene dal profilo del ruolo, ma una pedina puo' sostituirla
+	# (Rule 26: es. Thompson al posto del Grease Gun) con "weapon"/"ws".
+	var weapon: String = entry.get("weapon", prof["weapon"])
+	var ws: int = entry.get("ws", prof["ws"])
+	if not weapon.is_empty():
+		c.weapon_skills = {weapon: ws}
 	# Skill SS (Rule 24): dal profilo del ruolo e/o dalla voce di scenario.
 	for s in prof.get("skills", []):
 		c.skills.append(s)

@@ -13,6 +13,16 @@ const DATA := {
 		"bands": [[1, 2], [3, 1], [10, 0], [25, -2], [50, -4]]},
 	"M3 Grease Gun": {"max_range": 12, "rof": 3, "flags": [],
 		"bands": [[1, 2], [3, 1], [6, 0], [10, -2], [12, -4]]},
+	# Vol. 2 (Rule 26). Thompson: sostituibile al Grease Gun, gittata un po'
+	# piu' lunga. Springfield M1903: fucile con mirino (scoped), Slow, +1 in
+	# Aimed Fire oltre i 3 hex. StG 44: ROF 3 entro 13 hex, ROF 1 oltre.
+	"M1 Thompson": {"max_range": 16, "rof": 3, "flags": [],
+		"bands": [[1, 2], [3, 1], [6, 0], [10, -2], [16, -4]]},
+	"M1903 Springfield": {"max_range": 55, "rof": 1, "flags": ["slow", "scoped"],
+		"bands": [[1, 2], [3, 1], [12, 0], [30, -2], [55, -4]]},
+	"StG 44": {"max_range": 66, "rof": 3, "flags": [],
+		"rof_bands": [[13, 3], [66, 1]],
+		"bands": [[1, 2], [3, 1], [13, 0], [22, -2], [33, -4], [66, -6]]},
 	"BAR": {"max_range": 150, "rof": 2, "flags": ["heavy"],
 		"bands": [[1, 2], [3, 1], [12, 0], [30, -2], [50, -4], [80, -6], [150, -8]]},
 	"M1911": {"max_range": 7, "rof": 1, "flags": ["pistol"],
@@ -44,6 +54,17 @@ static func info(name: String) -> Dictionary:
 	var key: String = ALIASES.get(name, name)
 	assert(DATA.has(key), "Arma sconosciuta: %s" % name)
 	return DATA[key]
+
+
+# Rate of Fire alla gittata data. Le armi senza "rof_bands" hanno ROF fisso;
+# lo StG 44 (Rule 26) spara a ROF 3 entro 13 hex e ROF 1 oltre.
+static func rof_at(name: String, dist: int) -> int:
+	var w := info(name)
+	if w.has("rof_bands"):
+		for band in w["rof_bands"]:  # [gittata_max, rof]
+			if dist <= int(band[0]):
+				return int(band[1])
+	return int(w["rof"])
 
 
 # Modificatore WS per la gittata, o null (fuori gittata / NA).

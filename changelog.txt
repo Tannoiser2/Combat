@@ -1,3 +1,10 @@
+v0.11 — 2026-06-12
+- Volume 2, Rule 26: nuove armi
+  - M1 Thompson (gittata 16, ROF 3): sostituibile al Grease Gun
+  - M1903 Springfield: fucile col mirino, Slow, +1 in Aimed oltre 3 hex
+  - StG 44: ROF 3 entro 13 hex, ROF 1 oltre (gittata fino a 66)
+  - una pedina di scenario puo' sostituire l'arma del ruolo
+
 v0.10 — 2026-06-12
 - Volume 2, Rule 24: skill dei nemici Elite SS
   - Dodge / Dodge-2: -1 / -2 al WS di chi spara se l'SS e' in Evade

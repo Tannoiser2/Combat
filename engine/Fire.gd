@@ -82,7 +82,8 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
-	var rof := int(Weapons.info(weapon)["rof"])
+	var dist := Spotting.hex_distance(firer.position, target.position)
+	var rof := Weapons.rof_at(weapon, dist)
 	var any_hit := false
 	var nines := 0
 	var wounds_before := target.wounds.size()
@@ -187,6 +188,11 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2:
 		bits.append("+2 Sniper (Aimed)")
 		ws += 2
+	# Mirino (Rule 26, es. M1903 Springfield): +1 in Aimed Fire oltre i 3 hex.
+	if "scoped" in Weapons.info(weapon)["flags"] and firer.has_order \
+			and firer.order == D.Order.AIMED_FIRE and dist > 3:
+		bits.append("+1 mirino (Aimed >3)")
+		ws += 1
 	# Modificatori della carta di turno (solo per i Friendly).
 	if firer.side == D.Side.FRIENDLY:
 		m = int(state.turn_fx.get("ws_all", 0)) \

@@ -70,11 +70,14 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    TurnSequence._melee_attack_tq. Test deterministici in Main._test_ss_skills.
    DA FARE: il coltello da lancio del Knife Expert (gittata 2, WS = TQ-gittata)
    come attacco a distanza; assegnare le skill ai nemici degli scenari Vol. 2.
-2. Nuove armi (Rule 26): Thompson (sostituibile al Grease Gun),
-   Springfield M1903 (+1 Aimed oltre 3 hex, slow), STG 44 (ROF 3
-   entro 13 hex, ROF 1 oltre), M2 .50cal (solo veicoli, rimandare).
-   Le schede esatte (gittate/bande) sono nel Weapons Chart Addendum
-   nel repo privato.
+2. FATTO (3 armi): Rule 26. In Weapons.DATA: "M1 Thompson" (max 16, ROF 3),
+   "M1903 Springfield" (max 55, ROF 1, flag slow+scoped, +1 in Aimed oltre 3
+   hex via Fire._compute_ws), "StG 44" (max 66, ROF 3 entro 13 hex / ROF 1
+   oltre via Weapons.rof_at + rof_bands, usato in Fire.fire_action). Una pedina
+   di scenario puo' sostituire l'arma del ruolo con "weapon"/"ws" (Scenario._make).
+   Bande esatte dal Weapons Chart (repo privato). Test in Main._test_weapons.
+   DA FARE: M2 .50cal (solo veicoli, rimandata con la Rule 31-32); assegnare
+   le armi nuove ai soldati degli scenari Vol. 2.
 3. Meteo e condizioni del terreno (Rule 28): pioggia, nebbia, fango,
    neve — modificatori a LOS/WS/movimento via state.turn_fx.
 4. Nuovo terreno (Rule 27): edifici fortificati, filo spinato,

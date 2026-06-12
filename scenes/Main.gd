@@ -78,6 +78,8 @@ var _sfx: Dictionary = {}
 const WEAPON_SFX := {
 	"M1 Garand": "garand", "KAR 98K": "kar98", "Rifle": "kar98",
 	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
+	"M1 Thompson": "smg", "StG 44": "smg",
+	"M1903 Springfield": "garand",
 	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
@@ -1540,6 +1542,58 @@ func _test_rules() -> int:
 		print("TEST replay: passi non registrati")
 		fails += 1
 	fails += _test_ss_skills()
+	fails += _test_weapons()
+	return fails
+
+
+# Nuove armi del Volume 2 (Rule 26): fasce di gittata, ROF variabile dello
+# StG 44 e bonus del mirino del Springfield M1903.
+func _test_weapons() -> int:
+	var fails := 0
+	# Thompson: gittata 16, fasce come da chart.
+	if Weapons.range_ws_modifier("M1 Thompson", 6) != 0 \
+			or Weapons.range_ws_modifier("M1 Thompson", 16) != -4 \
+			or Weapons.range_ws_modifier("M1 Thompson", 17) != null:
+		print("TEST Thompson: fasce di gittata errate")
+		fails += 1
+	# StG 44: ROF 3 entro 13 hex, ROF 1 oltre; fasce fino a -6 a 66 hex.
+	if Weapons.rof_at("StG 44", 13) != 3 or Weapons.rof_at("StG 44", 14) != 1:
+		print("TEST StG 44: ROF per gittata errato")
+		fails += 1
+	if Weapons.range_ws_modifier("StG 44", 66) != -6 \
+			or Weapons.range_ws_modifier("StG 44", 67) != null:
+		print("TEST StG 44: fasce di gittata errate")
+		fails += 1
+	# Armi a ROF fisso: rof_at restituisce il ROF nominale.
+	if Weapons.rof_at("M1 Garand", 30) != 1 or Weapons.rof_at("M1 Thompson", 20) != 3:
+		print("TEST rof_at: ROF fisso errato")
+		fails += 1
+	# M1903 Springfield: mirino +1 in Aimed Fire oltre i 3 hex (stesse fasce
+	# del KAR 98K, cosi' la differenza isola il solo bonus del mirino).
+	var st := GameState.new()
+	st.rng.seed = 11
+	Boards.fill(st, "farmhouse")
+	st.impulse = 1
+	var scoped := Character.new("sc", "Scoped", Domain.Side.FRIENDLY, "Able")
+	scoped.troop_quality = 6
+	scoped.weapon_skills = {"M1903 Springfield": 6}
+	scoped.position = Vector2i(10, 10)
+	scoped.set_order(Domain.Order.AIMED_FIRE)
+	var plain := Character.new("pl", "Plain", Domain.Side.FRIENDLY, "Able")
+	plain.troop_quality = 6
+	plain.weapon_skills = {"KAR 98K": 6}
+	plain.position = Vector2i(10, 10)
+	plain.set_order(Domain.Order.AIMED_FIRE)
+	var far := Character.new("fa", "Far", Domain.Side.ENEMY, "Red")
+	far.position = Vector2i(10, 15)  # dist 5 (> 3 hex)
+	var near := Character.new("ne", "Near", Domain.Side.ENEMY, "Red")
+	near.position = Vector2i(10, 12)  # dist 2 (<= 3 hex)
+	if Fire._fire_ws(st, scoped, far) - Fire._fire_ws(st, plain, far) != 1:
+		print("TEST mirino: +1 mancante oltre 3 hex")
+		fails += 1
+	if Fire._fire_ws(st, scoped, near) - Fire._fire_ws(st, plain, near) != 0:
+		print("TEST mirino: bonus errato entro 3 hex")
+		fails += 1
 	return fails
 
 
