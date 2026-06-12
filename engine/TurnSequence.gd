@@ -49,6 +49,49 @@ static func friendly_card_play(state: GameState, index: int) -> void:
 		FriendlyCards.apply(state, state.friendly_card_played)
 
 
+# Carte DISCARD che convengono appena l'occasione si presenta: False
+# Alarm (toglie una Light Wound), Extra Mag (ricarica), Enough Is Enough
+# (+2 morale al piu' scosso), Stop! (Rally automatico di un Rout vicino
+# a un leader). Una sola occasione per carta, loggata.
+static func _use_proactive_discards(state: GameState) -> void:
+	for c in state.characters:
+		if c.side != Domain.Side.FRIENDLY or c.is_dead():
+			continue
+		if Domain.Wound.LIGHT in c.wounds \
+				and FriendlyCards.use_from_hand(state, FriendlyCards.FALSE_ALARM,
+					"la ferita di %s era solo un graffio" % c.display_name):
+			c.wounds.erase(Domain.Wound.LIGHT)
+		if c.no_ammo \
+				and FriendlyCards.use_from_hand(state, FriendlyCards.EXTRA_MAG,
+					"%s ricarica al volo" % c.display_name):
+			c.no_ammo = false
+			c.low_ammo = false
+	# Il morale peggiore della squadra, se Shaken o Rout.
+	var worst: Character = null
+	for c in state.characters:
+		if c.side == Domain.Side.FRIENDLY and not c.is_dead() \
+				and c.morale >= Domain.Morale.SHAKEN \
+				and (worst == null or c.morale > worst.morale):
+			worst = c
+	if worst != null:
+		if worst.morale == Domain.Morale.ROUT and _near_leader(state, worst) \
+				and FriendlyCards.use_from_hand(state, FriendlyCards.STOP,
+					"%s si ferma e si riprende" % worst.display_name):
+			worst.morale = Domain.raise_morale(worst.morale, 1, Domain.Morale.NORMAL)
+		elif FriendlyCards.use_from_hand(state, FriendlyCards.ENOUGH,
+				"%s ritrova il coraggio (+2 morale)" % worst.display_name):
+			worst.morale = Domain.raise_morale(worst.morale, 2, Domain.Morale.NORMAL)
+
+
+# C'e' un leader friendly entro il suo raggio di comando (LDR)?
+static func _near_leader(state: GameState, c: Character) -> bool:
+	for l in state.characters:
+		if l.side == Domain.Side.FRIENDLY and not l.is_dead() and l.leadership > 0 \
+				and Spotting.hex_distance(l.position, c.position) <= l.leadership:
+			return true
+	return false
+
+
 static func _no_events(state: GameState) -> bool:
 	if state.scenario_id.is_empty():
 		return false
@@ -69,6 +112,8 @@ static func friendly_order_phase(state: GameState) -> void:
 
 # Step 3 - Enemy Card and Order Phase (Rule 9.0)
 static func enemy_order_phase(state: GameState) -> void:
+	# Carte DISCARD "proattive" dalla mano (uso automatico razionale).
+	_use_proactive_discards(state)
 	# Ondate di rinforzi del turno, prima di assegnare gli ordini.
 	if not state.scenario_id.is_empty():
 		Scenario.run_waves(state)
@@ -246,6 +291,10 @@ static func resolve_action(state: GameState, c: Character) -> void:
 			if c.order in [Domain.Order.GRENADE, Domain.Order.SMOKE_GRENADE]:
 				if not c.thrown:
 					_try_throw(state, c)
+			elif c.order == Domain.Order.RIFLE_GRENADE:
+				# Lanciagranate M7: gittata lunga ma non sotto i 5 hex.
+				if not c.thrown:
+					_try_throw(state, c, 12, 5)
 			else:
 				_try_fire(state, c)
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
@@ -256,9 +305,10 @@ static func resolve_action(state: GameState, c: Character) -> void:
 			_do_melee(state, c)
 
 
-# Lancio granata (gittata 3, Grenade Check = TQC; il marker esplode in
-# End Phase). Automatico: sull'avversario visibile piu' vicino entro 3.
-static func _try_throw(state: GameState, thrower: Character) -> void:
+# Lancio granata (gittata 3 a mano, 5-12 col lanciagranate M7; Grenade
+# Check = TQC; il marker esplode in End Phase). Automatico:
+# sull'avversario visibile piu' vicino nella fascia di gittata.
+static func _try_throw(state: GameState, thrower: Character, max_r := 3, min_r := 1) -> void:
 	var best: Character = null
 	var best_d := 99
 	for t in state.characters:
@@ -269,7 +319,7 @@ static func _try_throw(state: GameState, thrower: Character) -> void:
 		if t.side == Domain.Side.FRIENDLY and not t.spotted:
 			continue
 		var d := Spotting.hex_distance(thrower.position, t.position)
-		if d <= 3 and d < best_d and LOS.clear(state, thrower, t):
+		if d >= min_r and d <= max_r and d < best_d and LOS.clear(state, thrower, t):
 			best_d = d
 			best = t
 	if best == null:
@@ -285,6 +335,12 @@ static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -
 	state.log_event("%s lancia una granata%s verso %02d.%02d (TQC %s)" % [
 		thrower.display_name, " fumogena" if smoke else "",
 		hex.x, hex.y, "ok" if check["passed"] else "fallito"])
+	# "Lucky Bounce": il giocatore ritira un Grenade Check fallito.
+	if not check["passed"] and thrower.side == Domain.Side.FRIENDLY \
+			and FriendlyCards.use_from_hand(state, FriendlyCards.LUCKY_BOUNCE,
+				"%s ritira il lancio" % thrower.display_name):
+		check = Checks.troop_quality_check(thrower, state.rng)
+		state.log_event("· nuovo Grenade Check: %s" % ("ok" if check["passed"] else "fallito"))
 	var target := hex
 	if not check["passed"]:
 		# lancio sbagliato: devia di 1 hex prima ancora dello scatter
@@ -305,6 +361,11 @@ static func _do_medic(state: GameState, medic: Character) -> void:
 			continue
 		if Spotting.hex_distance(medic.position, p.position) <= 1 and not p.wounds.is_empty():
 			var res := Checks.troop_quality_check(medic, state.rng)
+			# "Medical Marvel": la cura fallita riesce automaticamente.
+			if not res["passed"] and medic.side == Domain.Side.FRIENDLY \
+					and FriendlyCards.use_from_hand(state, FriendlyCards.MEDICAL,
+						"la cura di %s riesce comunque" % medic.display_name):
+				res["passed"] = true
 			if res["passed"]:
 				p.wounds.remove_at(p.wounds.size() - 1)
 				state.log_event("%s cura %s (TQC riuscito)" % [
@@ -330,9 +391,18 @@ static func _do_search(state: GameState, searcher: Character) -> void:
 					searcher.display_name, e.display_name])
 
 
-# Mischia (fine Charge). APPROSSIMATA: il regolamento di dettaglio non e'
-# trascritto; qui l'attaccante fa un TQC, in caso di successo ferisce
-# l'avversario adiacente (rivelandolo se nascosto).
+# Ordini "passivi" che in mischia lasciano scoperti (-2 al TQC difensivo).
+const MELEE_PASSIVE := [
+	Domain.Order.HIDE, Domain.Order.RALLY, Domain.Order.RELOAD,
+	Domain.Order.MEDICAL_AID, Domain.Order.CARRY_DRAG, Domain.Order.PLAN,
+]
+
+
+# Mischia (fine Charge), contrapposta: attaccante e difensore tirano un
+# TQC; chi passa quando l'altro fallisce infligge una pesca di ferita.
+# Doppio successo o doppio fallimento: il corpo a corpo resta in stallo.
+# (Approssimazione dichiarata: la procedura esatta del regolamento non e'
+# trascritta; questa e' simmetrica e usa i TQ effettivi con le ferite.)
 static func _do_melee(state: GameState, attacker: Character) -> void:
 	var target: Character = null
 	for d in state.characters:
@@ -348,12 +418,29 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		target.removed = true
 		state.log_event("%s travolge un'esca in mischia" % attacker.display_name)
 		return
-	var res := Checks.troop_quality_check(attacker, state.rng)
-	state.log_event("%s attacca %s in mischia: TQC %s" % [
+	# "Bayonet!": +2 all'attacco del giocatore in mischia.
+	var atk_bonus := 0
+	if attacker.side == Domain.Side.FRIENDLY \
+			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
+				"%s carica alla baionetta (+2)" % attacker.display_name):
+		atk_bonus = 2
+	var def_malus := -2 if (target.has_order and target.order in MELEE_PASSIVE) else 0
+	var a_roll := Checks.roll_d10(state.rng)
+	var a_pass := a_roll == 0 or (a_roll != 9 \
+		and a_roll <= Checks.effective_tq(attacker) + atk_bonus)
+	var d_roll := Checks.roll_d10(state.rng)
+	var d_pass := d_roll == 0 or (d_roll != 9 \
+		and d_roll <= Checks.effective_tq(target) + def_malus)
+	state.log_event("%s attacca %s in mischia: TQC %d (%s) contro %d (%s)" % [
 		attacker.display_name, target.display_name,
-		"riuscito" if res["passed"] else "fallito"])
-	if res["passed"]:
+		a_roll, "ok" if a_pass else "no", d_roll, "ok" if d_pass else "no"])
+	if a_pass and not d_pass:
 		Fire._resolve_wound(state, target)
+	elif d_pass and not a_pass:
+		state.log_event("  %s respinge l'assalto!" % target.display_name)
+		Fire._resolve_wound(state, attacker)
+	else:
+		state.log_event("  la mischia resta in stallo")
 
 
 # Ordini assegnabili a un Friendly, filtrati dalle limitazioni attive
@@ -409,9 +496,12 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 	var from := c.position
 	var n := Move.move_character(state, c, hexes)
 	if n > 0:
-		var verso := "verso" if Move.advances(c.order) else "via dal"
-		state.log_event("%s si sposta %s nemico: %02d.%02d -> %02d.%02d" % [
-			c.display_name, verso, from.x, from.y, c.position.x, c.position.y])
+		var how := "verso il nemico" if Move.advances(c.order) else "via dal nemico"
+		if c.side == Domain.Side.ENEMY and not Move.parse_dirs(c.order_move).is_empty() \
+				and c.order != Domain.Order.CHARGE:
+			how = "in direzione %s (bussola)" % c.order_move
+		state.log_event("%s si sposta %s: %02d.%02d -> %02d.%02d" % [
+			c.display_name, how, from.x, from.y, c.position.x, c.position.y])
 
 
 # Bersagli che il tiratore puo' ingaggiare ora (visti, in gittata, LOS).

@@ -198,6 +198,34 @@ static func apply(state, serial: int) -> void:
 		state.turn_fx[k] = FX[serial][k]
 
 
+# --- Carte DISCARD (si scartano dalla mano per l'effetto) ---------------
+# Il motore le usa con una politica automatica razionale: quando l'evento
+# di innesco si verifica, se la carta giusta e' in mano viene scartata e
+# l'effetto applicato (loggato). Gruppi per innesco:
+const KEEP_HEAD_DOWN := [1]    # colpo nemico subito -> solo Duck Back
+const LUCKY_BOUNCE := [4]      # ritira un Grenade Check fallito
+const ENOUGH := [7]            # +2 morale a un personaggio
+const FALSE_ALARM := [8]       # rimuove una Light Wound
+const EXTRA_MAG := [15]        # ricarica immediata
+const CRACK_SHOT := [21]       # colpo su nemico -> ucciso automaticamente
+const REROLL_WS := [28, 40]    # Good Shot / Lucky: ritira un tiro di WS
+const BAYONET := [29]          # +2 in mischia
+const MEDICAL := [42]          # Medical Roll riuscito automaticamente
+const STOP := [50]             # Rally automatico vicino a un leader
+
+
+# Se una delle carte e' in mano, la scarta e logga l'uso. Ritorna true.
+static func use_from_hand(state, serials: Array, reason: String) -> bool:
+	for s in serials:
+		var idx: int = state.friendly_hand.find(s)
+		if idx >= 0:
+			state.friendly_hand.remove_at(idx)
+			state.friendly_discard.append(s)
+			state.log_event('Dalla mano: "%s" - %s' % [title_of(s), reason])
+			return true
+	return false
+
+
 # Percorso dell'immagine della carta (grafica originale), o "" se assente.
 static func image(serial: int) -> String:
 	var path := "res://assets/cards/US-%02d.jpg" % serial

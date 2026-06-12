@@ -48,6 +48,8 @@ var role: String = ""
 # rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
 var is_dummy: bool = false
 var removed: bool = false
+# Nemico fuggito dalla mappa in Rout: conta come eliminato per i VP.
+var routed_off: bool = false
 # Ha gia' ricevuto il primo ordine? (per gli ordini forzati di scenario)
 var had_first_order: bool = false
 

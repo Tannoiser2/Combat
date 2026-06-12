@@ -107,11 +107,19 @@ static func nearest_enemy(state: GameState, mover: Character) -> Character:
 	return best
 
 
+# Registra un passo per l'animazione (UI) e il replay, poi sposta davvero.
+static func _commit_step(state: GameState, mover: Character, dest: Vector2i) -> void:
+	var from := mover.position
+	mover.position = dest
+	state.move_paths.append({"who": mover, "from": from, "to": dest})
+	Replay.step(state, mover, from, dest)
+
+
 # Passo verso un hex scelto (deve essere adiacente e libero). Per il
 # movimento guidato dal giocatore. Ritorna true se si e' mosso.
 static func step_to(state: GameState, mover: Character, dest: Vector2i) -> bool:
 	if dest in neighbors(state, mover.position) and is_passable(state, dest):
-		mover.position = dest
+		_commit_step(state, mover, dest)
 		return true
 	return false
 
@@ -131,7 +139,7 @@ static func step(state: GameState, mover: Character, target_pos: Vector2i, away:
 			best = n
 	if best.x <= -99:
 		return false
-	mover.position = best
+	_commit_step(state, mover, best)
 	return true
 
 
@@ -140,18 +148,23 @@ static func step(state: GameState, mover: Character, target_pos: Vector2i, away:
 static func compass_step(state: GameState, mover: Character, dirs: Array[int]) -> int:
 	var may_exit: bool = not state.scenario_id.is_empty() \
 		and Scenario.SCENARIOS[state.scenario_id].get("enemy_may_exit", false)
+	# Un nemico in ROUT che raggiunge il bordo fugge sempre dalla mappa
+	# (eliminato ai fini dei VP).
+	var routing := mover.morale == D.Morale.ROUT
 	for d in dirs:
 		if d < 1 or d >= state.compass.size():
 			continue
 		var dest := from_cube(to_cube(mover.position) + state.compass[d])
 		if not state.map.has(GameState.hex_key(dest.x, dest.y)):
-			if may_exit and mover.side == D.Side.ENEMY:
+			if (may_exit or routing) and mover.side == D.Side.ENEMY:
 				mover.removed = true
-				state.log_event("%s esce dalla mappa" % mover.display_name)
+				mover.routed_off = routing
+				state.log_event("%s %s" % [mover.display_name,
+					"fugge fuori mappa in ROUT" if routing else "esce dalla mappa"])
 				return 2
 			continue
 		if is_passable(state, dest):
-			mover.position = dest
+			_commit_step(state, mover, dest)
 			return 1
 	return 0
 

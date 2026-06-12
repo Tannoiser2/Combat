@@ -679,6 +679,10 @@ static func build(state: GameState, scenario_id: String) -> void:
 		dir1 = Move.to_cube(Vector2i(int(pb[0]), int(pb[1]))) \
 			- Move.to_cube(Vector2i(int(pa[0]), int(pa[1])))
 	state.compass = Move.compass_from_dir1(dir1)
+	# Vento: 1D6 sulla bussola; il fumo deriva di 1 hex per turno.
+	var wind_d := state.rng.randi_range(1, 6)
+	state.wind = state.compass[wind_d]
+	state.log_event("Vento verso direzione %d della bussola" % wind_d)
 
 	# Coppa nemica = personaggi reali + pedine-esca, mescolata.
 	var cup: Array = make_cup(sc["cup_spec"]) if sc.has("cup_spec") \
@@ -813,8 +817,13 @@ static func victory(state: GameState, scenario_id: String) -> Dictionary:
 	var plain := 0
 	var ncos := 0
 	var officers := 0
+	var routed := 0
 	for c in state.characters:
-		if c.side == D.Side.ENEMY and c.is_killed() and not c.is_dummy:
+		# Un nemico fuggito dalla mappa in Rout conta come eliminato.
+		if c.side == D.Side.ENEMY and not c.is_dummy \
+				and (c.is_killed() or c.routed_off):
+			if c.routed_off:
+				routed += 1
 			match c.role:
 				"NCO": ncos += 1
 				"Officer": officers += 1
@@ -823,6 +832,8 @@ static func victory(state: GameState, scenario_id: String) -> Dictionary:
 	vp += ncos * int(vp_rules.get("enemy_nco_killed", vp_rules.get("enemy_killed", 0)))
 	vp += officers * int(vp_rules.get("enemy_officer_killed", vp_rules.get("enemy_killed", 0)))
 	parts.append("%d nemici eliminati" % (plain + ncos + officers))
+	if routed > 0:
+		parts.append("%d fuggiti in rout" % routed)
 	vp += t["f_dead"] * int(vp_rules.get("friendly_killed", 0))
 	parts.append("%d caduti" % t["f_dead"])
 	var wounded := 0

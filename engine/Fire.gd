@@ -111,11 +111,13 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		outcome = "Soppresso!"  # colpito senza danni ma il morale cede
 	elif any_hit:
 		outcome = "Colpito!"
-	# Registra il colpo come dato per la visualizzazione (linea di fuoco).
+	# Registra il colpo come dato per la visualizzazione (linea di fuoco)
+	# e per il replay.
 	state.shots.append({
 		"from": firer.position, "to": target.position,
 		"hit": any_hit, "side": firer.side, "outcome": outcome,
 	})
+	Replay.shot(state, state.shots.back())
 
 
 # Ritorna {hit: bool, nine: bool}.
@@ -194,6 +196,13 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	# naturale) va confermato con un TQC, la cui TQ e' ridotta del valore
 	# per cui il WS era sotto zero (nota 2 del chart).
 	var is_hit := roll == 0 or roll <= ws
+	# Carte "Good Shot"/"Lucky": un tiro mancato del giocatore si ritira.
+	if not is_hit and firer.side == D.Side.FRIENDLY \
+			and FriendlyCards.use_from_hand(state, FriendlyCards.REROLL_WS,
+				"ritira il tiro mancato di %s" % firer.display_name):
+		roll = Checks.roll_d10(state.rng)
+		_log(state, "· nuovo tiro: %d (WS %d)" % [roll, ws])
+		is_hit = roll != 9 and (roll == 0 or roll <= ws)
 	if not is_hit:
 		_log(state, "%s spara a %s con %s: tira %d > WS %d, mancato" % [
 			firer.display_name, target.display_name, weapon, roll, ws])
@@ -212,6 +221,19 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	var wounded_or_killed := false
 	if mc_only:
 		_hit_morale_check(state, target)
+	elif target.side == D.Side.FRIENDLY \
+			and FriendlyCards.use_from_hand(state, FriendlyCards.KEEP_HEAD_DOWN,
+				"il colpo su %s diventa solo Duck Back" % target.display_name):
+		# "Keep Your Head Down": niente pesca ferita, solo testa giu'.
+		target.set_order(D.Order.DUCK_BACK)
+	elif target.side == D.Side.ENEMY and _crack_shot_worthy(target) \
+			and FriendlyCards.use_from_hand(state, FriendlyCards.CRACK_SHOT,
+				"%s e' ucciso sul colpo" % target.display_name):
+		# "Crack Shot": il colpo riuscito uccide automaticamente.
+		while not target.is_dead():
+			target.wounds.append(D.Wound.BAD)
+		target.clear_order()
+		wounded_or_killed = true
 	else:
 		wounded_or_killed = _resolve_wound(state, target)
 	# 0 naturale: il tiratore si esalta se ha fatto danno (mai Berserk).
@@ -220,6 +242,13 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
 	return {"hit": true, "nine": false}
+
+
+# La Crack Shot si spende solo su bersagli di valore (leader, mitragliere,
+# truppa d'elite), non sul primo soldato semplice colpito.
+static func _crack_shot_worthy(target: Character) -> bool:
+	return target.leadership > 0 or target.troop_quality >= 6 \
+		or target.weapon_skills.has("MG42")
 
 
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.

@@ -106,6 +106,13 @@ static func end_phase(state: GameState) -> void:
 			continue
 		m["turns_left"] -= 1
 		if m["turns_left"] > 0:
+			# Il fumo che resta deriva di 1 hex col vento.
+			if t == Type.SMOKE and state.wind != Vector3i.ZERO:
+				var dest := Move.from_cube(Move.to_cube(m["hex"]) + state.wind)
+				if state.map.has(GameState.hex_key(dest.x, dest.y)):
+					state.log_event("Il fumo deriva col vento: %02d.%02d -> %02d.%02d" % [
+						m["hex"].x, m["hex"].y, dest.x, dest.y])
+					m["hex"] = dest
 			keep.append(m)
 		else:
 			state.log_event("%s in %02d.%02d si dissolve" % [
@@ -117,6 +124,8 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 	var hex: Vector2i = m["hex"]
 	var pw: Array = POWER[m["type"]]
 	state.log_event("%s esplode in %02d.%02d!" % [NAMES[m["type"]], hex.x, hex.y])
+	state.booms.append({"hex": hex, "type": m["type"]})
+	Replay.boom(state, hex, m["type"])
 	# Cannoni (intro3/s9): la C4 nell'hex di un pezzo lo distrugge.
 	if m["type"] == Type.C4 and not state.scenario_id.is_empty():
 		var key := "%d,%d" % [hex.x, hex.y]

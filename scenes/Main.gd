@@ -60,6 +60,17 @@ var moves_left: int = 0
 var deploy_queue: Array = []
 var deploy_zone: Array[Vector2i] = []
 
+# Replay: riproduzione dei frame registrati dal motore (Replay.gd).
+# Ogni frame = un impulse, con tutte le azioni animate in simultanea.
+var replay_button: Button
+var replay_frames: Array = []
+var replay_idx := -1            # -1 = nessun replay in corso
+var replay_t := 0.0
+var replay_shots_done := false
+var replay_hidden_banner: CanvasLayer = null   # banner di vittoria sospeso
+const REPLAY_MOVE_T := 1.3      # durata della parte di movimento
+const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
+
 
 func _ready() -> void:
 	if not OS.get_environment("COMBAT_SELFTEST").is_empty():
@@ -317,6 +328,8 @@ func _start_turn() -> void:
 	phase = Phase.CARD
 	acting = null
 	map_view.cue_hexes = []
+	if replay_button != null:
+		replay_button.disabled = true
 	TurnSequence.friendly_card_phase_prepare(state)
 	_show_hand()
 	next_button.disabled = true
@@ -337,6 +350,10 @@ func _on_card_chosen(index: int) -> void:
 
 
 func _on_next_pressed() -> void:
+	# Durante un replay il pulsante lo salta.
+	if replay_idx >= 0:
+		_end_replay()
+		return
 	# In schieramento: "Posizioni standard" = accetta i default del libro.
 	if phase == Phase.DEPLOY:
 		deploy_queue = []
@@ -361,6 +378,8 @@ func _on_next_pressed() -> void:
 			impulse_next = 1
 			state.impulse = 1
 			state.shots.clear()
+			state.move_paths.clear()
+			state.booms.clear()
 			state.log_event("--- Impulse 1 ---")
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
@@ -380,6 +399,7 @@ func _advance_action() -> void:
 				return
 			state.impulse = impulse_next
 			state.shots.clear()
+			state.move_paths.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
@@ -425,6 +445,7 @@ func _finish_friendly_action() -> void:
 
 func _end_action_phase() -> void:
 	TurnSequence.end_phase(state)
+	replay_button.disabled = false
 	if state.game_over:
 		phase = Phase.GAME_OVER
 		var v := Scenario.victory(state, state.scenario_id)
@@ -436,7 +457,7 @@ func _end_action_phase() -> void:
 			_show_victory_banner(v)
 	else:
 		phase = Phase.END_TURN
-		hint_label.text = "End Phase: ordini rimossi"
+		hint_label.text = "End Phase: ordini rimossi (Replay turno per rivederlo)"
 		next_button.text = "Turno %d" % state.turn
 		next_button.disabled = false
 	_refresh()
@@ -468,6 +489,14 @@ func _show_victory_banner(v: Dictionary) -> void:
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(detail)
+	var rewatch := Button.new()
+	rewatch.text = "Rivedi la partita"
+	rewatch.custom_minimum_size = Vector2(0, 48)
+	rewatch.pressed.connect(func():
+		hud.hide()
+		replay_hidden_banner = hud
+		_start_replay(state.replay.duplicate()))
+	box.add_child(rewatch)
 	var back := Button.new()
 	back.text = "Torna al menu"
 	back.custom_minimum_size = Vector2(0, 48)
@@ -504,6 +533,89 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 			return false
 
 
+
+
+# --------------------------------------------------------------- replay
+
+# Replay del turno appena concluso (a fine partita: dell'ultimo turno).
+func _on_replay_turn() -> void:
+	var tno := state.turn - 1
+	_start_replay(state.replay.filter(func(f): return f["turn"] == tno))
+
+
+func _start_replay(frames: Array) -> void:
+	if frames.is_empty() or replay_idx >= 0:
+		hint_label.text = "Niente da rivedere"
+		return
+	replay_frames = frames
+	replay_idx = 0
+	map_view.replay_mode = true
+	map_view.selected = null
+	map_view.cue_hexes = []
+	map_view.los_lines = []
+	order_panel.hide()
+	replay_button.disabled = true
+	next_button.text = "Salta replay"
+	next_button.disabled = false
+	_replay_apply(frames[0])
+
+
+func _replay_apply(f: Dictionary) -> void:
+	replay_t = 0.0
+	replay_shots_done = false
+	map_view.replay_units = f["units"]
+	map_view.replay_paths = f["moves"]
+	map_view.replay_progress = 0.0
+	hint_label.text = "REPLAY - Turno %d, Impulse %d   (%d/%d)" % [
+		f["turn"], f["impulse"], replay_idx + 1, replay_frames.size()]
+	_maybe_screenshot()
+
+
+# Scandisce il replay: movimento simultaneo, poi i colpi, poi frame dopo.
+func _process(delta: float) -> void:
+	if replay_idx < 0:
+		return
+	replay_t += delta
+	var f: Dictionary = replay_frames[replay_idx]
+	var has_moves: bool = not f["moves"].is_empty()
+	var move_t: float = REPLAY_MOVE_T if has_moves else 0.4
+	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
+	# I colpi partono a meta' movimento (le esplosioni con loro).
+	if not replay_shots_done and replay_t >= move_t * 0.5:
+		replay_shots_done = true
+		for s in f["shots"]:
+			map_view.add_tracer(s)
+		for b in f["booms"]:
+			map_view.add_blast(b["hex"])
+	var tail: float = REPLAY_PAUSE_T + (1.2 if not f["shots"].is_empty() else 0.0)
+	if replay_t >= move_t + tail:
+		replay_idx += 1
+		if replay_idx >= replay_frames.size():
+			_end_replay()
+		else:
+			_replay_apply(replay_frames[replay_idx])
+
+
+func _end_replay() -> void:
+	replay_idx = -1
+	replay_frames = []
+	map_view.replay_mode = false
+	map_view.replay_units = {}
+	map_view.replay_paths = {}
+	map_view.queue_redraw()
+	hint_label.text = "Replay terminato"
+	match phase:
+		Phase.END_TURN:
+			next_button.text = "Turno %d" % state.turn
+			next_button.disabled = false
+			replay_button.disabled = false
+		Phase.GAME_OVER:
+			next_button.text = "Partita finita"
+			next_button.disabled = true
+			replay_button.disabled = false
+			if replay_hidden_banner != null:
+				replay_hidden_banner.show()
+	replay_hidden_banner = null
 
 
 # ---------------------------------------------------------------- input
@@ -576,6 +688,8 @@ func _handle_los_click(hex: Vector2i) -> void:
 
 
 func _on_map_clicked() -> void:
+	if replay_idx >= 0:
+		return
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
 		return
@@ -783,6 +897,13 @@ func _build_hud() -> void:
 	los_button.custom_minimum_size = Vector2(70, 40)
 	los_button.toggled.connect(_on_los_toggled)
 	top_box.add_child(los_button)
+	replay_button = Button.new()
+	replay_button.text = "Replay turno"
+	replay_button.tooltip_text = "Rivedi il turno appena giocato: tutte le azioni\ndi ogni impulse animate in simultanea."
+	replay_button.custom_minimum_size = Vector2(120, 40)
+	replay_button.disabled = true
+	replay_button.pressed.connect(_on_replay_turn)
+	top_box.add_child(replay_button)
 	next_button = Button.new()
 	next_button.text = "Avanti"
 	next_button.custom_minimum_size = Vector2(180, 40)
@@ -1143,7 +1264,12 @@ func _format_log_line(line: String) -> String:
 
 # ------------------------------------------------------------ auto-test
 
+var _auto_replayed := false
+
+
 func _auto_step() -> void:
+	if replay_idx >= 0:
+		return  # replay in corso: si lascia finire
 	match phase:
 		Phase.CARD:
 			_on_card_chosen(0)
@@ -1154,7 +1280,14 @@ func _auto_step() -> void:
 			next_button.disabled = false
 			_on_next_pressed()
 		Phase.GAME_OVER:
-			pass
+			# COMBAT_REPLAY=1: esercita il replay completo prima di uscire.
+			if not OS.get_environment("COMBAT_REPLAY").is_empty() and not _auto_replayed:
+				_auto_replayed = true
+				print("AUTO: replay di %d frame" % state.replay.size())
+				_start_replay(state.replay.duplicate())
+			else:
+				print("AUTO: fine partita")
+				get_tree().quit()
 		_:
 			_on_next_pressed()
 
@@ -1191,9 +1324,67 @@ func _selftest() -> void:
 					print("ASIMMETRIA LOS in %s: %s <-> %s (%s / %s)" % [
 						sid, a.display_name, b.display_name,
 						str(a.position), str(b.position)])
-	print("SELFTEST: %s (%d asimmetrie)" % [
+	failures += _test_rules()
+	print("SELFTEST: %s (%d problemi)" % [
 		"OK" if failures == 0 else "FALLITO", failures])
 	get_tree().quit(0 if failures == 0 else 1)
+
+
+# Micro-test deterministici delle regole nuove (mischia, carte DISCARD,
+# vento, rout fuori mappa, registrazione replay).
+func _test_rules() -> int:
+	var fails := 0
+	# Mischia contrapposta: rivela il bersaglio.
+	var st := GameState.new()
+	st.rng.seed = 5
+	Boards.fill(st, "farmhouse")
+	var atk := Character.new("a", "Atk", Domain.Side.FRIENDLY, "Able")
+	atk.troop_quality = 9
+	atk.weapon_skills = {"M1 Garand": 5}
+	atk.position = Vector2i(10, 10)
+	var def := Character.new("d", "Def", Domain.Side.ENEMY, "Red")
+	def.troop_quality = 3
+	def.weapon_skills = {"KAR 98K": 3}
+	def.position = Vector2i(10, 11)
+	st.characters.append(atk)
+	st.characters.append(def)
+	atk.set_order(Domain.Order.CHARGE)
+	TurnSequence._do_melee(st, atk)
+	if not def.known:
+		print("TEST mischia: bersaglio non rivelato")
+		fails += 1
+	# Extra Mag dalla mano: ricarica e scarta la carta.
+	atk.no_ammo = true
+	st.friendly_hand = [15]
+	TurnSequence._use_proactive_discards(st)
+	if atk.no_ammo or st.friendly_hand.has(15) or not st.friendly_discard.has(15):
+		print("TEST Extra Mag: non applicata")
+		fails += 1
+	# Fumo che deriva col vento nella End Phase.
+	st.compass = Move.compass_from_dir1(Vector3i(0, 1, -1))
+	st.wind = st.compass[1]  # nord: riga -1
+	st.area_markers = [{"type": Area.Type.SMOKE, "hex": Vector2i(10, 5),
+		"placed_turn": 1, "turns_left": 2}]
+	Area.end_phase(st)
+	if st.area_markers.is_empty() or st.area_markers[0]["hex"] != Vector2i(10, 4):
+		print("TEST vento: il fumo non deriva")
+		fails += 1
+	# Nemico in ROUT esce dal bordo mappa (eliminato per i VP).
+	def.morale = Domain.Morale.ROUT
+	def.position = Vector2i(10, 0)
+	var res := Move.compass_step(st, def, [1])
+	if res != 2 or not def.routed_off or not def.removed:
+		print("TEST rout: non esce dalla mappa (res %d)" % res)
+		fails += 1
+	# Il replay registra i passi di movimento.
+	st.replay.clear()
+	atk.position = Vector2i(10, 10)
+	Move.step_to(st, atk, Vector2i(10, 11))
+	Move.step_to(st, atk, Vector2i(10, 12))
+	if st.replay.is_empty() or st.replay[0]["moves"].values()[0].size() != 3:
+		print("TEST replay: passi non registrati")
+		fails += 1
+	return fails
 
 
 # Hook di debug per verifiche senza monitor (CI/cloud).

@@ -111,6 +111,20 @@ var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 var _display_pos := {}              # Character -> Vector2
 var _tracers: Array = []            # {from: Vector2, to: Vector2, hit, age}
 var _seen_shots := 0                # quanti state.shots gia' convertiti
+# Movimento fluido hex-per-hex: ogni passo del motore diventa un waypoint
+# e il segnalino li percorre a velocita' costante.
+var _waypoints := {}                # Character -> Array[Vector2]
+var _seen_moves := 0                # quanti state.move_paths gia' convertiti
+# Esplosioni: lampo che si espande e svanisce.
+var _blasts: Array = []             # {pos: Vector2, age: float}
+var _seen_booms := 0
+
+# --- Replay: la UI carica un frame "fantasma" e fa avanzare il progresso;
+# il disegno usa queste unita' al posto di state.characters.
+var replay_mode := false
+var replay_units: Dictionary = {}   # idx -> snapshot (vedi Replay.gd)
+var replay_paths: Dictionary = {}   # idx -> Array di Vector2i (percorso)
+var replay_progress := 0.0          # 0..1 sulla parte di movimento
 
 
 func _ready() -> void:
@@ -121,19 +135,65 @@ func _process(delta: float) -> void:
 	if state == null:
 		return
 	var dirty := false
-	# Segnalini: inseguimento esponenziale della posizione logica.
+	if replay_mode:
+		dirty = true
+	# Passi di movimento del motore -> waypoint per l'animazione.
+	if state.move_paths.size() < _seen_moves:
+		_seen_moves = 0
+	while _seen_moves < state.move_paths.size():
+		var mp: Dictionary = state.move_paths[_seen_moves]
+		var who: Character = mp["who"]
+		if not _waypoints.has(who):
+			_waypoints[who] = []
+			if not _display_pos.has(who):
+				_display_pos[who] = hex_center(mp["from"].x, mp["from"].y)
+		_waypoints[who].append(hex_center(mp["to"].x, mp["to"].y))
+		_seen_moves += 1
+	# Percorri i waypoint a velocita' costante (movimento fluido hex-per-hex).
+	for who in _waypoints.keys():
+		var pts: Array = _waypoints[who]
+		var cur: Vector2 = _display_pos.get(who, hex_center(who.position.x, who.position.y))
+		var budget := cell.x * 3.2 * delta
+		while budget > 0.0 and not pts.is_empty():
+			var d := cur.distance_to(pts[0])
+			if d <= budget:
+				cur = pts.pop_front()
+				budget -= d
+			else:
+				cur += (pts[0] - cur) / d * budget
+				budget = 0.0
+		_display_pos[who] = cur
+		if pts.is_empty():
+			_waypoints.erase(who)
+		dirty = true
+	# Segnalini senza percorso: inseguimento esponenziale della posizione
+	# logica (teletrasporti, schieramento).
 	for c in state.characters:
+		if _waypoints.has(c):
+			continue
 		var target := hex_center(c.position.x, c.position.y)
 		if not _display_pos.has(c):
 			_display_pos[c] = target
 			continue
-		var cur: Vector2 = _display_pos[c]
-		if cur.distance_to(target) > 0.5:
-			_display_pos[c] = cur.lerp(target, minf(1.0, delta * 9.0))
+		var cur2: Vector2 = _display_pos[c]
+		if cur2.distance_to(target) > 0.5:
+			_display_pos[c] = cur2.lerp(target, minf(1.0, delta * 9.0))
 			dirty = true
-		elif cur != target:
+		elif cur2 != target:
 			_display_pos[c] = target
 			dirty = true
+	# Esplosioni -> lampi.
+	if state.booms.size() < _seen_booms:
+		_seen_booms = 0
+	while _seen_booms < state.booms.size():
+		var bm: Dictionary = state.booms[_seen_booms]
+		add_blast(bm["hex"])
+		_seen_booms += 1
+	if not _blasts.is_empty():
+		dirty = true
+		for b in _blasts:
+			b["age"] += delta
+		_blasts = _blasts.filter(func(b): return b["age"] < 1.0)
 	# Nuovi colpi -> traccianti.
 	if state.shots.size() < _seen_shots:
 		_seen_shots = 0  # azzerati a inizio impulse
@@ -159,6 +219,36 @@ func _process(delta: float) -> void:
 # Posizione visiva (animata) di un personaggio.
 func _pos_of(c: Character) -> Vector2:
 	return _display_pos.get(c, hex_center(c.position.x, c.position.y))
+
+
+# Tracciante aggiunto dalla UI (replay): stesso dict di state.shots.
+func add_tracer(s: Dictionary) -> void:
+	_tracers.append({
+		"from": hex_center(s["from"].x, s["from"].y),
+		"to": hex_center(s["to"].x, s["to"].y),
+		"hit": s["hit"], "age": 0.0,
+		"outcome": s.get("outcome", ""),
+	})
+
+
+# Lampo di esplosione su un hex.
+func add_blast(hex: Vector2i) -> void:
+	_blasts.append({"pos": hex_center(hex.x, hex.y), "age": 0.0})
+
+
+# Posizione di un'unita' fantasma del replay: lungo il percorso del frame
+# secondo replay_progress, o ferma sulla posizione dello snapshot.
+func _replay_pos(idx: int) -> Vector2:
+	if replay_paths.has(idx):
+		var path: Array = replay_paths[idx]
+		if path.size() >= 2:
+			var s: float = replay_progress * (path.size() - 1)
+			var i: int = mini(int(s), path.size() - 2)
+			var a := hex_center(path[i].x, path[i].y)
+			var b := hex_center(path[i + 1].x, path[i + 1].y)
+			return a.lerp(b, s - i)
+	var p: Vector2i = replay_units[idx]["pos"]
+	return hex_center(p.x, p.y)
 
 # Segnalino "retro"/dummy generico per team nemico (non identificato).
 const DUMMY_BY_TEAM := {
@@ -349,52 +439,77 @@ func _draw() -> void:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)
 		draw_polyline(_closed(_hex_points(hc, radius * 0.96)),
 			Color(1.0, 1.0, 0.3, 0.9), radius * 0.06)
-	# Segnalini. Un Enemy non Known mostra il retro generico (dummy): il
-	# giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
-	for c in state.characters:
-		if c.is_dead():
-			continue
-		var hidden := c.side == D.Side.ENEMY and not c.known
-		var center := _pos_of(c)
-		if c == selected:
-			draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
-		# Segnalino vero se disponibile (dummy se nemico non identificato),
-		# altrimenti cerchietto di ripiego (build web senza i PNG).
-		var counter_id: String = DUMMY_BY_TEAM.get(c.team, "GE-RedTeam-Dummy-1") if hidden else c.counter
-		var tex := _counter_tex(counter_id)
-		if tex != null:
-			var s := radius * 1.5
-			draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+	# Lampi delle esplosioni: anello che si espande e svanisce.
+	for b in _blasts:
+		var bt: float = b["age"] / 1.0
+		draw_arc(b["pos"], radius * (0.3 + bt * 1.3), 0, TAU, 24,
+			Color(1.0, 0.6, 0.15, 1.0 - bt), radius * 0.16 * (1.05 - bt))
+		if bt < 0.4:
+			draw_circle(b["pos"], radius * 0.5 * (1.0 - bt),
+				Color(1.0, 0.85, 0.3, 0.9 - bt * 2.0))
+	# Segnalini. In replay si disegnano le unita' fantasma del frame; in
+	# gioco quelle vive. Un Enemy non Known mostra il retro generico
+	# (dummy): il giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
+	if replay_mode:
+		for idx in replay_units:
+			var u: Dictionary = replay_units[idx]
+			_draw_unit(font, radius, _replay_pos(idx), u["counter"], u["side"],
+				u["team"], u["hidden"], u["morale"], u["order"], u["name"], false)
+	else:
+		for c in state.characters:
+			if c.is_dead():
+				continue
+			var hidden := c.side == D.Side.ENEMY and not c.known
+			var center := _pos_of(c)
+			_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
+				c.morale, c.order if c.has_order else -1, c.display_name,
+				c == selected, c.order_move)
+			if c.side == D.Side.FRIENDLY and c.spotted:
+				draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
+					radius * 0.12, Color(0.9, 0.15, 0.15))
+
+
+# Un segnalino completo: pedina (o cerchietto di ripiego), pallino del
+# morale, badge dell'ordine. Usato sia per il gioco vivo sia per il replay.
+func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
+		side: int, team: String, hidden: bool, morale: int, order: int,
+		name: String, is_selected: bool, order_move: String = "") -> void:
+	if is_selected:
+		draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
+	# Segnalino vero se disponibile (dummy se nemico non identificato),
+	# altrimenti cerchietto di ripiego (build web senza i PNG).
+	var counter_id: String = DUMMY_BY_TEAM.get(team, "GE-RedTeam-Dummy-1") if hidden else counter
+	var tex := _counter_tex(counter_id)
+	if tex != null:
+		var s := radius * 1.5
+		draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+	else:
+		draw_circle(center, radius * 0.45,
+			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[side])
+		draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
+		draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
+			"?" if hidden else name.substr(0, 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
+	# Pallino del morale (alto a sinistra), bordato per leggibilita'.
+	if not hidden:
+		var mc := center + Vector2(-radius * 0.52, -radius * 0.52)
+		draw_circle(mc, radius * 0.17, MORALE_COLORS[morale])
+		draw_circle(mc, radius * 0.17, Color(0, 0, 0, 0.8), false, radius * 0.03)
+	# Ordine: segnalino-ordine vero (con impulse track) come badge in
+	# basso a destra; ripiego a etichetta per gli ordini senza marker.
+	if order >= 0 and not hidden:
+		var otex := _order_tex(order, side)
+		if otex != null:
+			var ms := radius * 0.95
+			draw_texture_rect(otex,
+				Rect2(center + Vector2(radius * 0.18, radius * 0.18), Vector2(ms, ms)), false)
 		else:
-			draw_circle(center, radius * 0.45,
-				Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[c.side])
-			draw_circle(center, radius * 0.45, Color(0, 0, 0, 0.6), false, radius * 0.04)
-			draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
-				"?" if hidden else c.display_name.substr(0, 1),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
-		# Pallino del morale (alto a sinistra), bordato per leggibilita'.
-		if not hidden:
-			var mc := center + Vector2(-radius * 0.52, -radius * 0.52)
-			draw_circle(mc, radius * 0.17, MORALE_COLORS[c.morale])
-			draw_circle(mc, radius * 0.17, Color(0, 0, 0, 0.8), false, radius * 0.03)
-		if c.side == D.Side.FRIENDLY and c.spotted:
-			draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
-				radius * 0.12, Color(0.9, 0.15, 0.15))
-		# Ordine: segnalino-ordine vero (con impulse track) come badge in
-		# basso a destra; ripiego a etichetta per gli ordini senza marker.
-		if c.has_order and not hidden:
-			var otex := _order_tex(c.order, c.side)
-			if otex != null:
-				var ms := radius * 0.95
-				draw_texture_rect(otex,
-					Rect2(center + Vector2(radius * 0.18, radius * 0.18), Vector2(ms, ms)), false)
-			else:
-				var label: String = D.ORDER_NAMES[c.order]
-				if not c.order_move.is_empty():
-					label += " " + c.order_move
-				draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
-					label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
-					Color(0.95, 0.95, 0.2))
+			var label: String = D.ORDER_NAMES[order]
+			if not order_move.is_empty():
+				label += " " + order_move
+			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
+				label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
+				Color(0.95, 0.95, 0.2))
 
 
 func _draw_procedural_terrain(font: Font, radius: float) -> void:

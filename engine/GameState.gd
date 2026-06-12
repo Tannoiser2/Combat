@@ -55,6 +55,10 @@ var initiative_order: Array[String] = []
 # dei delta cubici (impostata dallo scenario; [0] inutilizzato).
 var compass: Array = []
 
+# Direzione del vento (delta cubico, 1D6 sulla bussola a inizio scenario):
+# il fumo deriva di 1 hex per turno. ZERO = calma piatta.
+var wind: Vector3i = Vector3i.ZERO
+
 # Generatore di casualita' della partita: un solo rng, cosi' col seed
 # la partita e' riproducibile (utile per i test).
 var rng := RandomNumberGenerator.new()
@@ -103,6 +107,16 @@ var log: Array[String] = []
 # Colpi sparati nell'impulse corrente, come dati per la UI (linee di
 # fuoco): {from, to, hit, side}. La UI li disegna e li azzera per impulse.
 var shots: Array = []
+
+# Passi di movimento dell'impulse corrente, per l'animazione hex-per-hex:
+# {who: Character, from: Vector2i, to: Vector2i}. Stesso ciclo di shots.
+var move_paths: Array = []
+
+# Esplosioni avvenute (per il lampo in mappa): {hex, type}.
+var booms: Array = []
+
+# Frame registrati per il replay (vedi Replay.gd).
+var replay: Array = []
 
 
 func log_event(msg: String) -> void:
