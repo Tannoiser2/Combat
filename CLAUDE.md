@@ -111,9 +111,15 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    uscire in Move.move_character (esente con compagno in Hide, Move.wire_hide_exempt),
    nemici con ordini di movimento ridotti a Sneak e auto-Hide del TQ piu' basso
    con 2+ nemici (_wire_auto_hide), filtro legal_orders per il giocatore; non
-   blocca la LOS. Test Main._test_wire. DA FARE: abbazia (Rule 27.5: hex
-   interni/esterni con LOS speciale -1/hex). I terreni nuovi non sono ancora
-   piazzati in nessuno scenario (markers da scenario).
+   blocca la LOS. Test Main._test_wire. Abbazia (Rule 27.5) FATTO:
+   ABBEY_EXTERIOR/ABBEY_INTERIOR; copertura WS/spotting a seconda che il
+   tiratore/osservatore sia dentro o fuori (Fire.ABBEY_WS_*, Spotting.ABBEY_SPOT_*,
+   ultima colonna spotting stimata); -1/hex d'abbazia attraversato
+   (Fire._abbey_hexes_crossed); gli interni sono immuni al fuoco da fuori
+   (Fire.can_fire); la LOS dentro l'abbazia non e' bloccata dai muri ma da fuori
+   il muro esterno blocca (LOS both_abbey, HEIGHT2 2). Test Main._test_abbey.
+   RULE 27 COMPLETA. I terreni nuovi non sono ancora piazzati in nessuno
+   scenario (markers/board da scenario).
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
@@ -133,9 +139,10 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    legal_orders (giocatore) e convertiti in Medical Aid in _set_enemy_order
    (nemico). Scossa morale ai friendly con LOS alla morte/ferita grave del
    medico amico (30.1) in Fire._medic_shock (nat0 +2, <=TQ +1, nat9 -1).
-   Test in Main._test_medic. DA FARE: nemico che evita di sparare ai medici
-   amici (TQ+2), micro-AI del medico nemico verso i feriti (30.2), revenge sui
-   prigionieri.
+   Micro-AI del medico nemico (30.2): cura il ferito adiacente, altrimenti
+   Evade verso il ferito alleato entro 4 hex (bussola), altrimenti Hide
+   (TurnSequence._assign_medic_order). Test in Main._test_medic. DA FARE:
+   nemico che evita di sparare ai medici amici (TQ+2), revenge sui prigionieri.
 7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
    privato (scansioni mappe da classificare con tools/
    classify_terrain.py e generate_boards.py) e lo Scenario Book.

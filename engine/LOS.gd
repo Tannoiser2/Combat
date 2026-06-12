@@ -37,6 +37,8 @@ const HEIGHT2 := {
 	D.Terrain.TREES: 2, D.Terrain.HEDGEROW: 1, D.Terrain.BOCAGE: 2,
 	D.Terrain.WALL: 1, D.Terrain.ORCHARD: 2, D.Terrain.RUBBLE: 1,
 	D.Terrain.FOUNTAIN: 1, D.Terrain.FORTIFIED_BUILDING: 2,
+	# Abbazia (Rule 27.5): muri che bloccano dall'esterno (eccezione interna sotto).
+	D.Terrain.ABBEY_EXTERIOR: 2, D.Terrain.ABBEY_INTERIOR: 2,
 }
 
 
@@ -105,13 +107,17 @@ static func _hex_level2_at(state: GameState, pos: Vector2i) -> int:
 
 
 # Altezza efficace di un hex interposto, in mezzi livelli.
-static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool) -> int:
+static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool, both_abbey: bool = false) -> int:
 	var hex := state.hex_at(pos.x, pos.y)
 	if hex == null:
 		return 0
 	var base := hex.level * 2
 	if hex.terrain in DEPRESSION_LIKE:
 		return base  # interposta: "exists at level 0"
+	# Abbazia (Rule 27.5): tra due hex d'abbazia la LOS non e' bloccata dai
+	# muri dell'abbazia (vale il -1/hex sul WS, non un blocco).
+	if both_abbey and Domain.is_abbey(hex.terrain):
+		return base
 	if hex.terrain in LOW_TERRAIN:
 		return base + (1 if low_active else 0)
 	return base + int(HEIGHT2.get(hex.terrain, 0))
@@ -144,6 +150,11 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 	if state.max_los > 0 and Spotting.hex_distance(a, b) > state.max_los:
 		return false
 	var between := hexes_between(a, b)
+	# Abbazia (Rule 27.5): tra due hex d'abbazia i muri non bloccano la LOS.
+	var ha := state.hex_at(a.x, a.y)
+	var hb := state.hex_at(b.x, b.y)
+	var both_abbey := ha != null and hb != null \
+		and Domain.is_abbey(ha.terrain) and Domain.is_abbey(hb.terrain)
 	# H: ostacolo piu' alto; a parita', l'hex piu' lontano dal piu' alto.
 	var t2 := maxi(l1, l2)
 	var s2 := mini(l1, l2)
@@ -152,7 +163,7 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 	var h2 := -1000
 	var h_pos := taller_pos
 	for pos in between:
-		var hh := _hex_height2(state, pos, low_active)
+		var hh := _hex_height2(state, pos, low_active, both_abbey)
 		var farther := Spotting.hex_distance(taller_pos, pos) \
 			>= Spotting.hex_distance(taller_pos, h_pos)
 		if hh > h2 or (hh == h2 and farther):

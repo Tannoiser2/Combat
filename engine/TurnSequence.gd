@@ -204,7 +204,58 @@ static func _set_enemy_order(state: GameState, c: Character, order: int,
 			Domain.ORDER_NAMES[final_order]])
 
 
+# Il ferito alleato piu' vicino entro `max_d` hex, o null (Rule 30.2).
+static func _nearest_wounded_ally(state: GameState, medic: Character, max_d: int) -> Character:
+	var best: Character = null
+	var bd := 9999
+	for p in state.characters:
+		if p.side != medic.side or p == medic or p.is_dead() or p.wounds.is_empty():
+			continue
+		var d := Spotting.hex_distance(medic.position, p.position)
+		if d <= max_d and d < bd:
+			bd = d
+			best = p
+	return best
+
+
+# Numero di bussola (1..6) che meglio punta da `from` verso `to`.
+static func _compass_toward(state: GameState, from: Vector2i, to: Vector2i) -> int:
+	if state.compass.size() != 7:
+		return 1
+	var delta := Move.to_cube(to) - Move.to_cube(from)
+	var best_k := 1
+	var best_dot := -9999
+	for k in range(1, 7):
+		var d: Vector3i = state.compass[k]
+		var dot := d.x * delta.x + d.y * delta.y + d.z * delta.z
+		if dot > best_dot:
+			best_dot = dot
+			best_k = k
+	return best_k
+
+
+# Micro-AI del medico nemico (Rule 30.2): cura il ferito adiacente, altrimenti
+# si muove (Evade) verso il ferito alleato entro 4 hex, altrimenti Hide.
+static func _assign_medic_order(state: GameState, c: Character) -> void:
+	c.had_first_order = true
+	var ally := _nearest_wounded_ally(state, c, 4)
+	if ally == null:
+		_set_enemy_order(state, c, Domain.Order.HIDE)
+		state.log_event("%s (medico) non vede feriti: Hide" % c.display_name)
+		return
+	if Spotting.hex_distance(c.position, ally.position) <= 1:
+		_set_enemy_order(state, c, Domain.Order.MEDICAL_AID)
+		state.log_event("%s (medico) presta soccorso a %s" % [c.display_name, ally.display_name])
+	else:
+		_set_enemy_order(state, c, Domain.Order.EVADE, str(_compass_toward(state, c.position, ally.position)))
+		state.log_event("%s (medico) raggiunge il ferito %s" % [c.display_name, ally.display_name])
+
+
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
+	# Medico addestrato (Rule 30.2): logica dedicata, ignora il lookup morale.
+	if c.is_medic:
+		_assign_medic_order(state, c)
+		return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():

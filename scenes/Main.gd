@@ -1551,6 +1551,71 @@ func _test_rules() -> int:
 	fails += _test_fire()
 	fails += _test_medic()
 	fails += _test_wire()
+	fails += _test_abbey()
+	return fails
+
+
+# Abbazia (Volume 2, Rule 27.5).
+func _test_abbey() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	var firer := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 2)
+	# Da fuori non si colpisce un hex interno...
+	if Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST abbazia: l'interno non e' immune da fuori")
+		fails += 1
+	# ...ma da dentro l'abbazia si'.
+	st.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.ABBEY_EXTERIOR
+	if not Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST abbazia: da dentro dovrebbe poter colpire l'interno")
+		fails += 1
+	# Copertura dipendente dal tiratore: bersaglio esterno in Hide (gruppo 0).
+	var st2 := GameState.new()
+	st2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	var sh := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	sh.troop_quality = 6
+	sh.weapon_skills = {"M1 Garand": 6}
+	sh.position = Vector2i(0, 0)
+	var hid := Character.new("h", "H", Domain.Side.ENEMY, "Red")
+	hid.troop_quality = 5
+	hid.position = Vector2i(0, 2)
+	hid.set_order(Domain.Order.HIDE)
+	var ws_out: int = Fire._compute_ws(st2, sh, hid, "M1 Garand")["ws"]
+	st2.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.ABBEY_EXTERIOR
+	var ws_in: int = Fire._compute_ws(st2, sh, hid, "M1 Garand")["ws"]
+	if ws_in - ws_out != 2:  # -5 (fuori) vs -3 (dentro) sul gruppo Hide
+		print("TEST abbazia: copertura tiratore-dipendente errata (%d vs %d)" % [ws_in, ws_out])
+		fails += 1
+	# -1 per ogni hex d'abbazia attraversato.
+	var st3 := GameState.new()
+	st3.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	st3.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	if Fire._abbey_hexes_crossed(st3, Vector2i(0, 0), Vector2i(0, 3)) != 2:
+		print("TEST abbazia: conteggio hex attraversati errato")
+		fails += 1
+	# LOS: dentro l'abbazia non e' bloccata; da fuori il muro esterno blocca.
+	var st4 := GameState.new()
+	st4.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	st4.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.ABBEY_EXTERIOR)
+	st4.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.ABBEY_INTERIOR)
+	if not LOS.clear_positions(st4, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST abbazia: LOS interna dovrebbe essere libera")
+		fails += 1
+	st4.map[GameState.hex_key(0, 0)].terrain = Domain.Terrain.OPEN_LEVEL_0  # osservatore fuori
+	if LOS.clear_positions(st4, Vector2i(0, 0), Vector2i(0, 2), 0, 0, false):
+		print("TEST abbazia: il muro esterno dovrebbe bloccare da fuori")
+		fails += 1
 	return fails
 
 
@@ -1728,6 +1793,31 @@ func _test_medic() -> int:
 	Fire._resolve_wound(sk, null, mdead)
 	if not mdead.is_dead() or witness.morale == Domain.Morale.NORMAL:
 		print("TEST medico: nessuna reazione alla caduta del medico")
+		fails += 1
+	# Rule 30.2: micro-AI del medico nemico (Hide / Medical Aid / Evade).
+	var sa := GameState.new()
+	var emedic := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	emedic.troop_quality = 5
+	emedic.is_medic = true
+	emedic.position = Vector2i(5, 5)
+	sa.characters = [emedic]
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.HIDE:
+		print("TEST medico nemico: senza feriti dovrebbe fare Hide")
+		fails += 1
+	var w1 := Character.new("w1", "W1", Domain.Side.ENEMY, "Red")
+	w1.troop_quality = 5
+	w1.position = Vector2i(5, 6)  # adiacente
+	w1.wounds = [Domain.Wound.LIGHT]
+	sa.characters = [emedic, w1]
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.MEDICAL_AID:
+		print("TEST medico nemico: ferito adiacente -> Medical Aid")
+		fails += 1
+	w1.position = Vector2i(5, 8)  # dist 3 (entro 4)
+	TurnSequence._assign_enemy_order(sa, emedic, 1)
+	if emedic.order != Domain.Order.EVADE:
+		print("TEST medico nemico: ferito vicino -> si muove (Evade)")
 		fails += 1
 	return fails
 

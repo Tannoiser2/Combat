@@ -29,6 +29,11 @@ const ORDER_GROUP := {
 }
 const NO_ORDER_GROUP := 2
 
+# Abbazia (Rule 27.5): spotting di un bersaglio in abbazia, a seconda che
+# l'osservatore sia dentro o fuori. Ultima colonna stimata (manca dal chart).
+const ABBEY_SPOT_OUTSIDE := [-5, -4, -3, -2, -2, -3, -3]
+const ABBEY_SPOT_INSIDE := [-3, -2, -1, 0, 0, 0, 0]
+
 # Righe del chart: terreno del bersaglio -> modificatori per gruppo.
 # I livelli Open usano tutti la riga OPEN; Stream non e' nel chart
 # (trattato come Open, TODO verificare col regolamento).
@@ -91,6 +96,11 @@ static func target_modifier(state: GameState, target: Character, spotter: Charac
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
 	var group: int = ORDER_GROUP.get(target.order, NO_ORDER_GROUP) \
 		if target.has_order else NO_ORDER_GROUP
+	# Abbazia (Rule 27.5): copertura allo spotting a seconda che l'osservatore
+	# sia dentro o fuori dall'abbazia.
+	if D.is_abbey(terrain):
+		var inside := spotter != null and Fire._in_abbey(state, spotter.position)
+		return (ABBEY_SPOT_INSIDE if inside else ABBEY_SPOT_OUTSIDE)[group]
 	var mod: int = TERRAIN_MOD[terrain][group]
 	if spotter != null:
 		var side := Fire._entry_hexside(state, spotter.position, target.position)

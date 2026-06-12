@@ -68,6 +68,11 @@ const MC_ONLY := [
 ]
 
 const WOUND_MOD := {D.Wound.LIGHT: -1, D.Wound.BAD: -3}
+# Abbazia (Rule 27.5): la copertura di un bersaglio in un hex d'abbazia dipende
+# da DOVE spara il tiratore (dentro o fuori dall'abbazia), non solo dal terreno.
+const ABBEY_WS_OUTSIDE := [-5, -3, -3, -2, -1, -3, -3]
+const ABBEY_WS_INSIDE := [-3, -2, -2, -1, -1, -2, -2]
+
 const MORALE_WS_MOD := {
 	D.Morale.BERSERK: 3,
 	D.Morale.CAUTIOUS: -1,
@@ -82,7 +87,28 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	if Weapons.range_ws_modifier(weapon, dist) == null:
 		return false
+	# Abbazia (Rule 27.5): da fuori si colpiscono solo gli hex esterni; chi e'
+	# in un hex interno e' immune al fuoco proveniente da fuori dall'abbazia.
+	var th := state.hex_at(target.position.x, target.position.y)
+	if th != null and th.terrain == D.Terrain.ABBEY_INTERIOR and not _in_abbey(state, firer.position):
+		return false
 	return LOS.clear(state, firer, target)
+
+
+# Il personaggio e' dentro l'abbazia (suo hex con collare rosso o rosso+giallo)?
+static func _in_abbey(state: GameState, pos: Vector2i) -> bool:
+	var h := state.hex_at(pos.x, pos.y)
+	return h != null and Domain.is_abbey(h.terrain)
+
+
+# Quanti hex d'abbazia attraversa la linea di tiro (estremi esclusi)?
+static func _abbey_hexes_crossed(state: GameState, a: Vector2i, b: Vector2i) -> int:
+	var n := 0
+	for pos in LOS.hexes_between(a, b):
+		var h := state.hex_at(pos.x, pos.y)
+		if h != null and Domain.is_abbey(h.terrain):
+			n += 1
+	return n
 
 
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
@@ -190,17 +216,30 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		bits.append("%+d gittata %d hex" % [m, dist])
 	ws += m
 	if not suppressive:
-		var tmod: int = WS_MOD[terrain][group]
-		var tname: String = Domain.TERRAIN_NAMES[terrain]
-		# Hexside sul bordo d'ingresso del tiro (siepe/bocage/muro davanti
-		# al bersaglio): vale il modificatore piu' protettivo.
-		var side := _entry_hexside(state, firer.position, target.position)
-		if side >= 0 and WS_MOD[side][group] < tmod:
-			tmod = WS_MOD[side][group]
-			tname = Domain.TERRAIN_NAMES[side] + " (bordo)"
+		var tmod: int
+		var tname: String
+		if Domain.is_abbey(terrain):
+			# Abbazia (Rule 27.5): riga a seconda che il tiratore sia dentro o fuori.
+			var inside := _in_abbey(state, firer.position)
+			tmod = (ABBEY_WS_INSIDE if inside else ABBEY_WS_OUTSIDE)[group]
+			tname = "abbazia (tiratore %s)" % ("dentro" if inside else "fuori")
+		else:
+			tmod = WS_MOD[terrain][group]
+			tname = Domain.TERRAIN_NAMES[terrain]
+			# Hexside sul bordo d'ingresso del tiro (siepe/bocage/muro davanti
+			# al bersaglio): vale il modificatore piu' protettivo.
+			var side := _entry_hexside(state, firer.position, target.position)
+			if side >= 0 and WS_MOD[side][group] < tmod:
+				tmod = WS_MOD[side][group]
+				tname = Domain.TERRAIN_NAMES[side] + " (bordo)"
 		if tmod != 0:
 			bits.append("%+d bersaglio in %s" % [tmod, tname])
 		ws += tmod
+		# Abbazia: -1 per ogni hex d'abbazia attraversato dal tiro (Rule 27.5).
+		var crossed := _abbey_hexes_crossed(state, firer.position, target.position)
+		if crossed > 0:
+			bits.append("-%d abbazia attraversata" % crossed)
+			ws -= crossed
 	if firer.has_order:
 		m = int(Orders.FIRE_WS_MOD.get(firer.order, 0))
 		if m != 0:
