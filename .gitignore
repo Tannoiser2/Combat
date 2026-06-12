@@ -10,6 +10,9 @@ riferimenti/
 *.pdf
 *.vmod
 
+# Claude Code
+.claude/worktrees/
+
 # Sistema
 .DS_Store
 *.log
