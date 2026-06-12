@@ -86,8 +86,8 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    oltre via Weapons.rof_at + rof_bands, usato in Fire.fire_action). Una pedina
    di scenario puo' sostituire l'arma del ruolo con "weapon"/"ws" (Scenario._make).
    Bande esatte dal Weapons Chart (repo privato). Test in Main._test_weapons.
-   DA FARE: M2 .50cal (solo veicoli, rimandata con la Rule 31-32); assegnare
-   le armi nuove ai soldati degli scenari Vol. 2.
+   M2 .50cal aggiunta con la Rule 31-32 (solo veicoli). DA FARE: assegnare
+   Thompson/Springfield a specifici soldati degli scenari Vol. 2 (richiede dati del libro).
 3. FATTO: Meteo e condizioni del terreno (Rule 28) in Weather.gd (class_name,
    enum Type/Ground). state.weather/ground/max_los. Malus WS oltre 2 hex
    (Rain/Heavy Rain/Mist -1, Fog -2; esente se entrambi nello stesso edificio)

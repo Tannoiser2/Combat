@@ -81,14 +81,20 @@ const WEAPON_SFX := {
 	"M1 Thompson": "thompson", "StG 44": "stg44",
 	"M1903 Springfield": "springfield",
 	"Thrown Knife": "throw",
-	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
+	"BAR": "bar", "M1919": "m1919", "MG42": "mg42", "MG34 Vehicle": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
+	# Rule 31-32: armi anticarro e cannoni.
+	"Bazooka M9": "grenade", "Panzerfaust 60": "grenade", "Panzerfaust 100": "grenade",
+	"75mm L40 HE": "artillery", "75mm L40 AP": "artillery",
+	"KwK 7.5cm HE": "artillery", "KwK 7.5cm AP": "artillery",
+	"M2 .50cal": "m1919",
 }
 const AREA_SFX := {
 	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
 	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
 	Area.Type.C4: "artillery",
+	Area.Type.SMOKE: "smoke",
 }
 # Esito del fuoco (Fire.fire_action) -> suono di reazione.
 const OUTCOME_SFX := {

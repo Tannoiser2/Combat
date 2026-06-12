@@ -1,3 +1,16 @@
+v0.17 — 2026-06-12
+- Volume 2 completo: Rule 31-32 veicoli e anticarro
+  - 4 veicoli: Jeep, M3A1 Halftrack, M4A3 Sherman, PzIVH
+  - fuoco AT: WS check + penetrazione vs armatura (frontale/laterale/posteriore)
+  - cannone principale HE vs fanteria, AI dei veicoli nemici
+  - veicoli negli scenari: s20 Halftrack (amico), s21 Sherman + AT Grenadier
+    (nemici con Panzerfaust), s22 PzIVH (nemico)
+  - Pvt Cruz (Bazooka Man) aggiunto alla squadra Vol.2
+  - 9 nuove armi: Bazooka M9, Panzerfaust 60/100, 75mm HE/AP, KwK HE/AP,
+    MG34 Vehicle, M2 .50cal
+- Scenari Vol.2 (s11-s22) e 6 nuove mappe disponibili nel menu
+- Suoni per le armi AT e il fumogeno
+
 v0.16 — 2026-06-12
 - Volume 2, Rule 30: medici addestrati
   - disarmati: mai fuoco, granate, carica o mischia

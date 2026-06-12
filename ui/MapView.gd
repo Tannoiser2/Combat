@@ -263,6 +263,9 @@ const DUMMY_BY_TEAM := {
 	"Red": "GE-RedTeam-Dummy-1",
 	"White": "GE-WhiteTeam-Dummy-1",
 	"Yellow": "GE-YellowTeam-Dummy-1",
+	# Vol.2 SS: i file dummy non sono nel repo pubblico → cerchietto procedurale.
+	"Teal": "GE-TealTeam-Dummy-1",
+	"Purple": "GE-PurpleTeam-Dummy-1",
 }
 
 
