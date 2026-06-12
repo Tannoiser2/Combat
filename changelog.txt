@@ -1,0 +1,15 @@
+v0.9 — 2026-06-12
+- Suoni: spari, raffiche, esplosioni, mischia e urla (asset CC0)
+- I suoni funzionano anche nel replay
+- Replay fluido: niente pause tra impulsi e turni
+- Mischia secondo Rule 15: TQC del solo attaccante, stesso hex,
+  morale nel TQ, niente Duck Back (MC+WMC), Carica +1 all'impulso 4
+- Berserk: bonus WS corretto a +3 (era +1)
+- Soglie Punti Vittoria corrette secondo lo Scenario Book
+- Scenario 2: bombardamento iniziale 105mm (6 colpi con scatter)
+
+v0.8 — 2026-06-11
+- Replay del turno e dell'intera partita a fine missione
+- Movimento animato hex per hex
+- Bussola nemica (Rule 9.3), cover nel menu, formula di fuoco nel log
+- Splash screen con copertina e card delle missioni

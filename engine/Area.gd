@@ -126,6 +126,7 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 	state.log_event("%s esplode in %02d.%02d!" % [NAMES[m["type"]], hex.x, hex.y])
 	state.booms.append({"hex": hex, "type": m["type"]})
 	Replay.boom(state, hex, m["type"])
+	state.audio_events.append({"type": "boom", "area_type": m["type"], "hex": hex})
 	# Cannoni (intro3/s9): la C4 nell'hex di un pezzo lo distrugge.
 	if m["type"] == Type.C4 and not state.scenario_id.is_empty():
 		var key := "%d,%d" % [hex.x, hex.y]

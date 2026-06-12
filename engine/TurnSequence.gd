@@ -397,18 +397,32 @@ const MELEE_PASSIVE := [
 	Domain.Order.MEDICAL_AID, Domain.Order.CARRY_DRAG, Domain.Order.PLAN,
 ]
 
+# Modificatore al TQ in mischia (Rule 15/17): include il morale oltre alle ferite.
+const MELEE_MORALE_TQ := {
+	Domain.Morale.BERSERK: 3,
+	Domain.Morale.AGGRESSIVE: 2,
+	Domain.Morale.BOLD: 1,
+	Domain.Morale.NORMAL: 0,
+	Domain.Morale.CAUTIOUS: -1,
+	Domain.Morale.SHAKEN: -2,
+	Domain.Morale.ROUT: -99,
+}
 
-# Mischia (fine Charge), contrapposta: attaccante e difensore tirano un
-# TQC; chi passa quando l'altro fallisce infligge una pesca di ferita.
-# Doppio successo o doppio fallimento: il corpo a corpo resta in stallo.
-# (Approssimazione dichiarata: la procedura esatta del regolamento non e'
-# trascritta; questa e' simmetrica e usa i TQ effettivi con le ferite.)
+
+static func _melee_tq(c: Character) -> int:
+	return Checks.effective_tq(c) + int(MELEE_MORALE_TQ.get(c.morale, 0))
+
+
+# Mischia (Rule 15): solo l'attaccante tira un TQC (modificato da ferite e morale).
+# Successo = pesca carta ferita (senza Duck Back). Fallimento = nessun effetto.
+# La mischia avviene solo nello STESSO esagono. Charge all'impulso 4: +1 TQ.
 static func _do_melee(state: GameState, attacker: Character) -> void:
+	# Bersaglio nello stesso hex (non adiacente).
 	var target: Character = null
 	for d in state.characters:
 		if d.side == attacker.side or d.is_dead():
 			continue
-		if Spotting.hex_distance(attacker.position, d.position) <= 1:
+		if d.position == attacker.position:
 			target = d
 			break
 	if target == null:
@@ -418,29 +432,33 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		target.removed = true
 		state.log_event("%s travolge un'esca in mischia" % attacker.display_name)
 		return
-	# "Bayonet!": +2 all'attacco del giocatore in mischia.
+	# Rout in mischia: l'attaccante in Rota si arrende (Rule 15/17.3).
+	if attacker.morale == Domain.Morale.ROUT:
+		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
+		attacker.set_order(Domain.Order.GUARD)
+		return
+	# "Bayonet!": +2 TQ all'attaccante friendly.
 	var atk_bonus := 0
 	if attacker.side == Domain.Side.FRIENDLY \
 			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
 				"%s carica alla baionetta (+2)" % attacker.display_name):
 		atk_bonus = 2
-	var def_malus := -2 if (target.has_order and target.order in MELEE_PASSIVE) else 0
-	var a_roll := Checks.roll_d10(state.rng)
-	var a_pass := a_roll == 0 or (a_roll != 9 \
-		and a_roll <= Checks.effective_tq(attacker) + atk_bonus)
-	var d_roll := Checks.roll_d10(state.rng)
-	var d_pass := d_roll == 0 or (d_roll != 9 \
-		and d_roll <= Checks.effective_tq(target) + def_malus)
-	state.log_event("%s attacca %s in mischia: TQC %d (%s) contro %d (%s)" % [
+	# Charge all'impulso 4: +1 TQ (Rule 7.08/10.08).
+	if attacker.has_order and attacker.order == Domain.Order.CHARGE \
+			and state.impulse == 4:
+		atk_bonus += 1
+	var atk_tq := _melee_tq(attacker) + atk_bonus
+	var roll := Checks.roll_d10(state.rng)
+	var passed := roll == 0 or (roll != 9 and roll <= atk_tq)
+	state.log_event("%s attacca %s in mischia: TQ %d, tira %d -> %s" % [
 		attacker.display_name, target.display_name,
-		a_roll, "ok" if a_pass else "no", d_roll, "ok" if d_pass else "no"])
-	if a_pass and not d_pass:
-		Fire._resolve_wound(state, target)
-	elif d_pass and not a_pass:
-		state.log_event("  %s respinge l'assalto!" % target.display_name)
-		Fire._resolve_wound(state, attacker)
+		atk_tq, roll, "COLPISCE" if passed else "manca"])
+	if passed:
+		state.audio_events.append({"type": "melee", "hex": attacker.position})
+		Replay.sfx(state, "melee")
+		Fire._resolve_wound_melee(state, target)
 	else:
-		state.log_event("  la mischia resta in stallo")
+		state.log_event("  nessun effetto")
 
 
 # Ordini assegnabili a un Friendly, filtrati dalle limitazioni attive

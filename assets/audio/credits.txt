@@ -1,0 +1,95 @@
+WWII Tactical Game — Audio Credits
+====================================
+All sounds are CC0 (Creative Commons Zero / Public Domain).
+No attribution is required, but sources are listed below for reference.
+
+----------------------------------------------------------------------
+FILE: rifle.ogg
+SOURCE: shot_01.ogg
+ORIGIN: "25 CC0 Bang / Firework SFX" pack
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+NOTES:  Single gunshot bang sound
+
+----------------------------------------------------------------------
+FILE: mg.ogg
+SOURCE: machinegun_fire.ogg
+ORIGIN: Warfork Free Soundpacks — CC0 Pack
+        Created by Caine & MaxCarnage for the Warfork open-source FPS
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Machine gun burst sound
+
+----------------------------------------------------------------------
+FILE: pistol.ogg
+SOURCE: shot_02.ogg
+ORIGIN: "25 CC0 Bang / Firework SFX" pack
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+NOTES:  Single pistol-style gunshot sound
+
+----------------------------------------------------------------------
+FILE: grenade.ogg
+SOURCE: gren_strong_explosion1.ogg
+ORIGIN: Warfork Free Soundpacks — CC0 Pack
+        Created by Caine & MaxCarnage for the Warfork open-source FPS
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Grenade/small explosion sound
+
+----------------------------------------------------------------------
+FILE: artillery.ogg
+SOURCE: rocket_strong_explosion.ogg
+ORIGIN: Warfork Free Soundpacks — CC0 Pack
+        Created by Caine & MaxCarnage for the Warfork open-source FPS
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Heavy/artillery explosion sound (rocket explosion variant)
+
+----------------------------------------------------------------------
+FILE: melee.ogg
+SOURCE: impactPunch_heavy_000.ogg
+ORIGIN: Kenney Impact Sounds v1.0
+        Created by Kenney (www.kenney.nl), released 2019-12-19
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/kenney_impactsounds/Audio
+OFFICIAL: https://kenney.nl/assets/impact-sounds
+LICENSE: CC0 1.0 Universal — http://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Heavy punch impact sound for melee combat
+
+----------------------------------------------------------------------
+FILE: scream.ogg
+SOURCE: pain50.ogg (male player pain at 50% damage)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack
+        Created by Caine & MaxCarnage for the Warfork open-source FPS
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/players/male
+LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Brief pain/hit reaction vocalization
+
+----------------------------------------------------------------------
+FILE: smoke.ogg
+SOURCE: grenlaunch_strong.ogg (grenade launcher whoosh sound)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack
+        Created by Caine & MaxCarnage for the Warfork open-source FPS
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
+NOTES:  Whoosh/deploy sound used for smoke grenade deployment
+
+----------------------------------------------------------------------
+AGGREGATE REPOSITORY (used as mirror for several sounds above):
+  https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds
+  Description: "collection of cc0 sounds collected over some time"
+  License: CC0-1.0
+
+ORIGINAL WARFORK CC0 SOUNDPACK:
+  https://github.com/TeamForbiddenLLC/warfork-free-soundpacks
+  Authors: Caine, MaxCarnage (CC0 pack); Michael 'Tenshihan' Quinn (CC-BY-SA pack)
+  License page: CC0 1.0 Universal (Public Domain Dedication)
+
+KENNEY ASSET PACK:
+  https://kenney.nl/assets/impact-sounds
+  Creator: Kenney (www.kenney.nl)
+  License: CC0 1.0 Universal
+
+----------------------------------------------------------------------
+All CC0 sounds may be used freely in personal, educational, and commercial
+projects without any attribution requirement.

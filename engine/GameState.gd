@@ -115,6 +115,10 @@ var move_paths: Array = []
 # Esplosioni avvenute (per il lampo in mappa): {hex, type}.
 var booms: Array = []
 
+# Coda eventi audio dell'impulse corrente: {type, weapon?, area_type?, hex}.
+# La UI la consuma e la azzera dopo ogni azione, come shots/booms.
+var audio_events: Array = []
+
 # Frame registrati per il replay (vedi Replay.gd).
 var replay: Array = []
 

@@ -71,6 +71,20 @@ var replay_hidden_banner: CanvasLayer = null   # banner di vittoria sospeso
 const REPLAY_MOVE_T := 1.3      # durata della parte di movimento
 const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
 
+# Audio: player per tipo di suono (nil se il file non e' installato).
+var _sfx: Dictionary = {}
+const WEAPON_SFX := {
+	"M1 Garand": "rifle", "KAR 98K": "rifle",
+	"M3 Grease Gun": "mg", "BAR": "mg", "M1919": "mg", "MG42": "mg", "MP40": "mg",
+	"M1911": "pistol", "P38": "pistol",
+	"M7 Grenade Launcher": "grenade",
+}
+const AREA_SFX := {
+	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
+	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
+	Area.Type.C4: "artillery",
+}
+
 
 func _ready() -> void:
 	if not OS.get_environment("COMBAT_SELFTEST").is_empty():
@@ -127,7 +141,7 @@ func _start_scenario(scenario_id: String) -> void:
 	var z := 60.0 / map_view.cell.x
 	camera.zoom = Vector2(z, z)
 	add_child(camera)
-
+	_load_sfx()
 	_build_hud()
 	# Fase di schieramento, se lo scenario ha una zona e siamo interattivi.
 	deploy_zone = Scenario.deploy_hexes(state, scenario_id)
@@ -135,6 +149,33 @@ func _start_scenario(scenario_id: String) -> void:
 		_start_deploy()
 	else:
 		_start_turn()
+
+
+# --------------------------------------------------------- audio
+
+func _load_sfx() -> void:
+	_sfx.clear()
+	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream"]:
+		var path := "res://assets/audio/%s.ogg" % s
+		if ResourceLoader.exists(path):
+			var p := AudioStreamPlayer.new()
+			p.stream = load(path)
+			p.max_polyphony = 3
+			add_child(p)
+			_sfx[s] = p
+
+func _play_sfx(key: String) -> void:
+	if _sfx.has(key):
+		_sfx[key].play()
+
+func _consume_audio_events() -> void:
+	for ev in state.audio_events:
+		match ev["type"]:
+			"shot":  _play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+			"boom":  _play_sfx(AREA_SFX.get(ev["area_type"], "artillery"))
+			"melee": _play_sfx("melee")
+			"scream": _play_sfx("scream")
+	state.audio_events.clear()
 
 
 # --------------------------------------------------------- schieramento
@@ -236,6 +277,15 @@ func _show_scenario_menu() -> void:
 	tag.modulate = Color(0.55, 0.55, 0.50)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	left.add_child(tag)
+	# Changelog della build: cosa c'e' di nuovo, per riconoscere la versione.
+	if FileAccess.file_exists("res://changelog.txt"):
+		var clog := RichTextLabel.new()
+		clog.text = FileAccess.get_file_as_string("res://changelog.txt").strip_edges()
+		clog.custom_minimum_size = Vector2(0, 170)
+		clog.add_theme_font_size_override("normal_font_size", 12)
+		clog.modulate = Color(0.65, 0.65, 0.58)
+		clog.scroll_active = true
+		left.add_child(clog)
 
 	# --- colonna destra: card scorrevoli delle missioni
 	var right := VBoxContainer.new()
@@ -380,6 +430,7 @@ func _on_next_pressed() -> void:
 			state.shots.clear()
 			state.move_paths.clear()
 			state.booms.clear()
+			state.audio_events.clear()
 			state.log_event("--- Impulse 1 ---")
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
@@ -400,6 +451,7 @@ func _advance_action() -> void:
 			state.impulse = impulse_next
 			state.shots.clear()
 			state.move_paths.clear()
+			state.audio_events.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
@@ -414,6 +466,7 @@ func _advance_action() -> void:
 			_refresh()
 			return
 		TurnSequence.resolve_action(state, c)
+		_consume_audio_events()
 	# (non raggiunto)
 
 
@@ -571,23 +624,31 @@ func _replay_apply(f: Dictionary) -> void:
 	_maybe_screenshot()
 
 
-# Scandisce il replay: movimento simultaneo, poi i colpi, poi frame dopo.
+# Scandisce il replay: movimento simultaneo, con i colpi a meta' corsa.
+# I frame si incatenano senza pause (i traccianti sopravvivono al cambio
+# frame per conto loro); solo l'ultimo lascia una coda per gli esiti.
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
 	replay_t += delta
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
-	var move_t: float = REPLAY_MOVE_T if has_moves else 0.4
+	var has_fx: bool = not f["shots"].is_empty() or not f["booms"].is_empty()
+	var move_t: float = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
 	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
-	# I colpi partono a meta' movimento (le esplosioni con loro).
+	# I colpi partono a meta' movimento (esplosioni e suoni con loro).
 	if not replay_shots_done and replay_t >= move_t * 0.5:
 		replay_shots_done = true
 		for s in f["shots"]:
 			map_view.add_tracer(s)
+			_play_sfx(WEAPON_SFX.get(s.get("weapon", ""), "rifle"))
 		for b in f["booms"]:
 			map_view.add_blast(b["hex"])
-	var tail: float = REPLAY_PAUSE_T + (1.2 if not f["shots"].is_empty() else 0.0)
+			_play_sfx(AREA_SFX.get(b["type"], "artillery"))
+		for key in f.get("sfx", []):
+			_play_sfx(key)
+	var last: bool = replay_idx == replay_frames.size() - 1
+	var tail: float = (REPLAY_PAUSE_T + 1.2) if last and has_fx else 0.0
 	if replay_t >= move_t + tail:
 		replay_idx += 1
 		if replay_idx >= replay_frames.size():
@@ -787,6 +848,7 @@ func _handle_action_click(hex: Vector2i) -> void:
 		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
 			return  # click non valido: si ignora
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		_consume_audio_events()
 		_finish_friendly_action()
 	else:  # MOVE
 		var from := acting.position
@@ -1334,7 +1396,7 @@ func _selftest() -> void:
 # vento, rout fuori mappa, registrazione replay).
 func _test_rules() -> int:
 	var fails := 0
-	# Mischia contrapposta: rivela il bersaglio.
+	# Mischia (Rule 15): rivela il bersaglio nello stesso hex.
 	var st := GameState.new()
 	st.rng.seed = 5
 	Boards.fill(st, "farmhouse")
@@ -1345,7 +1407,7 @@ func _test_rules() -> int:
 	var def := Character.new("d", "Def", Domain.Side.ENEMY, "Red")
 	def.troop_quality = 3
 	def.weapon_skills = {"KAR 98K": 3}
-	def.position = Vector2i(10, 11)
+	def.position = Vector2i(10, 10)
 	st.characters.append(atk)
 	st.characters.append(def)
 	atk.set_order(Domain.Order.CHARGE)
