@@ -84,6 +84,8 @@ static func neighbors(state: GameState, h: Vector2i) -> Array[Vector2i]:
 static func is_passable(state: GameState, hex: Vector2i) -> bool:
 	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
 		return false
+	if Area.fire_at(state, hex) >= 0:
+		return false  # Rule 29.2: non si entra in un hex in fiamme
 	var occ := state.character_at(hex.x, hex.y)
 	return occ == null or occ.is_dead()
 
@@ -94,6 +96,8 @@ static func is_passable(state: GameState, hex: Vector2i) -> bool:
 static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool:
 	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
 		return false
+	if Area.fire_at(state, hex) >= 0:
+		return false  # Rule 29.2: nemmeno la carica entra nelle fiamme
 	var occ := state.character_at(hex.x, hex.y)
 	if occ == null or occ.is_dead():
 		return true

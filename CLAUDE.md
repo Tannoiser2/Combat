@@ -110,8 +110,17 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    base, -1 WS dal suo interno, solo Sneak per uscire con TQC, no blocco LOS) e
    abbazia (Rule 27.5: hex interni/esterni con LOS speciale -1/hex). I terreni
    nuovi non sono ancora piazzati in nessuno scenario (markers da scenario).
-5. Incendi (Rule 29): kindling/growth/spread col vento, generano fumo
-   (estende Area.gd).
+5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
+   KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
+   Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
+   end_phase); _process_fires gestisce danno a chi e' nell'hex (pesca 1 ferita,
+   2 se furioso; non nel turno in cui nasce), crescita (->furioso o spento col
+   9) e propagazione sottovento. Gli hex in fiamme bloccano movimento
+   (Move.is_passable/can_enter) e generano fumo (Area.smoke_penalty, usato da
+   Fire._smoke_modifier). Disegno fuoco in MapView. Test in Main._test_fire.
+   SEMPLIFICAZIONI: il fuoco emette fumo dal proprio hex (non genera la scia di
+   fading smoke sottovento turno per turno); la duck-back forzata di chi non
+   puo' avanzare per le fiamme non e' modellata.
 6. Medici addestrati (Rule 30).
 7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
    privato (scansioni mappe da classificare con tools/

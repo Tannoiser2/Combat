@@ -378,6 +378,13 @@ func _draw() -> void:
 				draw_circle(ac, radius * 0.85, Color(0.85, 0.85, 0.85, alpha))
 			Area.Type.ILLUM:
 				draw_circle(ac, radius * 0.9, Color(1.0, 0.95, 0.5, 0.25))
+			Area.Type.FIRE:
+				draw_circle(ac, radius * 0.55, Color(0.95, 0.45, 0.1, 0.8))
+				draw_circle(ac, radius * 0.30, Color(1.0, 0.85, 0.2, 0.9))
+			Area.Type.RAGING_FIRE:
+				draw_circle(ac, radius * 0.85, Color(0.9, 0.25, 0.05, 0.85))
+				draw_circle(ac, radius * 0.5, Color(1.0, 0.6, 0.1, 0.95))
+				draw_circle(ac, radius * 0.22, Color(1.0, 0.95, 0.5, 1.0))
 			Area.Type.C4:
 				draw_rect(Rect2(ac - Vector2(radius, radius) * 0.25,
 					Vector2(radius, radius) * 0.5), Color(0.8, 0.7, 0.2))

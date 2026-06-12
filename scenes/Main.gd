@@ -1548,6 +1548,74 @@ func _test_rules() -> int:
 	fails += _test_weather()
 	fails += _test_terrain()
 	fails += _test_knife()
+	fails += _test_fire()
+	return fails
+
+
+# Incendi (Volume 2, Rule 29).
+func _test_fire() -> int:
+	var fails := 0
+	# Solo il terreno infiammabile prende fuoco.
+	if not Area.burnable(Domain.Terrain.TREES) or Area.burnable(Domain.Terrain.OPEN_LEVEL_0):
+		print("TEST incendio: tabella infiammabilita' errata")
+		fails += 1
+	# fire_at / smoke_penalty / passabilita'.
+	var st := GameState.new()
+	st.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	if Area.fire_at(st, Vector2i(3, 3)) != Area.Type.FIRE \
+			or Area.smoke_penalty(st, Vector2i(3, 3)) != -3:
+		print("TEST incendio: fire_at/smoke_penalty errati")
+		fails += 1
+	if Move.is_passable(st, Vector2i(3, 3)):
+		print("TEST incendio: l'hex in fiamme non e' passabile")
+		fails += 1
+	var charger := Character.new("ch", "Ch", Domain.Side.FRIENDLY, "Able")
+	charger.position = Vector2i(3, 2)
+	charger.set_order(Domain.Order.CHARGE)
+	if Move.can_enter(st, charger, Vector2i(3, 3)):
+		print("TEST incendio: nemmeno la carica entra nelle fiamme")
+		fails += 1
+	st.area_markers[0]["type"] = Area.Type.RAGING_FIRE
+	if Area.smoke_penalty(st, Vector2i(3, 3)) != -4 \
+			or Area.fire_at(st, Vector2i(3, 3)) != Area.Type.RAGING_FIRE:
+		print("TEST incendio: furioso = -4")
+		fails += 1
+	# Chi resta nelle fiamme pesca una ferita (non nel turno in cui nasce).
+	var st2 := GameState.new()
+	st2.rng.seed = 1
+	st2.max_turns = 10
+	st2.turn = 2
+	st2.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st2.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	var victim := Character.new("v", "V", Domain.Side.FRIENDLY, "Able")
+	victim.troop_quality = 6
+	victim.position = Vector2i(3, 3)
+	st2.characters = [victim]
+	st2.friendly_deck = [17]  # carta con Light Wound
+	Area.end_phase(st2)
+	if victim.wounds.is_empty():
+		print("TEST incendio: chi e' nel fuoco non e' ferito")
+		fails += 1
+	# Un incendio appena nato non ferisce nello stesso turno.
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	st3.max_turns = 10
+	st3.turn = 1
+	st3.map[GameState.hex_key(3, 3)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	st3.area_markers = [{"type": Area.Type.FIRE, "hex": Vector2i(3, 3),
+		"placed_turn": 1, "turns_left": 99}]
+	var v3 := Character.new("v3", "V3", Domain.Side.FRIENDLY, "Able")
+	v3.troop_quality = 6
+	v3.position = Vector2i(3, 3)
+	st3.characters = [v3]
+	st3.friendly_deck = [17]
+	Area.end_phase(st3)
+	if not v3.wounds.is_empty():
+		print("TEST incendio: il fuoco appena nato non dovrebbe ferire")
+		fails += 1
 	return fails
 
 

@@ -472,15 +472,14 @@ static func _entry_hexside(state: GameState, from: Vector2i, to: Vector2i) -> in
 	return state.hexside_between(prev, to)
 
 
-# Penalita' del fumo lungo la linea di tiro (-4 pieno / -2 fading per hex).
+# Penalita' di fumo e incendi lungo la linea di tiro (numero di fumo per hex,
+# Rule 29.2: gli incendi contano come fumo e ostacolano il tiro).
 static func _smoke_modifier(state: GameState, a: Vector2i, b: Vector2i) -> int:
 	var mod := 0
 	var line: Array[Vector2i] = [a, b]
 	line.append_array(LOS.hexes_between(a, b))
 	for hex in line:
-		match Area.smoke_level(state, hex):
-			2: mod -= 4
-			1: mod -= 2
+		mod += Area.smoke_penalty(state, hex)
 	return mod
 
 
