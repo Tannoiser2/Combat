@@ -66,9 +66,11 @@ var replay_button: Button
 var replay_frames: Array = []
 var replay_idx := -1            # -1 = nessun replay in corso
 var replay_t := 0.0
-var replay_shots_done := false
+var replay_events: Array = []   # colpi/boom/suoni del frame, ordinati per "at"
+var replay_evt_idx := 0
 var replay_hidden_banner: CanvasLayer = null   # banner di vittoria sospeso
-const REPLAY_MOVE_T := 1.3      # durata della parte di movimento
+const REPLAY_MOVE_T := 1.3      # durata della parte di movimento (frame impulse)
+const REPLAY_TURN_T := 2.6      # durata di un TURNO fuso (replay partita)
 const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
 
 # Audio: player per tipo di suono (nil se il file non e' installato).
@@ -568,7 +570,7 @@ func _show_victory_banner(v: Dictionary) -> void:
 	rewatch.pressed.connect(func():
 		hud.hide()
 		replay_hidden_banner = hud
-		_start_replay(state.replay.duplicate()))
+		_start_replay(_merge_turn_frames(state.replay)))
 	box.add_child(rewatch)
 	var back := Button.new()
 	back.text = "Torna al menu"
@@ -635,41 +637,103 @@ func _start_replay(frames: Array) -> void:
 	_replay_apply(frames[0])
 
 
+# Fonde i frame per-impulse di ogni turno in un unico frame continuo
+# (per il replay dell'intera partita): tutti i percorsi del turno
+# animati in simultanea sulla stessa durata - chi ha fatto piu' strada
+# si muove piu' veloce - con colpi/boom/suoni programmati al momento
+# dell'impulso in cui sono avvenuti ("at" = frazione del turno).
+func _merge_turn_frames(frames: Array) -> Array:
+	var out: Array = []
+	for f in frames:
+		if out.is_empty() or out.back()["turn"] != f["turn"]:
+			out.append({
+				"turn": f["turn"], "impulse": 0, "merged": true,
+				"units": {}, "moves": {}, "shots": [], "booms": [], "sfx": [],
+			})
+		var m: Dictionary = out.back()
+		var at := (float(f["impulse"]) - 0.5) / 4.0
+		for idx in f["units"]:
+			if not m["units"].has(idx):
+				m["units"][idx] = f["units"][idx]
+		for idx in f["moves"]:
+			var path: Array = f["moves"][idx]
+			if not m["moves"].has(idx):
+				m["moves"][idx] = path.duplicate()
+			else:
+				var done: Array = m["moves"][idx]
+				m["moves"][idx] = done + (path.slice(1) if done.back() == path[0] else path)
+		for s in f["shots"]:
+			var s2: Dictionary = s.duplicate()
+			s2["at"] = at
+			m["shots"].append(s2)
+		for b in f["booms"]:
+			var b2: Dictionary = b.duplicate()
+			b2["at"] = at
+			m["booms"].append(b2)
+		for key in f.get("sfx", []):
+			m["sfx"].append({"key": key, "at": at})
+	return out
+
+
 func _replay_apply(f: Dictionary) -> void:
 	replay_t = 0.0
-	replay_shots_done = false
+	# Coda degli eventi del frame, ciascuno al suo istante "at" (frazione
+	# della durata; nei frame per-impulse tutto a meta' corsa).
+	replay_events = []
+	replay_evt_idx = 0
+	for s in f["shots"]:
+		replay_events.append({"at": s.get("at", 0.5), "kind": "shot", "data": s})
+	for b in f["booms"]:
+		replay_events.append({"at": b.get("at", 0.5), "kind": "boom", "data": b})
+	for e in f.get("sfx", []):
+		if e is Dictionary:
+			replay_events.append({"at": e["at"], "kind": "sfx", "data": e["key"]})
+		else:
+			replay_events.append({"at": 0.5, "kind": "sfx", "data": e})
+	replay_events.sort_custom(func(a, b): return a["at"] < b["at"])
 	map_view.replay_units = f["units"]
 	map_view.replay_paths = f["moves"]
 	map_view.replay_progress = 0.0
-	hint_label.text = "REPLAY - Turno %d, Impulse %d   (%d/%d)" % [
-		f["turn"], f["impulse"], replay_idx + 1, replay_frames.size()]
+	if f.get("merged", false):
+		hint_label.text = "REPLAY - Turno %d   (%d/%d)" % [
+			f["turn"], replay_idx + 1, replay_frames.size()]
+	else:
+		hint_label.text = "REPLAY - Turno %d, Impulse %d   (%d/%d)" % [
+			f["turn"], f["impulse"], replay_idx + 1, replay_frames.size()]
 	_maybe_screenshot()
 
 
-# Scandisce il replay: movimento simultaneo, con i colpi a meta' corsa.
-# I frame si incatenano senza pause (i traccianti sopravvivono al cambio
-# frame per conto loro); solo l'ultimo lascia una coda per gli esiti.
+# Scandisce il replay: movimento simultaneo, con gli eventi (colpi,
+# esplosioni, suoni) al loro istante. I frame si incatenano senza pause
+# (i traccianti sopravvivono al cambio frame per conto loro); solo
+# l'ultimo lascia una coda per gli esiti.
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
 	replay_t += delta
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
-	var has_fx: bool = not f["shots"].is_empty() or not f["booms"].is_empty()
-	var move_t: float = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
+	var has_fx: bool = not replay_events.is_empty()
+	var move_t: float
+	if f.get("merged", false):
+		move_t = REPLAY_TURN_T if has_moves else (0.9 if has_fx else 0.3)
+	else:
+		move_t = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
 	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
-	# I colpi partono a meta' movimento (esplosioni e suoni con loro).
-	if not replay_shots_done and replay_t >= move_t * 0.5:
-		replay_shots_done = true
-		for s in f["shots"]:
-			map_view.add_tracer(s)
-			_play_sfx(WEAPON_SFX.get(s.get("weapon", ""), "rifle"))
-			_play_sfx(OUTCOME_SFX.get(s.get("outcome", ""), ""))
-		for b in f["booms"]:
-			map_view.add_blast(b["hex"])
-			_play_sfx(AREA_SFX.get(b["type"], "artillery"))
-		for key in f.get("sfx", []):
-			_play_sfx(key)
+	while replay_evt_idx < replay_events.size() \
+			and replay_t >= replay_events[replay_evt_idx]["at"] * move_t:
+		var ev: Dictionary = replay_events[replay_evt_idx]
+		replay_evt_idx += 1
+		match ev["kind"]:
+			"shot":
+				map_view.add_tracer(ev["data"])
+				_play_sfx(WEAPON_SFX.get(ev["data"].get("weapon", ""), "rifle"))
+				_play_sfx(OUTCOME_SFX.get(ev["data"].get("outcome", ""), ""))
+			"boom":
+				map_view.add_blast(ev["data"]["hex"])
+				_play_sfx(AREA_SFX.get(ev["data"]["type"], "artillery"))
+			"sfx":
+				_play_sfx(ev["data"])
 	var last: bool = replay_idx == replay_frames.size() - 1
 	var tail: float = (REPLAY_PAUSE_T + 1.2) if last and has_fx else 0.0
 	if replay_t >= move_t + tail:
@@ -1375,7 +1439,7 @@ func _auto_step() -> void:
 			if not OS.get_environment("COMBAT_REPLAY").is_empty() and not _auto_replayed:
 				_auto_replayed = true
 				print("AUTO: replay di %d frame" % state.replay.size())
-				_start_replay(state.replay.duplicate())
+				_start_replay(_merge_turn_frames(state.replay))
 			else:
 				print("AUTO: fine partita")
 				get_tree().quit()
