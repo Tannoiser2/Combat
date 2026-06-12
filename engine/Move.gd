@@ -19,6 +19,39 @@ const CUBE_DIRS := [
 	Vector3i(-1, 1, 0), Vector3i(-1, 0, 1), Vector3i(0, -1, 1),
 ]
 
+# Le 6 direzioni in senso ORARIO sullo schermo, partendo da basso-destra.
+const CW_DIRS := [
+	Vector3i(1, -1, 0),   # 30 gradi: basso-destra
+	Vector3i(0, -1, 1),   # 90: basso
+	Vector3i(-1, 0, 1),   # 150: basso-sinistra
+	Vector3i(-1, 1, 0),   # 210: alto-sinistra
+	Vector3i(0, 1, -1),   # 270: alto
+	Vector3i(1, 0, -1),   # 330: alto-destra
+]
+
+
+# Bussola del nemico (Rule 9.3): dato il delta della freccia "1",
+# ritorna l'array indicizzabile 1..6 (senso orario) dei delta cubici.
+static func compass_from_dir1(dir1: Vector3i) -> Array:
+	var start := CW_DIRS.find(dir1)
+	if start < 0:
+		start = 4  # ripiego: "1" = nord
+	var out: Array = [Vector3i.ZERO]  # indice 0 inutilizzato
+	for k in range(6):
+		out.append(CW_DIRS[(start + k) % 6])
+	return out
+
+
+# "5/6" -> [5, 6]; "6" -> [6]; non-direzioni -> [].
+static func parse_dirs(move_str: String) -> Array[int]:
+	var out: Array[int] = []
+	for part in move_str.split("/"):
+		if part.is_valid_int():
+			var d := int(part)
+			if d >= 1 and d <= 6:
+				out.append(d)
+	return out
+
 # Ordini che fanno avanzare verso il nemico; gli altri (Evade, Carry/Drag)
 # allontanano.
 const TOWARD_ORDERS := [
@@ -102,21 +135,54 @@ static func step(state: GameState, mover: Character, target_pos: Vector2i, away:
 	return true
 
 
+# Passo in direzione di bussola (prima direzione percorribile della
+# lista). Ritorna: 0 = fermo, 1 = mosso, 2 = uscito dalla mappa.
+static func compass_step(state: GameState, mover: Character, dirs: Array[int]) -> int:
+	var may_exit: bool = not state.scenario_id.is_empty() \
+		and Scenario.SCENARIOS[state.scenario_id].get("enemy_may_exit", false)
+	for d in dirs:
+		if d < 1 or d >= state.compass.size():
+			continue
+		var dest := from_cube(to_cube(mover.position) + state.compass[d])
+		if not state.map.has(GameState.hex_key(dest.x, dest.y)):
+			if may_exit and mover.side == D.Side.ENEMY:
+				mover.removed = true
+				state.log_event("%s esce dalla mappa" % mover.display_name)
+				return 2
+			continue
+		if is_passable(state, dest):
+			mover.position = dest
+			return 1
+	return 0
+
+
 # Muove fino a `hexes` passi secondo l'ordine del personaggio.
+# I nemici con una direzione stampata sulla carta (es. Evade 5/6) seguono
+# la BUSSOLA (Rule 9.3); Charge e Berserk puntano il nemico piu' vicino;
+# senza direzione si ripiega su verso/lontano dal nemico.
 # Ritorna il numero di passi effettuati.
 static func move_character(state: GameState, mover: Character, hexes: int) -> int:
+	var dirs := parse_dirs(mover.order_move)
+	var use_compass: bool = mover.side == D.Side.ENEMY and not dirs.is_empty() \
+		and state.compass.size() == 7 and mover.order != D.Order.CHARGE
 	var target := nearest_enemy(state, mover)
-	if target == null:
+	if target == null and not use_compass:
 		return 0
 	var away := not advances(mover.order)
 	var moved := 0
 	for i in range(hexes):
-		# Charge/Sprint si fermano accanto al bersaglio (per la melee).
-		if not away and Spotting.hex_distance(mover.position, target.position) <= 1:
-			break
 		var from := mover.position
-		if not step(state, mover, target.position, away):
-			break
+		if use_compass:
+			var res := compass_step(state, mover, dirs)
+			if res != 1:
+				break
+		else:
+			# Charge/Sprint si fermano accanto al bersaglio (per la melee).
+			if not away and target != null \
+					and Spotting.hex_distance(mover.position, target.position) <= 1:
+				break
+			if not step(state, mover, target.position, away):
+				break
 		moved += 1
 		# Scavalcare un BOCAGE (argine alto) esaurisce il movimento.
 		if state.hexside_between(from, mover.position) == D.Terrain.BOCAGE:

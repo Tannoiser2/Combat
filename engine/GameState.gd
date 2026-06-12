@@ -51,8 +51,9 @@ var characters: Array[Character] = []
 # Ordine di iniziativa: lista di Team dal piu' basso (agisce primo) al piu' alto
 var initiative_order: Array[String] = []
 
-# Bussola direzionale del nemico (Rule 9.3): rotazione applicata alle direzioni
-var compass_rotation: int = 0
+# Bussola direzionale del nemico (Rule 9.3): array indicizzabile 1..6
+# dei delta cubici (impostata dallo scenario; [0] inutilizzato).
+var compass: Array = []
 
 # Generatore di casualita' della partita: un solo rng, cosi' col seed
 # la partita e' riproducibile (utile per i test).

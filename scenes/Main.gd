@@ -30,6 +30,10 @@ var hand_panel: PanelContainer
 var hand_box: HBoxContainer
 var log_text: RichTextLabel
 var info_text: RichTextLabel
+# Diario: cronologia completa + filtro delle righe di dettaglio ("·",
+# la formula del combattimento) attivabile dal toggle in testata.
+var log_history: Array[String] = []
+var log_show_detail := false
 var order_panel: PanelContainer   # selettore ordini con spiegazioni
 var order_list: VBoxContainer
 var order_desc: RichTextLabel
@@ -79,6 +83,7 @@ func _ready() -> void:
 func _start_scenario(scenario_id: String) -> void:
 	for child in get_children():
 		child.queue_free()
+	log_history.clear()
 	state = GameState.new()
 	# Seed fisso per partite riproducibili; COMBAT_SEED per variarlo
 	# (nei test) o "time" per una partita sempre diversa.
@@ -803,7 +808,19 @@ func _build_hud() -> void:
 	info_text.add_theme_font_size_override("normal_font_size", 15)
 	side_box.add_child(info_text)
 	side_box.add_child(HSeparator.new())
-	side_box.add_child(_section_label("DIARIO DI BATTAGLIA"))
+	var log_head := HBoxContainer.new()
+	var log_title := _section_label("DIARIO DI BATTAGLIA")
+	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	log_head.add_child(log_title)
+	var detail_toggle := CheckButton.new()
+	detail_toggle.text = "Formule"
+	detail_toggle.tooltip_text = "Mostra il calcolo del fuoco: WS, modificatori e tiro di dado"
+	detail_toggle.add_theme_font_size_override("font_size", 12)
+	detail_toggle.toggled.connect(func(on: bool):
+		log_show_detail = on
+		_rebuild_log())
+	log_head.add_child(detail_toggle)
+	side_box.add_child(log_head)
 	log_text = RichTextLabel.new()
 	log_text.bbcode_enabled = true
 	log_text.scroll_following = true
@@ -1078,7 +1095,9 @@ func _refresh() -> void:
 	_update_enemy_card()
 	_refresh_roster()
 	for line in state.drain_log():
-		log_text.append_text(_format_log_line(line) + "\n")
+		log_history.append(line)
+		if log_show_detail or not line.begins_with("·"):
+			log_text.append_text(_format_log_line(line) + "\n")
 		print(line)
 	map_view.queue_redraw()
 	_maybe_screenshot()
@@ -1096,9 +1115,19 @@ const LOG_KEYWORDS := {
 }
 
 
+# Ricostruisce il diario dalla cronologia (cambio del filtro "Formule").
+func _rebuild_log() -> void:
+	log_text.clear()
+	for line in log_history:
+		if log_show_detail or not line.begins_with("·"):
+			log_text.append_text(_format_log_line(line) + "\n")
+
+
 # Colora il log: nomi in neretto per nazione (blu USA, rosso tedeschi),
 # effetti evidenziati.
 func _format_log_line(line: String) -> String:
+	if line.begins_with("·"):
+		return "[i][color=#9aa5b0]%s[/color][/i]" % line
 	var out := line
 	for c in state.characters:
 		if c.display_name.is_empty() or not c.display_name in out:

@@ -127,41 +127,65 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		if target.has_order else NO_ORDER_GROUP
 	var suppressive := firer.has_order and firer.order == D.Order.SUPPRESSIVE_FIRE
 
+	# Il WS modificato, con la SCOMPOSIZIONE per il log di combattimento.
 	var ws: int = firer.weapon_skills[weapon]
-	ws += int(Weapons.range_ws_modifier(weapon, dist))
+	var bits: Array[String] = ["%d base %s" % [ws, weapon]]
+	var m: int = int(Weapons.range_ws_modifier(weapon, dist))
+	if m != 0:
+		bits.append("%+d gittata %d hex" % [m, dist])
+	ws += m
 	if not suppressive:
 		var tmod: int = WS_MOD[terrain][group]
+		var tname: String = Domain.TERRAIN_NAMES[terrain]
 		# Hexside sul bordo d'ingresso del tiro (siepe/bocage/muro davanti
 		# al bersaglio): vale il modificatore piu' protettivo.
 		var side := _entry_hexside(state, firer.position, target.position)
-		if side >= 0:
-			tmod = mini(tmod, WS_MOD[side][group])
+		if side >= 0 and WS_MOD[side][group] < tmod:
+			tmod = WS_MOD[side][group]
+			tname = Domain.TERRAIN_NAMES[side] + " (bordo)"
+		if tmod != 0:
+			bits.append("%+d bersaglio in %s" % [tmod, tname])
 		ws += tmod
 	if firer.has_order:
-		ws += int(Orders.FIRE_WS_MOD.get(firer.order, 0))
+		m = int(Orders.FIRE_WS_MOD.get(firer.order, 0))
+		if m != 0:
+			bits.append("%+d ordine %s" % [m, Domain.ORDER_NAMES[firer.order]])
+		ws += m
+	m = 0
 	for w in firer.wounds:
-		ws += WOUND_MOD[w]
-	ws += int(MORALE_WS_MOD.get(firer.morale, 0))
+		m += WOUND_MOD[w]
+	if m != 0:
+		bits.append("%+d ferite" % m)
+	ws += m
+	m = int(MORALE_WS_MOD.get(firer.morale, 0))
+	if m != 0:
+		bits.append("%+d morale %s" % [m, Domain.MORALE_NAMES[firer.morale]])
+	ws += m
 	# Modificatori della carta di turno (solo per i Friendly).
 	if firer.side == D.Side.FRIENDLY:
-		ws += int(state.turn_fx.get("ws_all", 0))
-		var tmods: Dictionary = state.turn_fx.get("ws_team", {})
-		ws += int(tmods.get(firer.team, 0))
+		m = int(state.turn_fx.get("ws_all", 0)) \
+			+ int(state.turn_fx.get("ws_team", {}).get(firer.team, 0))
 		if state.turn_fx.has("ws_cover_self"):
 			var fhex := state.hex_at(firer.position.x, firer.position.y)
 			if fhex != null and Domain.terrain_gives_cover(fhex.terrain):
-				ws += int(state.turn_fx["ws_cover_self"])
-	# Condizioni ambientali (default spente; attivate da scenario/eventi).
-	ws += int(state.turn_fx.get("fire_env_mod", 0))
-	# Fumo: -4 per hex di fumo pieno, -2 per fading, sull'intera linea
-	# di tiro (hex del tiratore, del bersaglio e interposti).
-	ws += _smoke_modifier(state, firer.position, target.position)
-	# Notte: -2 oltre 2 hex, salvo bersaglio illuminato.
+				m += int(state.turn_fx["ws_cover_self"])
+		if m != 0:
+			bits.append("%+d carta" % m)
+		ws += m
+	# Ambiente: eventi/scenario, fumo lungo il tiro, notte.
+	m = int(state.turn_fx.get("fire_env_mod", 0))
+	m += _smoke_modifier(state, firer.position, target.position)
 	if state.night and dist > 2 and not Area.illuminated(state, target.position):
-		ws += -2
+		m += -2
+	if m != 0:
+		bits.append("%+d ambiente (fumo/notte)" % m)
+	ws += m
 	# TODO: filo spinato per-hex.
 
 	var roll := Checks.roll_d10(state.rng)
+	# Riga di dettaglio (prefisso "·"): la formula completa del tiro.
+	# La UI puo' nasconderla/mostrarla (log collassabile).
+	_log(state, "· WS %d = %s | d10: %d" % [ws, ", ".join(bits), roll])
 	if roll == 9:
 		_log(state, "%s spara a %s con %s: 9 naturale, mancato!" % [
 			firer.display_name, target.display_name, weapon])

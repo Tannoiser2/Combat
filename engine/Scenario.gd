@@ -211,6 +211,7 @@ const SCENARIOS := {
 		"map": "hedgerows",
 		"turns": 7,
 		"hand_limit": 3,
+		"compass": ["19,2", "18,1"],
 		"deploy": {"triangle": ["18,14", "18,19", "28,19"]},
 		"desc": "Normandia, giugno 1944. Una pattuglia di sei uomini avanza\ntra le siepi per scoprire posizioni e forze del nemico.",
 		# Pattuglia di 6 uomini (Opzione 1), schierata nel triangolo
@@ -273,6 +274,7 @@ const SCENARIOS := {
 		"map": "village",
 		"turns": 5,
 		"hand_limit": 2,
+		"compass": ["11,2", "11,1"],
 		"deploy": {"cols": [11, 11], "rows": [1, 12]},
 		"desc": "La squadra divisa deve raggiungere la chiesa del paese.\nMa i tedeschi sono arrivati prima.",
 		"friendly": [
@@ -323,6 +325,7 @@ const SCENARIOS := {
 		"map": "farmhouse",
 		"turns": 7,
 		"hand_limit": 2,
+		"compass": ["11,11", "11,10"],
 		"deploy": {"cols": [11, 11], "rows": [12, 19]},
 		"desc": "Un pezzo d'artiglieria martella il C.P. della compagnia.\nCharlie Team avanza con le cariche C4.",
 		"friendly_morale": 2,  # Bold
@@ -372,6 +375,7 @@ const SCENARIOS := {
 		"map": "hill",
 		"turns": 7,
 		"hand_limit": 3,
+		"compass": ["11,2", "11,3"],
 		"deploy": {"cols": [19, 23], "rows": [2, 10]},
 		"desc": "Notte. Charlie Team e' di vedetta quando un ramo si spezza.\nUn grido: \"Eccoli, arrivano!\"",
 		"night": true,
@@ -423,6 +427,7 @@ const SCENARIOS := {
 	"s1": {
 		"name": "1. Attack the Farmhouse",
 		"map": "farmhouse", "turns": 12, "hand_limit": 3,
+		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Forze nemiche presidiano la fattoria.\nTocca alla tua squadra ripulirla.",
 		"squad_full": true,
@@ -585,6 +590,7 @@ const SCENARIOS := {
 	"s8": {
 		"name": "8. Rescue Mission",
 		"map": "hedgerows", "turns": 12, "hand_limit": 3,
+		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "Un partigiano con documenti vitali e' nascosto in\nun casolare oltre le linee. Riportatelo a casa.",
 		"squad_full": true,
@@ -608,6 +614,7 @@ const SCENARIOS := {
 	"s9": {
 		"name": "9. Destroy Those Guns!",
 		"map": "hedgerows", "turns": 12, "hand_limit": 4,
+		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "L'artiglieria nemica martella le nostre posizioni\ndai campi. Entrate e fate saltare i pezzi.",
 		"squad_full": true,
@@ -662,6 +669,16 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.characters.append(mq)
 	# Scenario notturno: -2 al fuoco oltre 2 hex (salvo illuminazione).
 	state.night = bool(sc.get("night", false))
+	# Bussola del nemico (Rule 9.3): ["hex", "hex verso cui punta '1'"];
+	# default: "1" = nord.
+	var dir1 := Vector3i(0, 1, -1)
+	var comp: Array = sc.get("compass", [])
+	if comp.size() == 2:
+		var pa: PackedStringArray = String(comp[0]).split(",")
+		var pb: PackedStringArray = String(comp[1]).split(",")
+		dir1 = Move.to_cube(Vector2i(int(pb[0]), int(pb[1]))) \
+			- Move.to_cube(Vector2i(int(pa[0]), int(pa[1])))
+	state.compass = Move.compass_from_dir1(dir1)
 
 	# Coppa nemica = personaggi reali + pedine-esca, mescolata.
 	var cup: Array = make_cup(sc["cup_spec"]) if sc.has("cup_spec") \
