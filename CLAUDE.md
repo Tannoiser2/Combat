@@ -36,12 +36,10 @@ Lingua del progetto: italiano (log, UI, commenti).
 
 ## Copyright — IMPORTANTE
 
-Il repo e' PUBBLICO. Mai committare: scansioni di mappe/carte/counter,
-PDF dei regolamenti, .vmod (gia' esclusi da .gitignore: riferimenti/,
-*.pdf, *.vmod). Il materiale protetto vive nel repo PRIVATO
-`Tannoiser2/combat-riferimenti` (zip di mappe, pedine, scenari e
-tabelle del Volume 2). La build web usa grafica procedurale di
-fallback proprio per questo.
+Il repo e' PUBBLICO. Mai committare: PDF dei regolamenti, .vmod
+(gia' esclusi da .gitignore: riferimenti/, *.pdf, *.vmod).
+I segnalini dei personaggi (Vol.1 e Vol.2) sono artwork originale
+del progetto e sono inclusi nel repo pubblico.
 
 ## Deploy
 
