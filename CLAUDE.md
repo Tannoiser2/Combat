@@ -127,10 +127,11 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    nel loro hex fuggono di 1 hex 1D6 (_medic_flee in _do_melee). Ordini di
    fuoco/granata/carica/mischia vietati: MEDIC_FORBIDDEN, filtrati in
    legal_orders (giocatore) e convertiti in Medical Aid in _set_enemy_order
-   (nemico). Test in Main._test_medic. DA FARE: scossa morale ai friendly con
-   LOS alla morte/ferita grave del medico amico (tabella 30.1), nemico che
-   evita di sparare ai medici amici (TQ+2), micro-AI del medico nemico verso i
-   feriti (30.2), revenge sui prigionieri.
+   (nemico). Scossa morale ai friendly con LOS alla morte/ferita grave del
+   medico amico (30.1) in Fire._medic_shock (nat0 +2, <=TQ +1, nat9 -1).
+   Test in Main._test_medic. DA FARE: nemico che evita di sparare ai medici
+   amici (TQ+2), micro-AI del medico nemico verso i feriti (30.2), revenge sui
+   prigionieri.
 7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
    privato (scansioni mappe da classificare con tools/
    classify_terrain.py e generate_boards.py) e lo Scenario Book.

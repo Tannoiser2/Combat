@@ -1630,6 +1630,27 @@ func _test_medic() -> int:
 	if doc2.position == Vector2i(5, 5) or not doc2.wounds.is_empty():
 		print("TEST medico: dovrebbe fuggire dalla mischia illeso")
 		fails += 1
+	# Rule 30.1: alla caduta del medico friendly, i compagni con LOS reagiscono.
+	var sk := GameState.new()
+	sk.rng.seed = 2
+	var kia := -1
+	for s in FriendlyCards.CARDS:
+		if FriendlyCards.wound_of(s) == FriendlyCards.WoundDraw.KIA:
+			kia = s
+			break
+	sk.friendly_deck = [kia, kia]
+	var mdead := Character.new("mm", "MM", Domain.Side.FRIENDLY, "Able")
+	mdead.troop_quality = 5
+	mdead.is_medic = true
+	mdead.position = Vector2i(0, 0)
+	var witness := Character.new("wi", "Wi", Domain.Side.FRIENDLY, "Able")
+	witness.troop_quality = 8  # cosi' la reazione cambia sempre il morale
+	witness.position = Vector2i(0, 1)
+	sk.characters = [mdead, witness]
+	Fire._resolve_wound(sk, null, mdead)
+	if not mdead.is_dead() or witness.morale == Domain.Morale.NORMAL:
+		print("TEST medico: nessuna reazione alla caduta del medico")
+		fails += 1
 	return fails
 
 

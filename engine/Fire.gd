@@ -360,6 +360,30 @@ static func _draw_wound(state: GameState, firer: Character, target: Character) -
 	return s1 if sev1 <= sev2 else s2
 
 
+# Rule 30.1: alla morte o ferita GRAVE di un Medico friendly, ogni friendly
+# con LOS reagisce (Injured/KIA Medic Morale Check): nat 0 +2, <=TQ +1,
+# nat 9 -1 (cap Berserk). Si attiva solo per i medici friendly.
+static func _medic_shock(state: GameState, medic: Character) -> void:
+	if medic.side != D.Side.FRIENDLY or not medic.is_medic:
+		return
+	_log(state, "%s (medico) e' caduto: i compagni con LOS reagiscono" % medic.display_name)
+	for c in state.characters:
+		if c.side != D.Side.FRIENDLY or c == medic or c.is_dead():
+			continue
+		if not LOS.clear(state, c, medic):
+			continue
+		var roll := Checks.roll_d10(state.rng)
+		var before := c.morale
+		if roll == 0:
+			c.morale = D.raise_morale(c.morale, 2, D.Morale.BERSERK)
+		elif roll == 9:
+			c.morale = D.lower_morale(c.morale, 1)
+		elif roll <= Checks.effective_tq(c):
+			c.morale = D.raise_morale(c.morale, 1, D.Morale.BERSERK)
+		if c.morale != before:
+			_log(state, "  %s: tira %d -> %s" % [c.display_name, roll, D.MORALE_NAMES[c.morale]])
+
+
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.
 static func _resolve_wound(state: GameState, firer: Character, target: Character) -> bool:
 	var serial := _draw_wound(state, firer, target)
@@ -378,6 +402,7 @@ static func _resolve_wound(state: GameState, firer: Character, target: Character
 			target.clear_order()
 			# Niente urlo qui: per il fuoco lo suona l'esito "Ucciso!" di
 			# fire_action; per le esplosioni ci pensa Area._blast_check.
+			_medic_shock(state, target)
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
@@ -388,7 +413,10 @@ static func _resolve_wound(state: GameState, firer: Character, target: Character
 			if target.is_dead():
 				_log(state, "  le ferite uccidono %s" % target.display_name)
 				target.clear_order()
+				_medic_shock(state, target)
 				return true
+			if w == D.Wound.BAD:
+				_medic_shock(state, target)
 			target.set_order(D.Order.DUCK_BACK)
 			var res := Checks.wound_morale_check(target, state.rng)
 			_log(state, "  WMC: tira %d -> %s, Duck Back" % [
@@ -414,6 +442,7 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			target.clear_order()
 			state.audio_events.append({"type": "scream", "hex": target.position})
 			Replay.sfx(state, "scream")
+			_medic_shock(state, target)
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
@@ -424,7 +453,10 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			if target.is_dead():
 				_log(state, "  le ferite uccidono %s" % target.display_name)
 				target.clear_order()
+				_medic_shock(state, target)
 				return true
+			if w == D.Wound.BAD:
+				_medic_shock(state, target)
 			# In mischia non si riceve Duck Back, ma MC e WMC come al solito.
 			var mc := Checks.morale_check(target, state.rng)
 			_log(state, "  MC mischia: tira %d -> %s" % [mc["roll"], D.MORALE_NAMES[mc["after"]]])
