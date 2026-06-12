@@ -123,8 +123,18 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		"outcome": outcome, "hex": firer.position})
 
 
-# Ritorna {hit: bool, nine: bool}.
-static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> Dictionary:
+# WS finale del tiro per la sola fascia di scelta del bersaglio (helper di
+# test/UI): solo il valore, senza tirare il dado. Usa la prima arma del
+# tiratore.
+static func _fire_ws(state: GameState, firer: Character, target: Character) -> int:
+	var weapon: String = firer.weapon_skills.keys()[0]
+	return int(_compute_ws(state, firer, target, weapon)["ws"])
+
+
+# Calcolo del WS modificato con la scomposizione per il log (Fire Resolution
+# Chart + "MODIFIES WS"). Estratto da _resolve_attack cosi' e' testabile a
+# parte. Ritorna {"ws": int, "bits": Array[String]}.
+static func _compute_ws(state: GameState, firer: Character, target: Character, weapon: String) -> Dictionary:
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var hex := state.hex_at(target.position.x, target.position.y)
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
@@ -132,7 +142,6 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		if target.has_order else NO_ORDER_GROUP
 	var suppressive := firer.has_order and firer.order == D.Order.SUPPRESSIVE_FIRE
 
-	# Il WS modificato, con la SCOMPOSIZIONE per il log di combattimento.
 	var ws: int = firer.weapon_skills[weapon]
 	var bits: Array[String] = ["%d base %s" % [ws, weapon]]
 	var m: int = int(Weapons.range_ws_modifier(weapon, dist))
@@ -166,6 +175,18 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 	if m != 0:
 		bits.append("%+d morale %s" % [m, Domain.MORALE_NAMES[firer.morale]])
 	ws += m
+	# Skill SS (Rule 24): Dodge del bersaglio in Evade, Sniper del tiratore.
+	if target.has_order and target.order == D.Order.EVADE:
+		if target.has_skill(Character.SKILL_DODGE_2):
+			bits.append("-2 Dodge-2 (Evade)")
+			ws -= 2
+		elif target.has_skill(Character.SKILL_DODGE):
+			bits.append("-1 Dodge (Evade)")
+			ws -= 1
+	if firer.has_skill(Character.SKILL_SNIPER) and firer.has_order \
+			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2:
+		bits.append("+2 Sniper (Aimed)")
+		ws += 2
 	# Modificatori della carta di turno (solo per i Friendly).
 	if firer.side == D.Side.FRIENDLY:
 		m = int(state.turn_fx.get("ws_all", 0)) \
@@ -186,6 +207,19 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		bits.append("%+d ambiente (fumo/notte)" % m)
 	ws += m
 	# TODO: filo spinato per-hex.
+	return {"ws": ws, "bits": bits}
+
+
+# Ritorna {hit: bool, nine: bool}.
+static func _resolve_attack(state: GameState, firer: Character, target: Character, weapon: String) -> Dictionary:
+	var hex := state.hex_at(target.position.x, target.position.y)
+	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
+	var group: int = WS_GROUP.get(target.order, NO_ORDER_GROUP) \
+		if target.has_order else NO_ORDER_GROUP
+	var suppressive := firer.has_order and firer.order == D.Order.SUPPRESSIVE_FIRE
+	var computed := _compute_ws(state, firer, target, weapon)
+	var ws: int = computed["ws"]
+	var bits: Array = computed["bits"]
 
 	var roll := Checks.roll_d10(state.rng)
 	# Riga di dettaglio (prefisso "·"): la formula completa del tiro.
@@ -238,7 +272,7 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		target.clear_order()
 		wounded_or_killed = true
 	else:
-		wounded_or_killed = _resolve_wound(state, target)
+		wounded_or_killed = _resolve_wound(state, firer, target)
 	# 0 naturale: il tiratore si esalta se ha fatto danno (mai Berserk).
 	if roll == 0 and wounded_or_killed:
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
@@ -254,10 +288,34 @@ static func _crack_shot_worthy(target: Character) -> bool:
 		or target.weapon_skills.has("MG42")
 
 
+# Pesca la carta-ferita tenendo conto delle skill SS (Rule 24): Deadly del
+# tiratore pesca 2 e applica la PIU' dannosa, Tough del bersaglio pesca 2 e
+# applica la MENO dannosa; se valgono entrambe (Deadly vs Tough) si annullano
+# e si pesca una sola carta. Logga il pescaggio e ritorna il serial scelto.
+static func _draw_wound(state: GameState, firer: Character, target: Character) -> int:
+	var bias := 0
+	if firer != null and firer.has_skill(Character.SKILL_DEADLY):
+		bias += 1
+	if target.has_skill(Character.SKILL_TOUGH):
+		bias -= 1
+	var s1 := state.draw_friendly_card()
+	state.friendly_discard.append(s1)
+	if bias == 0:
+		return s1
+	var s2 := state.draw_friendly_card()
+	state.friendly_discard.append(s2)
+	var sev1: int = FriendlyCards.wound_of(s1)
+	var sev2: int = FriendlyCards.wound_of(s2)
+	if bias > 0:
+		_log(state, "  Deadly: pesca %d e %d, applica la peggiore" % [s1, s2])
+		return s1 if sev1 >= sev2 else s2
+	_log(state, "  Tough: pesca %d e %d, applica la meno grave" % [s1, s2])
+	return s1 if sev1 <= sev2 else s2
+
+
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.
-static func _resolve_wound(state: GameState, target: Character) -> bool:
-	var serial := state.draw_friendly_card()
-	state.friendly_discard.append(serial)
+static func _resolve_wound(state: GameState, firer: Character, target: Character) -> bool:
+	var serial := _draw_wound(state, firer, target)
 	var wound: int = FriendlyCards.wound_of(serial)
 	match wound:
 		FriendlyCards.WoundDraw.CLOSE_CALL:
@@ -292,9 +350,8 @@ static func _resolve_wound(state: GameState, target: Character) -> bool:
 
 
 # Pesca della ferita in mischia (Rule 15): niente Duck Back, ma MC + WMC.
-static func _resolve_wound_melee(state: GameState, target: Character) -> bool:
-	var serial := state.draw_friendly_card()
-	state.friendly_discard.append(serial)
+static func _resolve_wound_melee(state: GameState, firer: Character, target: Character) -> bool:
+	var serial := _draw_wound(state, firer, target)
 	var wound: int = FriendlyCards.wound_of(serial)
 	match wound:
 		FriendlyCards.WoundDraw.CLOSE_CALL:

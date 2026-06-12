@@ -442,6 +442,19 @@ static func _melee_tq(c: Character) -> int:
 	return Checks.effective_tq(c) + int(MELEE_MORALE_TQ.get(c.morale, 0))
 
 
+# TQ d'attacco in mischia: base + morale (via _melee_tq) piu' i bonus
+# deterministici, ossia Charge all'impulso 4 (Rule 7.08/10.08) e Knife Expert
+# (Rule 24). Esclude la carta Bayonet, che si gioca in modo interattivo.
+static func _melee_attack_tq(state: GameState, attacker: Character) -> int:
+	var bonus := 0
+	if attacker.has_order and attacker.order == Domain.Order.CHARGE \
+			and state.impulse == 4:
+		bonus += 1
+	if attacker.has_skill(Character.SKILL_KNIFE_EXPERT):
+		bonus += 1
+	return _melee_tq(attacker) + bonus
+
+
 # Mischia (Rule 15): solo l'attaccante tira un TQC (modificato da ferite e morale).
 # Successo = pesca carta ferita (senza Duck Back). Fallimento = nessun effetto.
 # La mischia avviene solo nello STESSO esagono. Charge all'impulso 4: +1 TQ.
@@ -466,17 +479,14 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
 		attacker.set_order(Domain.Order.GUARD)
 		return
-	# "Bayonet!": +2 TQ all'attaccante friendly.
+	# "Bayonet!": +2 TQ all'attaccante friendly (carta, uso interattivo).
 	var atk_bonus := 0
 	if attacker.side == Domain.Side.FRIENDLY \
 			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
 				"%s carica alla baionetta (+2)" % attacker.display_name):
 		atk_bonus = 2
-	# Charge all'impulso 4: +1 TQ (Rule 7.08/10.08).
-	if attacker.has_order and attacker.order == Domain.Order.CHARGE \
-			and state.impulse == 4:
-		atk_bonus += 1
-	var atk_tq := _melee_tq(attacker) + atk_bonus
+	# TQ d'attacco: morale + Charge all'impulso 4 + Knife Expert (Rule 24).
+	var atk_tq := _melee_attack_tq(state, attacker) + atk_bonus
 	var roll := Checks.roll_d10(state.rng)
 	var passed := roll == 0 or (roll != 9 and roll <= atk_tq)
 	state.log_event("%s attacca %s in mischia: TQ %d, tira %d -> %s" % [
@@ -485,7 +495,7 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 	if passed:
 		state.audio_events.append({"type": "melee", "hex": attacker.position})
 		Replay.sfx(state, "melee")
-		Fire._resolve_wound_melee(state, target)
+		Fire._resolve_wound_melee(state, attacker, target)
 	else:
 		state.log_event("  nessun effetto")
 

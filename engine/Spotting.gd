@@ -101,7 +101,11 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	if not LOS.clear(state, spotter, target):
 		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
 	var dist := hex_distance(spotter.position, target.position)
-	var threshold := Checks.effective_tq(spotter) \
+	# Eagle Eyes (Rule 24): +1 alla TQ effettiva per lo spotting, max 8.
+	var tq := Checks.effective_tq(spotter)
+	if spotter.has_skill(Character.SKILL_EAGLE_EYES):
+		tq = mini(tq + 1, 8)
+	var threshold := tq \
 		+ target_modifier(state, target, spotter) + range_modifier(dist)
 	var roll := Checks.roll_d10(state.rng)
 	var success := roll <= threshold

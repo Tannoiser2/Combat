@@ -59,13 +59,17 @@ gia' lette; asset nel repo privato combat-riferimenti)
 
 Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
 
-1. IN CORSO: nemici Elite SS (Rule 24) — skill su Character.skills:
-   Dodge/-1 e Dodge-2/-2 al fuoco se in Evade; Tough (pesca 2 ferite,
-   applica la peggiore per chi spara... la MENO dannosa); Deadly
-   (pesca 2, applica la migliore; vs Tough si annullano); Eagle Eyes
-   (+1 TQ spotting, max 8); Sniper (+2 WS in Aimed Fire, non
-   all'impulso 2); Knife Expert (+1 TQ in mischia, coltello da lancio
-   gittata 2, WS = TQ-gittata).
+1. FATTO (skill base): nemici Elite SS (Rule 24) — skill su
+   Character.skills (costanti SKILL_* in Character.gd), assegnabili dagli
+   scenari per ruolo (ROLE["..."]["skills"]) o per pedina (entry "skills").
+   Implementate: Dodge/-1 e Dodge-2/-2 al fuoco se in Evade (Fire._compute_ws);
+   Tough (pesca 2 ferite, applica la MENO dannosa) e Deadly (pesca 2, la PIU'
+   dannosa; vs Tough si annullano) in Fire._draw_wound; Eagle Eyes (+1 TQ
+   spotting, cap 8) in Spotting.attempt; Sniper (+2 WS in Aimed Fire, non
+   all'impulso 2) in Fire._compute_ws; Knife Expert (+1 TQ in mischia) in
+   TurnSequence._melee_attack_tq. Test deterministici in Main._test_ss_skills.
+   DA FARE: il coltello da lancio del Knife Expert (gittata 2, WS = TQ-gittata)
+   come attacco a distanza; assegnare le skill ai nemici degli scenari Vol. 2.
 2. Nuove armi (Rule 26): Thompson (sostituibile al Grease Gun),
    Springfield M1903 (+1 Aimed oltre 3 hex, slow), STG 44 (ROF 3
    entro 13 hex, ROF 1 oltre), M2 .50cal (solo veicoli, rimandare).

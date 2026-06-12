@@ -1539,6 +1539,119 @@ func _test_rules() -> int:
 	if st.replay.is_empty() or st.replay[0]["moves"].values()[0].size() != 3:
 		print("TEST replay: passi non registrati")
 		fails += 1
+	fails += _test_ss_skills()
+	return fails
+
+
+# Skill dei nemici Elite SS (Rule 24).
+# Serial 1 = Close Call (lieve, severita' 0), serial 33 = Bad Wound (severita' 2).
+func _test_ss_skills() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 7
+	Boards.fill(st, "farmhouse")
+	var plain_shooter := Character.new("ps", "PS", Domain.Side.FRIENDLY, "Able")
+	var deadly := Character.new("de", "Deadly", Domain.Side.FRIENDLY, "Able")
+	deadly.skills = [Character.SKILL_DEADLY]
+	var plain_tgt := Character.new("pt", "PT", Domain.Side.ENEMY, "Red")
+	plain_tgt.troop_quality = 7
+	var tough := Character.new("to", "Tough", Domain.Side.ENEMY, "Red")
+	tough.troop_quality = 7
+	tough.skills = [Character.SKILL_TOUGH]
+
+	# Deadly: pesca 2 (33 e 1), applica la peggiore -> 33.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, deadly, plain_tgt) != 33:
+		print("TEST Deadly: non applica la ferita peggiore")
+		fails += 1
+	# Tough: pesca 2 (33 e 1), applica la meno grave -> 1.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, plain_shooter, tough) != 1:
+		print("TEST Tough: non applica la ferita meno grave")
+		fails += 1
+	# Deadly vs Tough si annullano: una sola pescata (33), il 1 resta nel mazzo.
+	st.friendly_deck = [1, 33]
+	st.friendly_discard = []
+	if Fire._draw_wound(st, deadly, tough) != 33 or st.friendly_deck != [1]:
+		print("TEST Deadly vs Tough: non si annullano")
+		fails += 1
+
+	# Eagle Eyes: +1 alla TQ effettiva nello spotting, con cap a 8.
+	var sp_a := Character.new("sa", "SA", Domain.Side.FRIENDLY, "Able")
+	sp_a.troop_quality = 5
+	sp_a.position = Vector2i(10, 10)
+	var sp_b := Character.new("sb", "SB", Domain.Side.FRIENDLY, "Able")
+	sp_b.troop_quality = 5
+	sp_b.skills = [Character.SKILL_EAGLE_EYES]
+	sp_b.position = Vector2i(10, 10)
+	var tgt := Character.new("et", "ET", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(10, 11)
+	st.characters = [sp_a, sp_b, tgt]
+	var th_a: int = Spotting.attempt(st, sp_a, tgt)["threshold"]
+	tgt.known = false
+	var th_b: int = Spotting.attempt(st, sp_b, tgt)["threshold"]
+	tgt.known = false
+	if th_a < 0 or th_b - th_a != 1:
+		print("TEST Eagle Eyes: bonus +1 errato (%d vs %d)" % [th_b, th_a])
+		fails += 1
+	# Cap a 8: con TQ 8 il bonus non si applica.
+	sp_a.troop_quality = 8
+	sp_b.troop_quality = 8
+	var c_a: int = Spotting.attempt(st, sp_a, tgt)["threshold"]
+	tgt.known = false
+	var c_b: int = Spotting.attempt(st, sp_b, tgt)["threshold"]
+	tgt.known = false
+	if c_b - c_a != 0:
+		print("TEST Eagle Eyes: cap a 8 non rispettato (%d vs %d)" % [c_b, c_a])
+		fails += 1
+
+	# Dodge/-2 abbassa il WS del tiratore se il bersaglio e' in Evade.
+	var firer := Character.new("fi", "Firer", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(10, 10)
+	var evader := Character.new("ev", "Evader", Domain.Side.ENEMY, "Red")
+	evader.troop_quality = 6
+	evader.position = Vector2i(10, 12)
+	evader.set_order(Domain.Order.EVADE)
+	var plain_ev := Character.new("pe", "PlainEv", Domain.Side.ENEMY, "Red")
+	plain_ev.troop_quality = 6
+	plain_ev.position = Vector2i(10, 12)
+	plain_ev.set_order(Domain.Order.EVADE)
+	evader.skills = [Character.SKILL_DODGE_2]
+	st.impulse = 1
+	if Fire._fire_ws(st, firer, plain_ev) - Fire._fire_ws(st, firer, evader) != 2:
+		print("TEST Dodge-2: il malus al WS non vale 2")
+		fails += 1
+
+	# Sniper: +2 WS in Aimed Fire fuori dall'impulso 2.
+	var sniper := Character.new("sn", "Sniper", Domain.Side.ENEMY, "Red")
+	sniper.troop_quality = 6
+	sniper.weapon_skills = {"KAR 98K": 6}
+	sniper.skills = [Character.SKILL_SNIPER]
+	sniper.position = Vector2i(10, 10)
+	sniper.set_order(Domain.Order.AIMED_FIRE)
+	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
+	prey.troop_quality = 6
+	prey.position = Vector2i(10, 12)
+	st.impulse = 1
+	var ws_imp1 := Fire._fire_ws(st, sniper, prey)
+	st.impulse = 2
+	var ws_imp2 := Fire._fire_ws(st, sniper, prey)
+	if ws_imp1 - ws_imp2 != 2:
+		print("TEST Sniper: +2 WS in Aimed Fire (non imp.2) errato")
+		fails += 1
+
+	# Knife Expert: +1 TQ in mischia.
+	var ke := Character.new("ke", "Knife", Domain.Side.ENEMY, "Red")
+	ke.troop_quality = 5
+	ke.skills = [Character.SKILL_KNIFE_EXPERT]
+	if TurnSequence._melee_attack_tq(st, ke) - (TurnSequence._melee_tq(ke)) != 1:
+		print("TEST Knife Expert: +1 TQ in mischia errato")
+		fails += 1
 	return fails
 
 

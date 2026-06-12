@@ -1,3 +1,14 @@
+v0.10 — 2026-06-12
+- Volume 2, Rule 24: skill dei nemici Elite SS
+  - Dodge / Dodge-2: -1 / -2 al WS di chi spara se l'SS e' in Evade
+  - Tough: ferito, pesca 2 carte e subisce la meno grave
+  - Deadly: quando spara, pesca 2 e applica la piu' grave
+    (Deadly contro Tough si annullano)
+  - Eagle Eyes: +1 alla TQ nello spotting (max 8)
+  - Sniper: +2 al WS in Aimed Fire (non all'impulso 2)
+  - Knife Expert: +1 alla TQ in mischia
+  - gli scenari possono dichiarare le skill per ruolo o per pedina
+
 v0.9 — 2026-06-12
 - Suoni: spari, raffiche, esplosioni, mischia e urla (asset CC0)
 - I suoni funzionano anche nel replay

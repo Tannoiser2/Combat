@@ -791,6 +791,12 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	c.leadership = prof["ldr"]
 	if not String(prof["weapon"]).is_empty():
 		c.weapon_skills = {prof["weapon"]: prof["ws"]}
+	# Skill SS (Rule 24): dal profilo del ruolo e/o dalla voce di scenario.
+	for s in prof.get("skills", []):
+		c.skills.append(s)
+	for s in entry.get("skills", []):
+		if s not in c.skills:
+			c.skills.append(s)
 	c.counter = entry.get("counter", "")
 	c.role = entry["role"]
 	c.is_dummy = entry["role"] == "Dummy"
