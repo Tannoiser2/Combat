@@ -143,9 +143,16 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Evade verso il ferito alleato entro 4 hex (bussola), altrimenti Hide
    (TurnSequence._assign_medic_order). Test in Main._test_medic. DA FARE:
    nemico che evita di sparare ai medici amici (TQ+2), revenge sui prigionieri.
-7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
-   privato (scansioni mappe da classificare con tools/
-   classify_terrain.py e generate_boards.py) e lo Scenario Book.
+7. FATTO: Scenari Vol. 2 (s11-s22) + 6 mappe nuove (woods, town, abbey,
+   hamlet, hedgerows2, ridge). Boards.gd rigenerato con tutte e 10 le mappe.
+   Ruoli SS (SS Schutze/Veteran/NCO/Officer) con skill Dodge/Tough; team Teal
+   e Purple; FULL_SQUAD_VOL2 (Perez + 11, team Able/Baker/Charlie con Leader2
+   Cpl Diaz). Scenari: s11 Payback Time, s12 Overrun, s13 Find That Radio,
+   s14 Defend the CP, s15 They're Falling Back, s16 Get Them Out of There,
+   s17 Clear Them Out, s18 Great Minds (notte), s19 No Man Left Behind,
+   s20 Long Run Home, s21 Machine-Gun Ridge, s22 Outflanked. Setup posizioni
+   derivate da analisi terreno (non dal libro scenari ufficiale): rifinibili
+   con i dati reali se disponibili.
 8. Veicoli e anticarro (Rule 31-32): il pezzo grosso, per ultimo.
 
 ## Bug noti / attenzioni
