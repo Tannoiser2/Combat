@@ -454,6 +454,7 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		attacker.display_name, target.display_name,
 		atk_tq, roll, "COLPISCE" if passed else "manca"])
 	if passed:
+		state.audio_events.append({"type": "melee", "hex": attacker.position})
 		Fire._resolve_wound_melee(state, target)
 	else:
 		state.log_event("  nessun effetto")

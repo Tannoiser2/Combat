@@ -118,6 +118,7 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		"hit": any_hit, "side": firer.side, "outcome": outcome,
 	})
 	Replay.shot(state, state.shots.back())
+	state.audio_events.append({"type": "shot", "weapon": weapon, "hex": firer.position})
 
 
 # Ritorna {hit: bool, nine: bool}.
@@ -268,6 +269,7 @@ static func _resolve_wound(state: GameState, target: Character) -> bool:
 			while not target.is_dead():
 				target.wounds.append(D.Wound.BAD)
 			target.clear_order()
+			state.audio_events.append({"type": "scream", "hex": target.position})
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
@@ -303,6 +305,7 @@ static func _resolve_wound_melee(state: GameState, target: Character) -> bool:
 			while not target.is_dead():
 				target.wounds.append(D.Wound.BAD)
 			target.clear_order()
+			state.audio_events.append({"type": "scream", "hex": target.position})
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD

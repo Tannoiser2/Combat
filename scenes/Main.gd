@@ -71,6 +71,20 @@ var replay_hidden_banner: CanvasLayer = null   # banner di vittoria sospeso
 const REPLAY_MOVE_T := 1.3      # durata della parte di movimento
 const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
 
+# Audio: player per tipo di suono (nil se il file non e' installato).
+var _sfx: Dictionary = {}
+const WEAPON_SFX := {
+	"M1 Garand": "rifle", "KAR 98K": "rifle",
+	"M3 Grease Gun": "mg", "BAR": "mg", "M1919": "mg", "MG42": "mg", "MP40": "mg",
+	"M1911": "pistol", "P38": "pistol",
+	"M7 Grenade Launcher": "grenade",
+}
+const AREA_SFX := {
+	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
+	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
+	Area.Type.C4: "artillery",
+}
+
 
 func _ready() -> void:
 	if not OS.get_environment("COMBAT_SELFTEST").is_empty():
@@ -127,7 +141,7 @@ func _start_scenario(scenario_id: String) -> void:
 	var z := 60.0 / map_view.cell.x
 	camera.zoom = Vector2(z, z)
 	add_child(camera)
-
+	_load_sfx()
 	_build_hud()
 	# Fase di schieramento, se lo scenario ha una zona e siamo interattivi.
 	deploy_zone = Scenario.deploy_hexes(state, scenario_id)
@@ -135,6 +149,32 @@ func _start_scenario(scenario_id: String) -> void:
 		_start_deploy()
 	else:
 		_start_turn()
+
+
+# --------------------------------------------------------- audio
+
+func _load_sfx() -> void:
+	_sfx.clear()
+	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream"]:
+		var path := "res://assets/audio/%s.ogg" % s
+		if ResourceLoader.exists(path):
+			var p := AudioStreamPlayer.new()
+			p.stream = load(path)
+			p.max_polyphony = 3
+			add_child(p)
+			_sfx[s] = p
+
+func _consume_audio_events() -> void:
+	for ev in state.audio_events:
+		var key := ""
+		match ev["type"]:
+			"shot":  key = WEAPON_SFX.get(ev["weapon"], "rifle")
+			"boom":  key = AREA_SFX.get(ev["area_type"], "artillery")
+			"melee": key = "melee"
+			"scream": key = "scream"
+		if key != "" and _sfx.has(key):
+			_sfx[key].play()
+	state.audio_events.clear()
 
 
 # --------------------------------------------------------- schieramento
@@ -380,6 +420,7 @@ func _on_next_pressed() -> void:
 			state.shots.clear()
 			state.move_paths.clear()
 			state.booms.clear()
+			state.audio_events.clear()
 			state.log_event("--- Impulse 1 ---")
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
@@ -400,6 +441,7 @@ func _advance_action() -> void:
 			state.impulse = impulse_next
 			state.shots.clear()
 			state.move_paths.clear()
+			state.audio_events.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
@@ -414,6 +456,7 @@ func _advance_action() -> void:
 			_refresh()
 			return
 		TurnSequence.resolve_action(state, c)
+		_consume_audio_events()
 	# (non raggiunto)
 
 
@@ -787,6 +830,7 @@ func _handle_action_click(hex: Vector2i) -> void:
 		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
 			return  # click non valido: si ignora
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		_consume_audio_events()
 		_finish_friendly_action()
 	else:  # MOVE
 		var from := acting.position
