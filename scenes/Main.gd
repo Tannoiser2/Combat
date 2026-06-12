@@ -1549,6 +1549,87 @@ func _test_rules() -> int:
 	fails += _test_terrain()
 	fails += _test_knife()
 	fails += _test_fire()
+	fails += _test_medic()
+	return fails
+
+
+# Medici addestrati (Volume 2, Rule 30).
+func _test_medic() -> int:
+	var fails := 0
+	# Medico disarmato: nessun bersaglio di fuoco possibile.
+	var st := GameState.new()
+	var medic := Character.new("md", "Doc", Domain.Side.FRIENDLY, "Able")
+	medic.troop_quality = 5
+	medic.is_medic = true
+	medic.position = Vector2i(5, 5)
+	var foe := Character.new("fo", "Foe", Domain.Side.ENEMY, "Red")
+	foe.troop_quality = 5
+	foe.known = true
+	foe.position = Vector2i(5, 6)
+	st.characters = [medic, foe]
+	if not TurnSequence.valid_fire_targets(st, medic).is_empty():
+		print("TEST medico: disarmato non puo' sparare")
+		fails += 1
+	# legal_orders: niente fuoco/mischia, ma Medical Aid si'.
+	var orders := TurnSequence.legal_orders(st, medic)
+	if Domain.Order.AIMED_FIRE in orders or Domain.Order.CHARGE in orders \
+			or Domain.Order.MEDICAL_AID not in orders:
+		print("TEST medico: legal_orders non filtra il combattimento")
+		fails += 1
+	# Enemy medic: un ordine di fuoco diventa Medical Aid.
+	var emed := Character.new("em", "Sani", Domain.Side.ENEMY, "Red")
+	emed.troop_quality = 5
+	emed.is_medic = true
+	TurnSequence._set_enemy_order(st, emed, Domain.Order.AIMED_FIRE)
+	if emed.order != Domain.Order.MEDICAL_AID:
+		print("TEST medico: ordine di fuoco non convertito in cura")
+		fails += 1
+	# +2 TQ alla cura: con un tiro che passa solo grazie al +2.
+	var seed := 1
+	var roll := 0
+	while true:
+		var probe := RandomNumberGenerator.new()
+		probe.seed = seed
+		roll = probe.randi_range(0, 9)
+		if roll >= 2:
+			break
+		seed += 1
+	for as_medic in [true, false]:
+		var sm := GameState.new()
+		sm.rng.seed = seed
+		var doc := Character.new("d2", "D2", Domain.Side.FRIENDLY, "Able")
+		doc.troop_quality = roll - 1  # senza +2 il tiro fallisce
+		doc.is_medic = as_medic
+		doc.position = Vector2i(2, 2)
+		var hurt := Character.new("hu", "Hurt", Domain.Side.FRIENDLY, "Able")
+		hurt.troop_quality = 6
+		hurt.position = Vector2i(2, 3)
+		hurt.wounds = [Domain.Wound.LIGHT]
+		sm.characters = [doc, hurt]
+		TurnSequence._do_medic(sm, doc)
+		var cured := hurt.wounds.is_empty()
+		if cured != as_medic:
+			print("TEST medico: +2 TQ alla cura errato (medic=%s, curato=%s)" % [as_medic, cured])
+			fails += 1
+	# Mai mischia: se un avversario entra nel suo hex, il medico fugge.
+	var sf := GameState.new()
+	sf.rng.seed = 9
+	for col in range(3, 8):
+		for row in range(3, 8):
+			sf.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var doc2 := Character.new("d3", "D3", Domain.Side.FRIENDLY, "Able")
+	doc2.troop_quality = 5
+	doc2.is_medic = true
+	doc2.position = Vector2i(5, 5)
+	var att := Character.new("at", "Att", Domain.Side.ENEMY, "Red")
+	att.troop_quality = 6
+	att.position = Vector2i(5, 5)
+	att.set_order(Domain.Order.CHARGE)
+	sf.characters = [doc2, att]
+	TurnSequence._do_melee(sf, att)
+	if doc2.position == Vector2i(5, 5) or not doc2.wounds.is_empty():
+		print("TEST medico: dovrebbe fuggire dalla mischia illeso")
+		fails += 1
 	return fails
 
 

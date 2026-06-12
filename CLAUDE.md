@@ -121,7 +121,16 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    SEMPLIFICAZIONI: il fuoco emette fumo dal proprio hex (non genera la scia di
    fading smoke sottovento turno per turno); la duck-back forzata di chi non
    puo' avanzare per le fiamme non e' modellata.
-6. Medici addestrati (Rule 30).
+6. PARZIALE: Medici addestrati (Rule 30). Character.is_medic; ruolo "Medic"
+   (ROLE) o entry "medic". Disarmati (weapon_skills vuoto -> no fuoco), +2 TQ
+   in Medical Aid (TurnSequence._do_medic), mai mischia: se un avversario entra
+   nel loro hex fuggono di 1 hex 1D6 (_medic_flee in _do_melee). Ordini di
+   fuoco/granata/carica/mischia vietati: MEDIC_FORBIDDEN, filtrati in
+   legal_orders (giocatore) e convertiti in Medical Aid in _set_enemy_order
+   (nemico). Test in Main._test_medic. DA FARE: scossa morale ai friendly con
+   LOS alla morte/ferita grave del medico amico (tabella 30.1), nemico che
+   evita di sparare ai medici amici (TQ+2), micro-AI del medico nemico verso i
+   feriti (30.2), revenge sui prigionieri.
 7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
    privato (scansioni mappe da classificare con tools/
    classify_terrain.py e generate_boards.py) e lo Scenario Book.

@@ -30,6 +30,9 @@ const ROLE := {
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	"BAR Gunner": {"tq": 5, "ldr": 0, "weapon": "BAR", "ws": 5},
 	"MG Gunner": {"tq": 5, "ldr": 0, "weapon": "M1919", "ws": 5},
+	# Medico addestrato (Rule 30): disarmato, +2 TQ alle cure. Vale per
+	# entrambi i lati (lo schiera lo scenario).
+	"Medic": {"tq": 5, "ldr": 0, "weapon": "", "ws": 0, "medic": true},
 	# Pedina-esca: valori minimi, non combatte mai.
 	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
 }
@@ -811,6 +814,10 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	for s in entry.get("skills", []):
 		if s not in c.skills:
 			c.skills.append(s)
+	# Medico addestrato (Rule 30): disarmato. Da ruolo ("medic") o pedina.
+	if bool(prof.get("medic", false)) or bool(entry.get("medic", false)):
+		c.is_medic = true
+		c.weapon_skills = {}
 	c.counter = entry.get("counter", "")
 	c.role = entry["role"]
 	c.is_dummy = entry["role"] == "Dummy"

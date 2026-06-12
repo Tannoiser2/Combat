@@ -57,6 +57,9 @@ var no_ammo: bool = false
 
 # Ruolo dello scenario ("Recruit", "NCO", "Officer"...): serve ai VP.
 var role: String = ""
+# Medico addestrato (Rule 30): disarmato, mai fuoco/mischia, +2 TQ alle cure,
+# fugge se un avversario entra nel suo hex. Vale per friendly ed enemy.
+var is_medic: bool = false
 # Pedina-esca (Dummy): nessun valore reale; quando viene individuata si
 # rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
 var is_dummy: bool = false

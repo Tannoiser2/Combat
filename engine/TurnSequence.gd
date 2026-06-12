@@ -156,6 +156,9 @@ static func _update_initiative_order(state: GameState) -> void:
 static func _set_enemy_order(state: GameState, c: Character, order: int,
 		move: String = "", grenade: bool = false, charge: bool = false) -> void:
 	var final_order := Weather.demote_order(state.ground, order)
+	# Medico addestrato (Rule 30): mai fuoco/granate/carica/mischia -> cura.
+	if c.is_medic and final_order in MEDIC_FORBIDDEN:
+		final_order = Domain.Order.MEDICAL_AID
 	c.set_order(final_order, move, grenade, charge)
 	if final_order != order:
 		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
@@ -402,7 +405,10 @@ static func _do_medic(state: GameState, medic: Character) -> void:
 		if p.side != medic.side or p == medic or p.is_dead():
 			continue
 		if Spotting.hex_distance(medic.position, p.position) <= 1 and not p.wounds.is_empty():
-			var res := Checks.troop_quality_check(medic, state.rng)
+			# Medico addestrato (Rule 30): +2 TQ al check di Medical Aid.
+			var bonus := 2 if medic.is_medic else 0
+			var roll := Checks.roll_d10(state.rng)
+			var res := {"passed": roll <= Checks.effective_tq(medic) + bonus}
 			# "Medical Marvel": la cura fallita riesce automaticamente.
 			if not res["passed"] and medic.side == Domain.Side.FRIENDLY \
 					and FriendlyCards.use_from_hand(state, FriendlyCards.MEDICAL,
@@ -431,6 +437,29 @@ static func _do_search(state: GameState, searcher: Character) -> void:
 			else:
 				state.log_event("%s scopre %s cercando" % [
 					searcher.display_name, e.display_name])
+
+
+# Ordini vietati a un medico addestrato (Rule 30): mai fuoco, granate,
+# carica o mischia. Se assegnati, diventano Medical Aid (nemico) o sono
+# nascosti dal menu (giocatore).
+const MEDIC_FORBIDDEN := [
+	Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE, Domain.Order.SUPPRESSIVE_FIRE,
+	Domain.Order.GUARD, Domain.Order.CHARGE, Domain.Order.MELEE,
+	Domain.Order.GRENADE, Domain.Order.RIFLE_GRENADE, Domain.Order.SMOKE_GRENADE,
+]
+
+
+# Il medico fugge di 1 hex in direzione 1D6 quando un avversario entra nel
+# suo hex (Rule 30): non combatte mai.
+static func _medic_flee(state: GameState, medic: Character) -> void:
+	var dir: Vector3i = Move.CUBE_DIRS[state.rng.randi_range(0, 5)]
+	var dest := Move.from_cube(Move.to_cube(medic.position) + dir)
+	if Move.is_passable(state, dest):
+		state.log_event("%s (medico) sfugge all'assalto: %02d.%02d -> %02d.%02d" % [
+			medic.display_name, medic.position.x, medic.position.y, dest.x, dest.y])
+		medic.position = dest
+	else:
+		state.log_event("%s (medico) non riesce a fuggire" % medic.display_name)
 
 
 # Ordini "passivi" che in mischia lasciano scoperti (-2 al TQC difensivo).
@@ -487,6 +516,11 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		target.removed = true
 		state.log_event("%s travolge un'esca in mischia" % attacker.display_name)
 		return
+	# Medico addestrato (Rule 30): non entra mai in mischia; se un avversario
+	# arriva nel suo hex, fugge di 1 hex in direzione 1D6.
+	if target.is_medic:
+		_medic_flee(state, target)
+		return
 	# Rout in mischia: l'attaccante in Rota si arrende (Rule 15/17.3).
 	if attacker.morale == Domain.Morale.ROUT:
 		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
@@ -527,6 +561,9 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 	for o in Domain.Order.values():
 		# Condizione del terreno (Rule 28.2): ordini di movimento vietati.
 		if Weather.order_forbidden(state.ground, o):
+			continue
+		# Medico addestrato (Rule 30): niente fuoco/granate/carica/mischia.
+		if c.is_medic and o in MEDIC_FORBIDDEN:
 			continue
 		if restrict == "worried" and c.morale in [Domain.Morale.CAUTIOUS, Domain.Morale.SHAKEN] \
 				and o != Domain.Order.HIDE:
