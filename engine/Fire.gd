@@ -64,7 +64,7 @@ const MC_ONLY := [
 
 const WOUND_MOD := {D.Wound.LIGHT: -1, D.Wound.BAD: -3}
 const MORALE_WS_MOD := {
-	D.Morale.BERSERK: 1,
+	D.Morale.BERSERK: 3,
 	D.Morale.CAUTIOUS: -1,
 	D.Morale.SHAKEN: -2,
 }
@@ -283,6 +283,42 @@ static func _resolve_wound(state: GameState, target: Character) -> bool:
 			var res := Checks.wound_morale_check(target, state.rng)
 			_log(state, "  WMC: tira %d -> %s, Duck Back" % [
 				res["roll"], D.MORALE_NAMES[res["after"]]])
+			return true
+
+
+# Pesca della ferita in mischia (Rule 15): niente Duck Back, ma MC + WMC.
+static func _resolve_wound_melee(state: GameState, target: Character) -> bool:
+	var serial := state.draw_friendly_card()
+	state.friendly_discard.append(serial)
+	var wound: int = FriendlyCards.wound_of(serial)
+	match wound:
+		FriendlyCards.WoundDraw.CLOSE_CALL:
+			_log(state, "  pesca carta %d: Close Call" % serial)
+			_hit_morale_check(state, target)
+			return false
+		FriendlyCards.WoundDraw.KIA:
+			_log(state, "  pesca carta %d: K.I.A. - %s e' morto" % [
+				serial, target.display_name])
+			target.wounds.append(D.Wound.BAD)
+			while not target.is_dead():
+				target.wounds.append(D.Wound.BAD)
+			target.clear_order()
+			return true
+		_:
+			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
+			target.wounds.append(w)
+			_log(state, "  pesca carta %d: %s per %s (niente Duck Back in mischia)" % [serial,
+				"Light Wound" if w == D.Wound.LIGHT else "Bad Wound",
+				target.display_name])
+			if target.is_dead():
+				_log(state, "  le ferite uccidono %s" % target.display_name)
+				target.clear_order()
+				return true
+			# In mischia non si riceve Duck Back, ma MC e WMC come al solito.
+			var mc := Checks.morale_check(target, state.rng)
+			_log(state, "  MC mischia: tira %d -> %s" % [mc["roll"], D.MORALE_NAMES[mc["after"]]])
+			var wmc := Checks.wound_morale_check(target, state.rng)
+			_log(state, "  WMC mischia: tira %d -> %s" % [wmc["roll"], D.MORALE_NAMES[wmc["after"]]])
 			return true
 
 

@@ -456,6 +456,16 @@ const SCENARIOS := {
 		"desc": "Prenderla e' stato facile, tenerla no:\nil nemico torna a riprendersi la 'sua' fattoria.",
 		"squad_full": true,
 		"enemy_morale": 1,  # Aggressive
+		# SR9: bombardamento iniziale (105mm, 6 colpi).
+		"opening_barrage": {
+			"type": "ARTILLERY_105",
+			"rolls": 6,
+			"scatter": true,
+			"hex_table": [
+				"20,7", "27,11", "20,14", "27,18", "30,12",
+				"28,7", "19,14", "24,13", "23,6", "12,10",
+			],
+		},
 		"cup_spec": {
 			"Blue": {"Recruit": 2, "Rifleman": 5, "NCO": 1, "Officer": 1},
 			"Red": {"Veteran": 2, "Rifleman": 5, "Recruit": 1},
@@ -701,6 +711,10 @@ static func build(state: GameState, scenario_id: String) -> void:
 		_place_enemy(state, entry, hexes[placed])
 		placed += 1
 
+	# Bombardamento iniziale (se previsto dallo scenario, es. s2).
+	if sc.has("opening_barrage"):
+		_run_opening_barrage(state, sc["opening_barrage"])
+
 	# Mano iniziale (Starting Hand Size).
 	for i in range(state.hand_limit):
 		state.friendly_hand.append(state.draw_friendly_card())
@@ -885,15 +899,18 @@ static func victory(state: GameState, scenario_id: String) -> Dictionary:
 		return {"outcome": "Sconfitta - %d/%d cannoni distrutti" % [
 			state.guns_destroyed.size(), guns.size()], "vp": vp,
 			"detail": ", ".join(parts)}
-	var outcome := "Sconfitta"
-	if vp >= 13:
-		outcome = "Vittoria netta"
-	elif vp >= 8:
-		outcome = "Vittoria"
-	elif vp >= 4:
+	# Soglie standard (Scenario Book): 15+/12-14/9-11/6-8/1-5/<=0.
+	var outcome := "Demozione"
+	if vp >= 15:
+		outcome = "Vittoria Superba – menzionato nei bollettini!"
+	elif vp >= 12:
+		outcome = "Buona Vittoria"
+	elif vp >= 9:
 		outcome = "Vittoria risicata"
+	elif vp >= 6:
+		outcome = "Non abbastanza"
 	elif vp >= 1:
-		outcome = "Prestazione scarsa"
+		outcome = "Prestazione scadente"
 	return {"outcome": outcome, "vp": vp,
 		"detail": "%d VP - %s" % [vp, ", ".join(parts)]}
 
@@ -928,6 +945,36 @@ static func _victory_recon(state: GameState, t: Dictionary) -> Dictionary:
 static func side_eliminated(state: GameState) -> bool:
 	var t := tally(state)
 	return t["f_alive"] == 0 or t["e_alive"] == 0
+
+
+# Bombardamento iniziale di setup (Rule speciale s2): piazza i marker d'artiglieria
+# e li fa esplodere subito, prima dell'inizio della partita.
+static func _run_opening_barrage(state: GameState, spec: Dictionary) -> void:
+	var type_name: String = spec["type"]
+	var atype: int = Area.Type.ARTILLERY_105
+	if type_name == "MORTAR_81":
+		atype = Area.Type.MORTAR_81
+	elif type_name == "MORTAR_60":
+		atype = Area.Type.MORTAR_60
+	var table: Array = spec["hex_table"]
+	var n_rolls: int = spec["rolls"]
+	var scatter: bool = spec.get("scatter", false)
+	state.log_event("=== BOMBARDAMENTO INIZIALE (%s, %d colpi) ===" % [type_name, n_rolls])
+	for i in range(n_rolls):
+		var idx := Checks.roll_d10(state.rng)
+		var hexkey: String = table[idx]
+		var p: PackedStringArray = String(hexkey).split(",")
+		var hex := Vector2i(int(p[0]), int(p[1]))
+		if scatter:
+			if state.rng.randi_range(1, 6) > 2:
+				var dir: Vector3i = Move.CUBE_DIRS[state.rng.randi_range(0, 5)]
+				var dev := Move.from_cube(Move.to_cube(hex) + dir)
+				if state.map.has(GameState.hex_key(dev.x, dev.y)):
+					state.log_event("  colpo %d: %02d.%02d devia -> %02d.%02d" % [
+						i + 1, hex.x, hex.y, dev.x, dev.y])
+					hex = dev
+		var marker := {"type": atype, "hex": hex, "placed_turn": 0, "turns_left": 1}
+		Area._explode(state, marker)
 
 
 static func _shuffle(arr: Array, rng: RandomNumberGenerator) -> void:

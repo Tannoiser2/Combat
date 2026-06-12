@@ -1334,7 +1334,7 @@ func _selftest() -> void:
 # vento, rout fuori mappa, registrazione replay).
 func _test_rules() -> int:
 	var fails := 0
-	# Mischia contrapposta: rivela il bersaglio.
+	# Mischia (Rule 15): rivela il bersaglio nello stesso hex.
 	var st := GameState.new()
 	st.rng.seed = 5
 	Boards.fill(st, "farmhouse")
@@ -1345,7 +1345,7 @@ func _test_rules() -> int:
 	var def := Character.new("d", "Def", Domain.Side.ENEMY, "Red")
 	def.troop_quality = 3
 	def.weapon_skills = {"KAR 98K": 3}
-	def.position = Vector2i(10, 11)
+	def.position = Vector2i(10, 10)
 	st.characters.append(atk)
 	st.characters.append(def)
 	atk.set_order(Domain.Order.CHARGE)
