@@ -679,6 +679,16 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.characters.append(mq)
 	# Scenario notturno: -2 al fuoco oltre 2 hex (salvo illuminazione).
 	state.night = bool(sc.get("night", false))
+	# Meteo e condizioni del terreno (Rule 28): chiavi "weather"/"ground"
+	# (nomi in Weather.TYPE_BY_NAME/GROUND_BY_NAME). Il limite di visibilita'
+	# si tira ora a inizio scenario.
+	state.weather = Weather.TYPE_BY_NAME.get(sc.get("weather", "clear"), Weather.Type.CLEAR)
+	state.ground = Weather.GROUND_BY_NAME.get(sc.get("ground", "none"), Weather.Ground.NONE)
+	state.max_los = Weather.roll_max_los(state.weather, state.rng)
+	if state.weather != Weather.Type.CLEAR or state.ground != Weather.Ground.NONE:
+		state.log_event("Meteo: %s, terreno: %s%s" % [
+			Weather.TYPE_NAMES[state.weather], Weather.GROUND_NAMES[state.ground],
+			"" if state.max_los == 0 else " (visibilita' max %d hex)" % state.max_los])
 	# Bussola del nemico (Rule 9.3): ["hex", "hex verso cui punta '1'"];
 	# default: "1" = nord.
 	var dir1 := Vector3i(0, 1, -1)
@@ -765,7 +775,7 @@ static func run_waves(state: GameState) -> void:
 			arrived = true
 			if wave.has("forced"):
 				var parts: PackedStringArray = String(wave["forced"]).split(" ")
-				e.set_order(ORDER_BY_NAME[parts[0]], parts[1])
+				e.set_order(Weather.demote_order(state.ground, ORDER_BY_NAME[parts[0]]), parts[1])
 				e.had_first_order = true
 		if arrived:
 			state.log_event("Arrivano rinforzi nemici al bordo!")

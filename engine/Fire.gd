@@ -204,13 +204,14 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		if m != 0:
 			bits.append("%+d carta" % m)
 		ws += m
-	# Ambiente: eventi/scenario, fumo lungo il tiro, notte.
+	# Ambiente: eventi/scenario, fumo lungo il tiro, notte, meteo (Rule 28).
 	m = int(state.turn_fx.get("fire_env_mod", 0))
 	m += _smoke_modifier(state, firer.position, target.position)
 	if state.night and dist > 2 and not Area.illuminated(state, target.position):
 		m += -2
+	m += Weather.ws_modifier(state, firer, target, dist)
 	if m != 0:
-		bits.append("%+d ambiente (fumo/notte)" % m)
+		bits.append("%+d ambiente (fumo/notte/meteo)" % m)
 	ws += m
 	# TODO: filo spinato per-hex.
 	return {"ws": ws, "bits": bits}

@@ -134,6 +134,9 @@ static func clear_hexes(state: GameState, a: Vector2i, b: Vector2i) -> bool:
 
 static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 		l1: int, l2: int, low_active: bool) -> bool:
+	# Limite di visibilita' del meteo (Rule 28.1): oltre il raggio, niente LOS.
+	if state.max_los > 0 and Spotting.hex_distance(a, b) > state.max_los:
+		return false
 	var between := hexes_between(a, b)
 	# H: ostacolo piu' alto; a parita', l'hex piu' lontano dal piu' alto.
 	var t2 := maxi(l1, l2)

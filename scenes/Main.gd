@@ -1543,6 +1543,120 @@ func _test_rules() -> int:
 		fails += 1
 	fails += _test_ss_skills()
 	fails += _test_weapons()
+	fails += _test_weather()
+	return fails
+
+
+# Meteo e condizioni del terreno (Volume 2, Rule 28).
+func _test_weather() -> int:
+	var fails := 0
+	# Malus al WS oltre i 2 hex (mappa vuota = niente edifici).
+	var st := GameState.new()
+	var a := Character.new("a", "A", Domain.Side.FRIENDLY, "Able")
+	a.position = Vector2i(0, 0)
+	var b := Character.new("b", "B", Domain.Side.ENEMY, "Red")
+	st.weather = Weather.Type.RAIN
+	b.position = Vector2i(0, 3)  # dist 3 (> 2)
+	if Weather.ws_modifier(st, a, b, 3) != -1:
+		print("TEST meteo: pioggia -1 oltre 2 hex errato")
+		fails += 1
+	if Weather.ws_modifier(st, a, b, 2) != 0:
+		print("TEST meteo: malus applicato entro 2 hex")
+		fails += 1
+	st.weather = Weather.Type.FOG
+	if Weather.ws_modifier(st, a, b, 3) != -2:
+		print("TEST meteo: nebbia -2 errato")
+		fails += 1
+	# Stesso edificio: nessun malus.
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	st.map[GameState.hex_key(0, 3)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	st.weather = Weather.Type.RAIN
+	if Weather.ws_modifier(st, a, b, 3) != 0:
+		print("TEST meteo: edificio non esenta dal malus")
+		fails += 1
+	# Limite di visibilita': oltre il raggio niente LOS.
+	var st2 := GameState.new()
+	st2.max_los = 3
+	if LOS.clear_positions(st2, Vector2i(0, 0), Vector2i(0, 4), 0, 0, false):
+		print("TEST visibilita': LOS non bloccata oltre il raggio")
+		fails += 1
+	if not LOS.clear_positions(st2, Vector2i(0, 0), Vector2i(0, 3), 0, 0, false):
+		print("TEST visibilita': LOS bloccata entro il raggio")
+		fails += 1
+	# Demozione degli ordini per condizione del terreno.
+	if Weather.demote_order(Weather.Ground.MUD, Domain.Order.SPRINT) != Domain.Order.EVADE \
+			or Weather.demote_order(Weather.Ground.MUD, Domain.Order.AIMED_FIRE) != Domain.Order.AIMED_FIRE:
+		print("TEST fango: demozione Sprint errata")
+		fails += 1
+	if Weather.demote_order(Weather.Ground.DEEP_SNOW, Domain.Order.EVADE) != Domain.Order.SNEAK \
+			or Weather.demote_order(Weather.Ground.DEEP_SNOW, Domain.Order.RUN_AND_GUN) != Domain.Order.SNEAK \
+			or Weather.demote_order(Weather.Ground.NONE, Domain.Order.SPRINT) != Domain.Order.SPRINT:
+		print("TEST neve alta: demozione errata")
+		fails += 1
+	# legal_orders esclude lo Sprint sul fango.
+	var st3 := GameState.new()
+	st3.ground = Weather.Ground.MUD
+	var fc := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	fc.troop_quality = 6
+	fc.position = Vector2i(5, 5)
+	st3.characters = [fc]
+	var orders := TurnSequence.legal_orders(st3, fc)
+	if Domain.Order.SPRINT in orders or Domain.Order.HIDE not in orders:
+		print("TEST fango: legal_orders non filtra lo Sprint")
+		fails += 1
+	# Winter Camouflage: -1 a essere individuato sulla neve.
+	var st4 := GameState.new()
+	st4.ground = Weather.Ground.SNOW
+	st4.rng.seed = 3
+	var spot := Character.new("s", "S", Domain.Side.FRIENDLY, "Able")
+	spot.troop_quality = 6
+	spot.position = Vector2i(0, 0)
+	var camo := Character.new("c", "C", Domain.Side.ENEMY, "Red")
+	camo.troop_quality = 5
+	camo.position = Vector2i(0, 2)
+	camo.skills = [Character.SKILL_WINTER_CAMO]
+	var plain := Character.new("p", "P", Domain.Side.ENEMY, "Red")
+	plain.troop_quality = 5
+	plain.position = Vector2i(0, 2)
+	var th_camo: int = Spotting.attempt(st4, spot, camo)["threshold"]
+	var th_plain: int = Spotting.attempt(st4, spot, plain)["threshold"]
+	if th_camo - th_plain != -1:
+		print("TEST Winter Camo: -1 allo spotting errato (%d vs %d)" % [th_camo, th_plain])
+		fails += 1
+	# Limite di visibilita' tirato: fasce d10 corrette.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for i in range(60):
+		var f := Weather.roll_max_los(Weather.Type.FOG, rng)
+		var mi := Weather.roll_max_los(Weather.Type.MIST, rng)
+		var hr := Weather.roll_max_los(Weather.Type.HEAVY_RAIN, rng)
+		if f < 1 or f > 6 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
+			print("TEST visibilita': fasce di tiro fuori range")
+			fails += 1
+			break
+	if Weather.roll_max_los(Weather.Type.CLEAR, rng) != 0:
+		print("TEST visibilita': il sereno non e' illimitato")
+		fails += 1
+	# Pioggia battente -> fango col 9; con pioggia normale mai.
+	var st5 := GameState.new()
+	st5.rng.seed = 1
+	st5.weather = Weather.Type.HEAVY_RAIN
+	var became := false
+	for i in range(400):
+		if Weather.maybe_make_mud(st5):
+			became = true
+			break
+	if not became or st5.ground != Weather.Ground.MUD:
+		print("TEST pioggia battente: il fango non si forma")
+		fails += 1
+	var st6 := GameState.new()
+	st6.rng.seed = 1
+	st6.weather = Weather.Type.RAIN
+	for i in range(50):
+		if Weather.maybe_make_mud(st6):
+			print("TEST pioggia normale: fango non previsto")
+			fails += 1
+			break
 	return fails
 
 

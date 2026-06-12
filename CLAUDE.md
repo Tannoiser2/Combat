@@ -78,8 +78,18 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Bande esatte dal Weapons Chart (repo privato). Test in Main._test_weapons.
    DA FARE: M2 .50cal (solo veicoli, rimandata con la Rule 31-32); assegnare
    le armi nuove ai soldati degli scenari Vol. 2.
-3. Meteo e condizioni del terreno (Rule 28): pioggia, nebbia, fango,
-   neve — modificatori a LOS/WS/movimento via state.turn_fx.
+3. FATTO: Meteo e condizioni del terreno (Rule 28) in Weather.gd (class_name,
+   enum Type/Ground). state.weather/ground/max_los. Malus WS oltre 2 hex
+   (Rain/Heavy Rain/Mist -1, Fog -2; esente se entrambi nello stesso edificio)
+   in Fire._compute_ws; limite di visibilita' (2d6/1d6+4/1d6) bloccante in
+   LOS.clear_positions. Condizioni terreno: Mud/Snow vietano Sprint (nemici
+   ->Evade), Deep Snow vieta Sprint/Evade/Run&Gun (->Sneak) via
+   Weather.demote_order in TurnSequence._set_enemy_order e legal_orders.
+   Winter Camouflage (skill) -1 spotting su neve. Pioggia battente ->fango col
+   9 a fine turno (Weather.maybe_make_mud in end_phase). Scenari: chiavi
+   "weather"/"ground". Test in Main._test_weather. NOTA: la notte qui resta
+   un malus WS (non un limite LOS), quindi la combinazione notte+meteo "usa il
+   minore" non si applica. Veicoli (no Fast/Forward) rimandati con la Rule 31-32.
 4. Nuovo terreno (Rule 27): edifici fortificati, filo spinato,
    trincee, abbazia, fontane.
 5. Incendi (Rule 29): kindling/growth/spread col vento, generano fumo

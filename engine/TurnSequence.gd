@@ -150,13 +150,26 @@ static func _update_initiative_order(state: GameState) -> void:
 		state.initiative_order.append(e[1])
 
 
+# Assegna un ordine a un Enemy applicando le restrizioni del terreno
+# (Rule 28.2: Sprint -> Evade su fango/neve; Sprint/Evade/Run&Gun -> Sneak su
+# neve alta). La direzione (order_move) si conserva.
+static func _set_enemy_order(state: GameState, c: Character, order: int,
+		move: String = "", grenade: bool = false, charge: bool = false) -> void:
+	var final_order := Weather.demote_order(state.ground, order)
+	c.set_order(final_order, move, grenade, charge)
+	if final_order != order:
+		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
+			Domain.ORDER_NAMES[order], Weather.GROUND_NAMES[state.ground],
+			Domain.ORDER_NAMES[final_order]])
+
+
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
 		var fo := Scenario.first_order(state.scenario_id, state.rng)
 		if not fo.is_empty():
-			c.set_order(fo["order"], fo["move"])
+			_set_enemy_order(state, c, fo["order"], fo["move"])
 			c.had_first_order = true
 			state.log_event("%s (ordine iniziale) -> %s %s" % [
 				c.display_name, Domain.ORDER_NAMES[c.order], c.order_move])
@@ -169,7 +182,7 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 		var bhex := state.hex_at(c.position.x, c.position.y)
 		if bhex != null and bhex.terrain == Domain.Terrain.BUILDING:
 			if Checks.troop_quality_check(c, state.rng)["passed"]:
-				c.set_order(Domain.Order.AIMED_FIRE)
+				_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
 				state.log_event("%s si apposta alla finestra -> Aimed Fire" % c.display_name)
 				return
 	if not EnemyCards.has_table_row(c.morale):
@@ -177,11 +190,11 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 		# stampato sulla carta: il Berserk carica il nemico piu' vicino,
 		# il Rout fugge.
 		if c.morale == Domain.Morale.BERSERK:
-			c.set_order(Domain.Order.CHARGE, EnemyCards.berserk_move(serial), false, true)
+			_set_enemy_order(state, c, Domain.Order.CHARGE, EnemyCards.berserk_move(serial), false, true)
 			state.log_event("%s e' BERSERK -> Charge %s" % [
 				c.display_name, c.order_move])
 		else:  # ROUT
-			c.set_order(Domain.Order.EVADE, EnemyCards.rout_move(serial))
+			_set_enemy_order(state, c, Domain.Order.EVADE, EnemyCards.rout_move(serial))
 			state.log_event("%s e' in ROUT -> fugge %s" % [
 				c.display_name, c.order_move])
 		return
@@ -190,7 +203,7 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	var in_cover := (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
 		or state.hex_has_hexside(c.position)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
-	c.set_order(entry["order"], entry["move"], entry["grenade"], entry["charge"])
+	_set_enemy_order(state, c, entry["order"], entry["move"], entry["grenade"], entry["charge"])
 	var extra := "" if c.order_move.is_empty() else " " + c.order_move
 	if entry["grenade"]:
 		extra += " +Grenade"
@@ -512,6 +525,9 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 			break
 	var allowed: Array[int] = []
 	for o in Domain.Order.values():
+		# Condizione del terreno (Rule 28.2): ordini di movimento vietati.
+		if Weather.order_forbidden(state.ground, o):
+			continue
 		if restrict == "worried" and c.morale in [Domain.Morale.CAUTIOUS, Domain.Morale.SHAKEN] \
 				and o != Domain.Order.HIDE:
 			continue
@@ -672,6 +688,8 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 static func end_phase(state: GameState) -> void:
 	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
 	Area.end_phase(state)
+	# Pioggia battente: puo' trasformare il terreno in fango (Rule 28.1).
+	Weather.maybe_make_mud(state)
 	# Obiettivi di ricognizione raggiunti in questo turno.
 	if not state.scenario_id.is_empty():
 		Scenario.scan_objectives(state)

@@ -1,3 +1,14 @@
+v0.12 — 2026-06-12
+- Volume 2, Rule 28: meteo e condizioni del terreno
+  - Pioggia (-1 WS oltre 2 hex), Pioggia battente (-1 WS, visibilita' 2d6,
+    puo' diventare fango), Foschia (-1 WS, visibilita' 1d6+4), Nebbia
+    (-2 WS, visibilita' 1d6)
+  - oltre la visibilita' massima la LOS e' bloccata
+  - Fango/Neve: niente Sprint (nemici ridotti a Evade); Neve alta:
+    niente Sprint/Evade/Run&Gun (ridotti a Sneak)
+  - Winter Camouflage: -1 a essere individuati sulla neve
+  - il meteo si imposta da scenario ("weather"/"ground")
+
 v0.11 — 2026-06-12
 - Volume 2, Rule 26: nuove armi
   - M1 Thompson (gittata 16, ROF 3): sostituibile al Grease Gun

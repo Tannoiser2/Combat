@@ -16,6 +16,7 @@ const SKILL_DEADLY := "Deadly"         # quando spara: pesca 2, applica la PIU' 
 const SKILL_EAGLE_EYES := "Eagle Eyes" # +1 TQ in spotting (TQ effettiva max 8)
 const SKILL_SNIPER := "Sniper"         # +2 WS in Aimed Fire (non all'impulso 2)
 const SKILL_KNIFE_EXPERT := "Knife Expert"  # +1 TQ in mischia (+ coltello da lancio)
+const SKILL_WINTER_CAMO := "Winter Camouflage"  # -1 a essere individuato su neve (Rule 28.2)
 
 # Identita'
 var id: String

@@ -107,6 +107,10 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 		tq = mini(tq + 1, 8)
 	var threshold := tq \
 		+ target_modifier(state, target, spotter) + range_modifier(dist)
+	# Winter Camouflage (Rule 28.2): -1 a individuare il bersaglio sulla neve.
+	if target.has_skill(Character.SKILL_WINTER_CAMO) \
+			and state.ground in [Weather.Ground.SNOW, Weather.Ground.DEEP_SNOW]:
+		threshold -= 1
 	var roll := Checks.roll_d10(state.rng)
 	var success := roll <= threshold
 	if success:
