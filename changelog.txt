@@ -1,3 +1,12 @@
+v0.20 — 2026-06-12
+- Segnalini azione: sostituiti con gli originali dal Vol.1 zip
+  (AimedFire, Evade, DuckBack, Grenade, Charge, Guard, Plan, MedicalAid,
+  RifleGrenade, Run&Gun, Reload, Sprint GE, Sneak GE, Smoke generico)
+- Veicoli: immagini originali (Halftrack, Sherman, PzIVH, Jeep)
+  ora visibili al posto del rettangolo di fallback
+- Asset aggiuntivi: crew tedeschi, marker veicolo Vol.2,
+  frecce di direzione, civili Vol.2
+
 v0.19 — 2026-06-12
 - Segnalini soldato completi: aggiunto set integrale Vol.1 e Vol.2
   - Vol.1: GE RedTeam, YellowTeam, WhiteTeam + squad US estesa
