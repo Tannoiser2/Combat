@@ -25,15 +25,19 @@ const ROLE := {
 	"LMG": {"tq": 5, "ldr": 0, "weapon": "MG42", "ws": 5},
 	"Sniper": {"tq": 5, "ldr": 0, "weapon": "KAR 98K", "ws": 8},
 	"Maquis": {"tq": 4, "ldr": 0, "weapon": "M1911", "ws": 3},
-	# Truppe SS (Rule 24): Dodge di base; Veteran SS anche Tough.
+	# Truppe SS (Rule 24): skill per ruolo — ogni archetipo ha una specializzazione.
+	# Schutze: assaltatori (Dodge + Knife Expert, +1 TQ in mischia).
+	# NCO: capisquadra che spottano (Dodge + Eagle Eyes, TQ 7+1=8 spotting).
+	# Veteran: duri e letali (Dodge + Tough + Deadly).
+	# Officer: tiratori di precisione (Dodge + Sniper, WS 7+2=9 in Aimed).
 	"SS Schutze": {"tq": 6, "ldr": 0, "weapon": "StG 44", "ws": 5,
-		"skills": ["Dodge"]},
+		"skills": ["Dodge", "Knife Expert"]},
 	"SS Veteran": {"tq": 7, "ldr": 0, "weapon": "StG 44", "ws": 6,
-		"skills": ["Dodge", "Tough"]},
+		"skills": ["Dodge", "Tough", "Deadly"]},
 	"SS NCO": {"tq": 7, "ldr": 1, "weapon": "StG 44", "ws": 6,
-		"skills": ["Dodge"]},
+		"skills": ["Dodge", "Eagle Eyes"]},
 	"SS Officer": {"tq": 8, "ldr": 2, "weapon": "MP40", "ws": 7,
-		"skills": ["Dodge"]},
+		"skills": ["Dodge", "Sniper"]},
 	# Friendly
 	"Leader": {"tq": 6, "ldr": 3, "weapon": "M3 Grease Gun", "ws": 7},
 	"Leader2": {"tq": 6, "ldr": 2, "weapon": "M1 Thompson", "ws": 6},
@@ -203,7 +207,7 @@ const FULL_SQUAD_VOL2 := [
 	{"name": "Pvt Butler", "role": "BAR Gunner", "team": "Able",
 		"counter": "US-Able-Pvt-Butler"},
 	{"name": "Pvt Hatcher", "role": "US Rifleman", "team": "Able",
-		"counter": "US-Able-Pvt-Hatcher"},
+		"counter": "US-Able-Pvt-Hatcher", "weapon": "M1 Thompson", "ws": 5},
 	{"name": "PVT Peterson", "role": "US Rifleman", "team": "Able",
 		"counter": "US-Able-PVT-Peterson"},
 	{"name": "Pvt James", "role": "US Rifleman", "team": "Baker",
@@ -221,7 +225,7 @@ const FULL_SQUAD_VOL2 := [
 	{"name": "Pvt Hall", "role": "US Rifleman", "team": "Charlie",
 		"counter": "US-Charlie-Pvt-Hall"},
 	{"name": "Pvt Holland", "role": "US Rifleman", "team": "Charlie",
-		"counter": "US-Charlie-Pvt-Holland"},
+		"counter": "US-Charlie-Pvt-Holland", "weapon": "M1903 Springfield", "ws": 5},
 	{"name": "Pvt Williams", "role": "MG Gunner", "team": "Charlie",
 		"counter": "US-Charlie-Pvt-Williams"},
 ]

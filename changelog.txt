@@ -1,3 +1,14 @@
+v0.18 — 2026-06-12
+- Skill SS distribuite per ruolo (s11-s22):
+  - SS Schutze: Dodge + Knife Expert (assaltatori aggressivi in mischia)
+  - SS NCO: Dodge + Eagle Eyes (capisquadra che spottano, TQ effettivo 8)
+  - SS Veteran: Dodge + Tough + Deadly (duri da abbattere, letali)
+  - SS Officer: Dodge + Sniper (precisione a lungo raggio, WS 9 in Aimed)
+- Armi nuove alla squadra Vol.2:
+  - Pvt Hatcher (Able): M1 Thompson (mitra d'assalto per il team Able)
+  - Pvt Holland (Charlie): M1903 Springfield (tiratore scelto del team Charlie)
+- Replay del turno: flusso cinematografico continuo (come il replay di fine partita)
+
 v0.17 — 2026-06-12
 - Volume 2 completo: Rule 31-32 veicoli e anticarro
   - 4 veicoli: Jeep, M3A1 Halftrack, M4A3 Sherman, PzIVH
