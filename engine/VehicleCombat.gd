@@ -18,6 +18,13 @@ enum Speed { FAST, FORWARD }
 # armor[face] = valore NORMAL; armor_g[face] = valore GLANCING (piu' alto).
 # Face: 0=FRONT, 1=SIDE, 2=REAR.
 # weapon = arma montata principale; ws = WS base con quell'arma.
+const VEHICLE_COUNTER := {
+	"Jeep":          "FR-Jeep-A",
+	"M3A1 Halftrack":"FR-M3a1",
+	"M4A3 Sherman":  "FR-M4A3-A",
+	"PzIVH":         "EN-PZIVH-A",
+}
+
 const VEHICLE_DATA := {
 	"Jeep": {
 		"speed": Speed.FAST,
@@ -77,6 +84,7 @@ static func make_vehicle(v_name: String, side: int, team: String,
 	c.facing = facing
 	c.is_vehicle = true
 	c.vehicle_type = v_name
+	c.counter = VEHICLE_COUNTER.get(v_name, "")
 	c.troop_quality = int(vd["tq"])
 	c.morale = D.Morale.BOLD
 	var w: String = weapon_override if not weapon_override.is_empty() else str(vd["weapon"])

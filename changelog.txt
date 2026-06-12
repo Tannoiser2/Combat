@@ -1,3 +1,15 @@
+v0.19 — 2026-06-12
+- Segnalini soldato completi: aggiunto set integrale Vol.1 e Vol.2
+  - Vol.1: GE RedTeam, YellowTeam, WhiteTeam + squad US estesa
+    (Crowe, OConnel, Mayfield, Donahue, Goldstein, Woodruff, Lozano, Maloney, ecc.)
+  - Vol.2: GE TealTeam + PurpleTeam, US Perez, Hatcher, Holland, Diaz, Cruz ecc.
+- Segnalini azione mancanti aggiunti (artwork originale):
+  - US: Sprint, Smoke Grenade, Search, Rally, Carry/Drag, Melee
+  - GE: Sprint, Charge, Smoke Grenade, Rifle Grenade, Plan, Medical Aid,
+        Search, Rally, Carry/Drag, Melee, Guard
+- Segnalini veicoli: Halftrack, Sherman, PzIVH e Jeep ora mostrano
+  l'immagine originale invece del rettangolo di fallback
+
 v0.18 — 2026-06-12
 - Skill SS distribuite per ruolo (s11-s22):
   - SS Schutze: Dodge + Knife Expert (assaltatori aggressivi in mischia)
