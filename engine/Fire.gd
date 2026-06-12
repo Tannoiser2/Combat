@@ -216,6 +216,10 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 	if m != 0:
 		bits.append("%+d morale %s" % [m, Domain.MORALE_NAMES[firer.morale]])
 	ws += m
+	# Filo spinato (Rule 27.7): -1 al WS sparando da un hex con filo spinato.
+	if state.has_wire(firer.position):
+		bits.append("-1 filo spinato")
+		ws -= 1
 	# Skill SS (Rule 24): Dodge del bersaglio in Evade, Sniper del tiratore.
 	if target.has_order and target.order == D.Order.EVADE:
 		if target.has_skill(Character.SKILL_DODGE_2):

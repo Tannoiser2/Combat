@@ -117,6 +117,9 @@ static func enemy_order_phase(state: GameState) -> void:
 	# Ondate di rinforzi del turno, prima di assegnare gli ordini.
 	if not state.scenario_id.is_empty():
 		Scenario.run_waves(state)
+	# Filo spinato (Rule 27.7): in un hex con 2+ nemici, il TQ piu' basso passa
+	# automaticamente in Hide prima di assegnare gli altri ordini.
+	_wire_auto_hide(state)
 	# SOP step 3a: una carta per ogni Enemy Team con almeno un Alerted.
 	state.enemy_cards_in_play.clear()
 	for team in state.enemy_teams_with_alerted():
@@ -125,12 +128,43 @@ static func enemy_order_phase(state: GameState) -> void:
 		state.log_event("Team %s pesca la Enemy Card %d (iniziativa %d)" % [
 			team, serial, EnemyCards.initiative_of(serial)])
 		# SOP step 3b: ordini a tutti gli Alerted del team, ciascuno
-		# secondo il proprio morale e la propria copertura.
+		# secondo il proprio morale e la propria copertura. Salta chi ha gia'
+		# un ordine (es. Hide automatico del filo spinato).
 		for c in state.characters_of_team(team):
-			if c.alerted and not c.is_dead():
+			if c.alerted and not c.is_dead() and not c.has_order:
 				_assign_enemy_order(state, c, serial)
 	# SOP step 3c: completare l'Initiative Order Track.
 	_update_initiative_order(state)
+
+
+# Ordini di movimento (diversi da Sneak) limitati dal filo spinato (Rule 27.7).
+const WIRE_MOVEMENT := [Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
+	Domain.Order.EVADE, Domain.Order.CHARGE]
+
+
+# Filo spinato (Rule 27.7): in ogni hex con filo spinato e 2+ nemici vivi, il
+# personaggio col TQ piu' basso riceve un Hide automatico (il primo trovato a
+# parita' di TQ).
+static func _wire_auto_hide(state: GameState) -> void:
+	var by_hex := {}
+	for c in state.characters:
+		if c.side != Domain.Side.ENEMY or c.is_dead() or not state.has_wire(c.position):
+			continue
+		var k := GameState.hex_key(c.position.x, c.position.y)
+		if not by_hex.has(k):
+			by_hex[k] = []
+		by_hex[k].append(c)
+	for k in by_hex:
+		var group: Array = by_hex[k]
+		if group.size() < 2:
+			continue
+		var lowest: Character = group[0]
+		for c in group:
+			if c.troop_quality < lowest.troop_quality:
+				lowest = c
+		lowest.set_order(Domain.Order.HIDE)
+		lowest.had_first_order = true
+		state.log_event("%s si appiattisce sul filo spinato (Hide automatico)" % lowest.display_name)
 
 
 # L'Initiative Track: ogni Team friendly prende il valore della Friendly
@@ -159,6 +193,10 @@ static func _set_enemy_order(state: GameState, c: Character, order: int,
 	# Medico addestrato (Rule 30): mai fuoco/granate/carica/mischia -> cura.
 	if c.is_medic and final_order in MEDIC_FORBIDDEN:
 		final_order = Domain.Order.MEDICAL_AID
+	# Filo spinato (Rule 27.7): gli ordini di movimento (non Sneak) -> Sneak.
+	if final_order in WIRE_MOVEMENT and state.has_wire(c.position) \
+			and not Move.wire_hide_exempt(state, c):
+		final_order = Domain.Order.SNEAK
 	c.set_order(final_order, move, grenade, charge)
 	if final_order != order:
 		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
@@ -564,6 +602,10 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 			continue
 		# Medico addestrato (Rule 30): niente fuoco/granate/carica/mischia.
 		if c.is_medic and o in MEDIC_FORBIDDEN:
+			continue
+		# Filo spinato (Rule 27.7): per muoversi fuori si usa solo Sneak.
+		if o in WIRE_MOVEMENT and state.has_wire(c.position) \
+				and not Move.wire_hide_exempt(state, c):
 			continue
 		if restrict == "worried" and c.morale in [Domain.Morale.CAUTIOUS, Domain.Morale.SHAKEN] \
 				and o != Domain.Order.HIDE:

@@ -688,6 +688,12 @@ static func build(state: GameState, scenario_id: String) -> void:
 	state.weather = Weather.TYPE_BY_NAME.get(sc.get("weather", "clear"), Weather.Type.CLEAR)
 	state.ground = Weather.GROUND_BY_NAME.get(sc.get("ground", "none"), Weather.Ground.NONE)
 	state.max_los = Weather.roll_max_los(state.weather, state.rng)
+	# Filo spinato (Rule 27.7): overlay sugli hex elencati nella chiave "wire".
+	for wk in sc.get("wire", []):
+		var wp: PackedStringArray = String(wk).split(",")
+		var wh := state.hex_at(int(wp[0]), int(wp[1]))
+		if wh != null:
+			wh.wire = true
 	if state.weather != Weather.Type.CLEAR or state.ground != Weather.Ground.NONE:
 		state.log_event("Meteo: %s, terreno: %s%s" % [
 			Weather.TYPE_NAMES[state.weather], Weather.GROUND_NAMES[state.ground],

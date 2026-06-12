@@ -1550,6 +1550,84 @@ func _test_rules() -> int:
 	fails += _test_knife()
 	fails += _test_fire()
 	fails += _test_medic()
+	fails += _test_wire()
+	return fails
+
+
+# Filo spinato (Volume 2, Rule 27.7).
+func _test_wire() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var firer := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 2)
+	# -1 al WS sparando dal filo spinato.
+	var ws_open: int = Fire._compute_ws(st, firer, tgt, "M1 Garand")["ws"]
+	st.map[GameState.hex_key(0, 0)].wire = true
+	var ws_wire: int = Fire._compute_ws(st, firer, tgt, "M1 Garand")["ws"]
+	if ws_open - ws_wire != 1:
+		print("TEST filo spinato: -1 al WS dall'interno errato")
+		fails += 1
+	# Ordine di movimento nemico (non Sneak) -> Sneak.
+	var en := Character.new("en", "En", Domain.Side.ENEMY, "Red")
+	en.troop_quality = 5
+	en.position = Vector2i(0, 0)
+	st.characters = [en]
+	TurnSequence._set_enemy_order(st, en, Domain.Order.RUN_AND_GUN, "3")
+	if en.order != Domain.Order.SNEAK:
+		print("TEST filo spinato: ordine di movimento non ridotto a Sneak")
+		fails += 1
+	# legal_orders del giocatore: niente Sprint dall'interno, Sneak si'.
+	var fr := Character.new("fr", "Fr", Domain.Side.FRIENDLY, "Able")
+	fr.troop_quality = 6
+	fr.position = Vector2i(0, 0)
+	st.characters = [fr]
+	var orders := TurnSequence.legal_orders(st, fr)
+	if Domain.Order.SPRINT in orders or Domain.Order.SNEAK not in orders:
+		print("TEST filo spinato: legal_orders non filtra il movimento")
+		fails += 1
+	# Auto-Hide: in un hex con 2 nemici, il TQ piu' basso passa in Hide.
+	var a := Character.new("a", "A", Domain.Side.ENEMY, "Red")
+	a.troop_quality = 6
+	a.position = Vector2i(0, 0)
+	var b := Character.new("b", "B", Domain.Side.ENEMY, "Red")
+	b.troop_quality = 3
+	b.position = Vector2i(0, 0)
+	st.characters = [a, b]
+	TurnSequence._wire_auto_hide(st)
+	if b.order != Domain.Order.HIDE or a.has_order:
+		print("TEST filo spinato: auto-Hide del TQ piu' basso errato")
+		fails += 1
+	# TQC per uscire: fallendo si resta impigliati (nessun movimento).
+	var seed := 1
+	while true:
+		var probe := RandomNumberGenerator.new()
+		probe.seed = seed
+		if probe.randi_range(0, 9) > 3:  # > TQ 3 -> TQC fallito
+			break
+		seed += 1
+	var sw := GameState.new()
+	sw.rng.seed = seed
+	for col in range(3, 9):
+		for row in range(3, 12):
+			sw.map[GameState.hex_key(col, row)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	sw.map[GameState.hex_key(5, 5)].wire = true
+	var stuck := Character.new("st", "St", Domain.Side.ENEMY, "Red")
+	stuck.troop_quality = 3
+	stuck.position = Vector2i(5, 5)
+	stuck.set_order(Domain.Order.SNEAK)
+	var prey := Character.new("pr", "Pr", Domain.Side.FRIENDLY, "Able")
+	prey.troop_quality = 6
+	prey.position = Vector2i(5, 9)
+	sw.characters = [stuck, prey]
+	if Move.move_character(sw, stuck, 1) != 0 or stuck.position != Vector2i(5, 5):
+		print("TEST filo spinato: il TQC d'uscita fallito non trattiene")
+		fails += 1
 	return fails
 
 

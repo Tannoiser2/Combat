@@ -199,7 +199,23 @@ static func compass_step(state: GameState, mover: Character, dirs: Array[int]) -
 # la BUSSOLA (Rule 9.3); Charge e Berserk puntano il nemico piu' vicino;
 # senza direzione si ripiega su verso/lontano dal nemico.
 # Ritorna il numero di passi effettuati.
+# Un compagno dello stesso lato nell'hex tiene giu' il filo spinato con un
+# ordine Hide: in quel caso le restrizioni del filo non si applicano (Rule 27.7).
+static func wire_hide_exempt(state: GameState, mover: Character) -> bool:
+	for c in state.characters:
+		if c != mover and not c.is_dead() and c.position == mover.position \
+				and c.side == mover.side and c.has_order and c.order == D.Order.HIDE:
+			return true
+	return false
+
+
 static func move_character(state: GameState, mover: Character, hexes: int) -> int:
+	# Filo spinato (Rule 27.7): per USCIRE serve un TQC (fallito = resta
+	# impigliato), salvo che un compagno nell'hex sia in Hide.
+	if state.has_wire(mover.position) and not wire_hide_exempt(state, mover):
+		if not Checks.troop_quality_check(mover, state.rng)["passed"]:
+			state.log_event("%s e' impigliato nel filo spinato (TQC fallito)" % mover.display_name)
+			return 0
 	var dirs := parse_dirs(mover.order_move)
 	var use_compass: bool = mover.side == D.Side.ENEMY and not dirs.is_empty() \
 		and state.compass.size() == 7 and mover.order != D.Order.CHARGE

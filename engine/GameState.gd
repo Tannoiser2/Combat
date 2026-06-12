@@ -4,13 +4,21 @@
 class_name GameState
 extends RefCounted
 
-# Una casella di mappa: terreno + livello di altezza.
+# Una casella di mappa: terreno + livello di altezza. Il filo spinato
+# (Rule 27.7) e' un overlay sul terreno base, non un terreno a se'.
 class MapHex:
 	var terrain: int  # Domain.Terrain
 	var level: int = 0
+	var wire: bool = false  # filo spinato sovrapposto (Rule 27.7)
 	func _init(p_terrain: int, p_level: int = 0) -> void:
 		terrain = p_terrain
 		level = p_level
+
+
+# C'e' filo spinato in questo hex? (Rule 27.7)
+func has_wire(pos: Vector2i) -> bool:
+	var h := hex_at(pos.x, pos.y)
+	return h != null and h.wire
 
 var turn: int = 1
 var impulse: int = 1  # 1..4

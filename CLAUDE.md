@@ -106,10 +106,14 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    puo' caricare l'occupante via Move.can_enter, Rule 27.2), TRENCH (= Depression
    via LOS.DEPRESSION_LIKE). Valori WS/spotting dai chart del repo privato in
    Fire.WS_MOD e Spotting.TERRAIN_MOD; cover in Domain.COVER_TERRAINS. Test in
-   Main._test_terrain. DA FARE: filo spinato (Rule 27.7: overlay sul terreno
-   base, -1 WS dal suo interno, solo Sneak per uscire con TQC, no blocco LOS) e
-   abbazia (Rule 27.5: hex interni/esterni con LOS speciale -1/hex). I terreni
-   nuovi non sono ancora piazzati in nessuno scenario (markers da scenario).
+   Main._test_terrain. Filo spinato (Rule 27.7) FATTO: overlay MapHex.wire
+   (chiave scenario "wire"), -1 WS dall'interno (Fire._compute_ws), TQC per
+   uscire in Move.move_character (esente con compagno in Hide, Move.wire_hide_exempt),
+   nemici con ordini di movimento ridotti a Sneak e auto-Hide del TQ piu' basso
+   con 2+ nemici (_wire_auto_hide), filtro legal_orders per il giocatore; non
+   blocca la LOS. Test Main._test_wire. DA FARE: abbazia (Rule 27.5: hex
+   interni/esterni con LOS speciale -1/hex). I terreni nuovi non sono ancora
+   piazzati in nessuno scenario (markers da scenario).
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
