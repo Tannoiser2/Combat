@@ -47,6 +47,8 @@ const ROLE := {
 	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
 	# Rule 31-32: porta il bazooka (M9); stat. come rifleman ma arma AT.
 	"Bazooka Man": {"tq": 5, "ldr": 0, "weapon": "Bazooka M9", "ws": 5},
+	# Fanteria controcarri tedesca (Panzerfaust 60); stat. come Rifleman.
+	"AT Grenadier": {"tq": 5, "ldr": 0, "weapon": "Panzerfaust 60", "ws": 5},
 }
 
 # Zona di schieramento per la fase di deploy. Ritorna gli hex validi.
@@ -210,6 +212,8 @@ const FULL_SQUAD_VOL2 := [
 		"counter": "US-Baker-Pvt-Moore"},
 	{"name": "Pvt Lewist", "role": "US Rifleman", "team": "Baker",
 		"counter": "US-Baker-Pvt-Lewist"},
+	{"name": "Pvt Cruz", "role": "Bazooka Man", "team": "Baker",
+		"counter": "US-Baker-Pvt-Cruz"},
 	{"name": "Cpl Diaz", "role": "Leader2", "team": "Charlie",
 		"counter": "US-Charlie-Cpl-Diaz"},
 	{"name": "Pvt Bennett", "role": "US Rifleman", "team": "Charlie",
@@ -923,6 +927,10 @@ const SCENARIOS := {
 		"enemy_setup": ["1,4", "1,8", "1,12", "2,6", "2,10", "3,5", "3,9",
 			"28,4", "28,8", "28,12", "29,6", "29,10"],
 		"exit_col": 2,
+		"vehicles": [
+			{"type": "M3A1 Halftrack", "side": "friendly", "team": "Baker",
+				"pos": "17,10", "facing": 4},
+		],
 		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
 			"friendly_exited": 3},
 	},
@@ -935,8 +943,9 @@ const SCENARIOS := {
 		"desc": "Una mitragliatrice tedesca controlla tutta la cresta.\nNeutralizzatela prima che l'avanzata sia bloccata.",
 		"squad_vol2": true,
 		"cup_spec": {
-			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2, "SS Schutze": 5},
-			"Purple": {"SS NCO": 2, "SS Schutze": 4},
+			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2,
+				"SS Schutze": 4, "AT Grenadier": 1},
+			"Purple": {"SS NCO": 2, "SS Schutze": 3, "AT Grenadier": 1},
 		},
 		"dummies": 16,
 		"enemy_setup": ["10,6", "11,4", "11,12", "13,8", "13,11",
@@ -944,6 +953,10 @@ const SCENARIOS := {
 			"19,10", "21,7", "22,3", "23,15", "24,9"],
 		"gun_hexes": ["13,11", "17,9"],
 		"c4": true,
+		"vehicles": [
+			{"type": "M4A3 Sherman", "side": "friendly", "team": "Able",
+				"pos": "32,10", "facing": 4},
+		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -2, "friendly_wounded": -1,
 			"guns_required": true},
@@ -968,6 +981,10 @@ const SCENARIOS := {
 			"RUN_AND_GUN 5", "SPRINT 6/5", "SPRINT 5/6"],
 		"waves": [
 			{"turn": 4, "hexes": ["1,5", "1,9", "1,13", "35,5", "35,9"]},
+		],
+		"vehicles": [
+			{"type": "PzIVH", "side": "enemy", "team": "Purple",
+				"pos": "33,10", "facing": 4},
 		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -3, "friendly_wounded": -1},
@@ -1084,6 +1101,8 @@ static func build(state: GameState, scenario_id: String) -> void:
 			vc.alerted = true
 			vc.known = true   # un veicolo e' sempre visibile (non si nasconde)
 			vc.morale = int(sc.get("enemy_morale", D.Morale.NORMAL))
+		else:
+			vc.spotted = true  # il carro amico e' visibile anche ai nemici
 		state.characters.append(vc)
 		state.log_event("Veicolo schierato: %s (%s) in %02d.%02d" % [
 			vtype, vteam, vc.position.x, vc.position.y])
