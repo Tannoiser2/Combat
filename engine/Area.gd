@@ -159,4 +159,8 @@ static func _blast_check(state: GameState, c: Character, power: int) -> void:
 		return
 	state.log_event("  %s e' investito dall'esplosione" % c.display_name)
 	c.known = true
+	var dead_before := c.is_dead()
 	Fire._resolve_wound(state, c)
+	if c.is_dead() and not dead_before:
+		state.audio_events.append({"type": "scream", "hex": c.position})
+		Replay.sfx(state, "scream")

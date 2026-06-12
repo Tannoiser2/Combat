@@ -66,16 +66,19 @@ var replay_button: Button
 var replay_frames: Array = []
 var replay_idx := -1            # -1 = nessun replay in corso
 var replay_t := 0.0
-var replay_shots_done := false
+var replay_events: Array = []   # colpi/boom/suoni del frame, ordinati per "at"
+var replay_evt_idx := 0
 var replay_hidden_banner: CanvasLayer = null   # banner di vittoria sospeso
-const REPLAY_MOVE_T := 1.3      # durata della parte di movimento
+const REPLAY_MOVE_T := 1.3      # durata della parte di movimento (frame impulse)
+const REPLAY_TURN_T := 2.6      # durata di un TURNO fuso (replay partita)
 const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
 
 # Audio: player per tipo di suono (nil se il file non e' installato).
 var _sfx: Dictionary = {}
 const WEAPON_SFX := {
-	"M1 Garand": "rifle", "KAR 98K": "rifle",
-	"M3 Grease Gun": "mg", "BAR": "mg", "M1919": "mg", "MG42": "mg", "MP40": "mg",
+	"M1 Garand": "garand", "KAR 98K": "kar98", "Rifle": "kar98",
+	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
+	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
 }
@@ -83,6 +86,11 @@ const AREA_SFX := {
 	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
 	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
 	Area.Type.C4: "artillery",
+}
+# Esito del fuoco (Fire.fire_action) -> suono di reazione.
+const OUTCOME_SFX := {
+	"Ucciso!": "kill", "Ferito!": "wound",
+	"Soppresso!": "suppress", "Colpito!": "suppress", "Mancato": "miss",
 }
 
 
@@ -155,7 +163,9 @@ func _start_scenario(scenario_id: String) -> void:
 
 func _load_sfx() -> void:
 	_sfx.clear()
-	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream"]:
+	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
+			"garand", "kar98", "mg42", "m1919", "bar", "smg",
+			"kill", "wound", "suppress", "miss", "throw"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -171,10 +181,13 @@ func _play_sfx(key: String) -> void:
 func _consume_audio_events() -> void:
 	for ev in state.audio_events:
 		match ev["type"]:
-			"shot":  _play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+			"shot":
+				_play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+				_play_sfx(OUTCOME_SFX.get(ev.get("outcome", ""), ""))
 			"boom":  _play_sfx(AREA_SFX.get(ev["area_type"], "artillery"))
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
+			"throw": _play_sfx("throw")
 	state.audio_events.clear()
 
 
@@ -481,6 +494,12 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 		map_view.cue_color = Color(0.95, 0.2, 0.2, 0.9)
 		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
 		next_button.text = "Passa"
+	elif action_kind == TurnSequence.Act.THROW:
+		map_view.cue_hexes = TurnSequence.valid_throw_hexes(state, c)
+		map_view.cue_color = Color(0.95, 0.6, 0.15, 0.9)
+		hint_label.text = "%s: clicca l'hex bersaglio della granata (arancio) o premi Passa" % \
+			c.display_name
+		next_button.text = "Passa"
 	else:
 		map_view.cue_hexes = _passable_neighbors(c)
 		map_view.cue_color = Color(0.3, 0.9, 0.3, 0.9)
@@ -498,6 +517,9 @@ func _finish_friendly_action() -> void:
 
 func _end_action_phase() -> void:
 	TurnSequence.end_phase(state)
+	# Le granate esplodono in End Phase: senza questo i boom non suonano
+	# mai (gli eventi venivano azzerati all'impulse 1 del turno dopo).
+	_consume_audio_events()
 	replay_button.disabled = false
 	if state.game_over:
 		phase = Phase.GAME_OVER
@@ -548,7 +570,7 @@ func _show_victory_banner(v: Dictionary) -> void:
 	rewatch.pressed.connect(func():
 		hud.hide()
 		replay_hidden_banner = hud
-		_start_replay(state.replay.duplicate()))
+		_start_replay(_merge_turn_frames(state.replay)))
 	box.add_child(rewatch)
 	var back := Button.new()
 	back.text = "Torna al menu"
@@ -570,7 +592,7 @@ func _hexes_of(chars: Array) -> Array[Vector2i]:
 func _passable_neighbors(c: Character) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for n in Move.neighbors(state, c.position):
-		if Move.is_passable(state, n):
+		if Move.can_enter(state, c, n):
 			out.append(n)
 	return out
 
@@ -582,6 +604,8 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 			return not TurnSequence.valid_fire_targets(state, c).is_empty()
 		TurnSequence.Act.MOVE:
 			return not _passable_neighbors(c).is_empty()
+		TurnSequence.Act.THROW:
+			return not TurnSequence.valid_throw_hexes(state, c).is_empty()
 		_:
 			return false
 
@@ -613,40 +637,103 @@ func _start_replay(frames: Array) -> void:
 	_replay_apply(frames[0])
 
 
+# Fonde i frame per-impulse di ogni turno in un unico frame continuo
+# (per il replay dell'intera partita): tutti i percorsi del turno
+# animati in simultanea sulla stessa durata - chi ha fatto piu' strada
+# si muove piu' veloce - con colpi/boom/suoni programmati al momento
+# dell'impulso in cui sono avvenuti ("at" = frazione del turno).
+func _merge_turn_frames(frames: Array) -> Array:
+	var out: Array = []
+	for f in frames:
+		if out.is_empty() or out.back()["turn"] != f["turn"]:
+			out.append({
+				"turn": f["turn"], "impulse": 0, "merged": true,
+				"units": {}, "moves": {}, "shots": [], "booms": [], "sfx": [],
+			})
+		var m: Dictionary = out.back()
+		var at := (float(f["impulse"]) - 0.5) / 4.0
+		for idx in f["units"]:
+			if not m["units"].has(idx):
+				m["units"][idx] = f["units"][idx]
+		for idx in f["moves"]:
+			var path: Array = f["moves"][idx]
+			if not m["moves"].has(idx):
+				m["moves"][idx] = path.duplicate()
+			else:
+				var done: Array = m["moves"][idx]
+				m["moves"][idx] = done + (path.slice(1) if done.back() == path[0] else path)
+		for s in f["shots"]:
+			var s2: Dictionary = s.duplicate()
+			s2["at"] = at
+			m["shots"].append(s2)
+		for b in f["booms"]:
+			var b2: Dictionary = b.duplicate()
+			b2["at"] = at
+			m["booms"].append(b2)
+		for key in f.get("sfx", []):
+			m["sfx"].append({"key": key, "at": at})
+	return out
+
+
 func _replay_apply(f: Dictionary) -> void:
 	replay_t = 0.0
-	replay_shots_done = false
+	# Coda degli eventi del frame, ciascuno al suo istante "at" (frazione
+	# della durata; nei frame per-impulse tutto a meta' corsa).
+	replay_events = []
+	replay_evt_idx = 0
+	for s in f["shots"]:
+		replay_events.append({"at": s.get("at", 0.5), "kind": "shot", "data": s})
+	for b in f["booms"]:
+		replay_events.append({"at": b.get("at", 0.5), "kind": "boom", "data": b})
+	for e in f.get("sfx", []):
+		if e is Dictionary:
+			replay_events.append({"at": e["at"], "kind": "sfx", "data": e["key"]})
+		else:
+			replay_events.append({"at": 0.5, "kind": "sfx", "data": e})
+	replay_events.sort_custom(func(a, b): return a["at"] < b["at"])
 	map_view.replay_units = f["units"]
 	map_view.replay_paths = f["moves"]
 	map_view.replay_progress = 0.0
-	hint_label.text = "REPLAY - Turno %d, Impulse %d   (%d/%d)" % [
-		f["turn"], f["impulse"], replay_idx + 1, replay_frames.size()]
+	if f.get("merged", false):
+		hint_label.text = "REPLAY - Turno %d   (%d/%d)" % [
+			f["turn"], replay_idx + 1, replay_frames.size()]
+	else:
+		hint_label.text = "REPLAY - Turno %d, Impulse %d   (%d/%d)" % [
+			f["turn"], f["impulse"], replay_idx + 1, replay_frames.size()]
 	_maybe_screenshot()
 
 
-# Scandisce il replay: movimento simultaneo, con i colpi a meta' corsa.
-# I frame si incatenano senza pause (i traccianti sopravvivono al cambio
-# frame per conto loro); solo l'ultimo lascia una coda per gli esiti.
+# Scandisce il replay: movimento simultaneo, con gli eventi (colpi,
+# esplosioni, suoni) al loro istante. I frame si incatenano senza pause
+# (i traccianti sopravvivono al cambio frame per conto loro); solo
+# l'ultimo lascia una coda per gli esiti.
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
 	replay_t += delta
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
-	var has_fx: bool = not f["shots"].is_empty() or not f["booms"].is_empty()
-	var move_t: float = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
+	var has_fx: bool = not replay_events.is_empty()
+	var move_t: float
+	if f.get("merged", false):
+		move_t = REPLAY_TURN_T if has_moves else (0.9 if has_fx else 0.3)
+	else:
+		move_t = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
 	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
-	# I colpi partono a meta' movimento (esplosioni e suoni con loro).
-	if not replay_shots_done and replay_t >= move_t * 0.5:
-		replay_shots_done = true
-		for s in f["shots"]:
-			map_view.add_tracer(s)
-			_play_sfx(WEAPON_SFX.get(s.get("weapon", ""), "rifle"))
-		for b in f["booms"]:
-			map_view.add_blast(b["hex"])
-			_play_sfx(AREA_SFX.get(b["type"], "artillery"))
-		for key in f.get("sfx", []):
-			_play_sfx(key)
+	while replay_evt_idx < replay_events.size() \
+			and replay_t >= replay_events[replay_evt_idx]["at"] * move_t:
+		var ev: Dictionary = replay_events[replay_evt_idx]
+		replay_evt_idx += 1
+		match ev["kind"]:
+			"shot":
+				map_view.add_tracer(ev["data"])
+				_play_sfx(WEAPON_SFX.get(ev["data"].get("weapon", ""), "rifle"))
+				_play_sfx(OUTCOME_SFX.get(ev["data"].get("outcome", ""), ""))
+			"boom":
+				map_view.add_blast(ev["data"]["hex"])
+				_play_sfx(AREA_SFX.get(ev["data"]["type"], "artillery"))
+			"sfx":
+				_play_sfx(ev["data"])
 	var last: bool = replay_idx == replay_frames.size() - 1
 	var tail: float = (REPLAY_PAUSE_T + 1.2) if last and has_fx else 0.0
 	if replay_t >= move_t + tail:
@@ -848,6 +935,12 @@ func _handle_action_click(hex: Vector2i) -> void:
 		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
 			return  # click non valido: si ignora
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		_consume_audio_events()
+		_finish_friendly_action()
+	elif action_kind == TurnSequence.Act.THROW:
+		if not hex in TurnSequence.valid_throw_hexes(state, acting):
+			return  # click non valido: si ignora
+		TurnSequence.throw_grenade(state, acting, hex)
 		_consume_audio_events()
 		_finish_friendly_action()
 	else:  # MOVE
@@ -1346,7 +1439,7 @@ func _auto_step() -> void:
 			if not OS.get_environment("COMBAT_REPLAY").is_empty() and not _auto_replayed:
 				_auto_replayed = true
 				print("AUTO: replay di %d frame" % state.replay.size())
-				_start_replay(state.replay.duplicate())
+				_start_replay(_merge_turn_frames(state.replay))
 			else:
 				print("AUTO: fine partita")
 				get_tree().quit()

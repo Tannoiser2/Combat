@@ -74,6 +74,88 @@ REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/
 LICENSE: CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
 NOTES:  Whoosh/deploy sound used for smoke grenade deployment
 
+======================================================================
+PER-WEAPON SHOT SOUNDS + OUTCOME SOUNDS (added 2026-06-12)
+======================================================================
+All files below are derived exclusively from CC0 source material and are
+themselves dedicated to the public domain (CC0). Bursts were assembled
+(layered/sequenced at historically representative rates of fire, with
+minor pitch/gain variation, trimming and normalization) from CC0 single
+shots using ffmpeg/numpy.
+
+----------------------------------------------------------------------
+FILE: garand.ogg  (M1 Garand — single sharp rifle crack with faint "ping")
+SOURCES: shot_01.ogg ("25 CC0 Bang / Firework SFX" pack)
+         impactBell_heavy_000.ogg (Kenney Impact Sounds, pitched up,
+         low-volume layer simulating the en-bloc clip ping)
+REPOS:  https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+        https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/kenney_impactsounds/Audio
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: kar98.ogg  (Kar 98k — single deep bolt-action boom)
+SOURCES: riotgun_fire_strong.ogg (deep report) + shot_03.ogg (attack crack)
+REPOS:  https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+        https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: mg42.ogg  (MG42 — "buzzsaw" burst, 18 rounds at 1200 rpm / 50 ms)
+SOURCE: machinegun_fire.ogg (single MG shot, sequenced into burst)
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: m1919.ogg  (M1919 .30 cal — heavy slow burst, 7 rounds at ~450 rpm)
+SOURCE: bang_03.ogg (deep thud, sequenced into burst)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: bar.ogg  (BAR — short automatic burst, 4 rounds at ~550 rpm)
+SOURCE: bang_07.ogg (punchy mid-weight bang, sequenced into burst)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: smg.ogg  (MP40/M3 — light snappy SMG burst, 6 rounds at ~630 rpm)
+SOURCE: shot_03.ogg (light crack, sequenced into burst)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-CC0-bang-sfx
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: pistol.ogg  (unchanged — existing shot_02.ogg remains; it is already
+       bright/snappy and distinct from all the new weapon sounds)
+
+----------------------------------------------------------------------
+FILE: kill.ogg  (death cry)
+SOURCE: death.ogg (male player death vocal)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack by Caine & MaxCarnage
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/players/male
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: wound.ogg  (pain grunt — hit but alive)
+SOURCE: pain25.ogg (male player pain vocal; different take than scream.ogg)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack by Caine & MaxCarnage
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/players/male
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: suppress.ogg  (bullet ricochet — pinned down)
+SOURCE: ric1.ogg (bullet ricochet)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack by Caine & MaxCarnage
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/weapons
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: miss.ogg  (bullet flyby/whizz — shot missed)
+SOURCE: "Swish 1.wav" (Micro Pack - Organic Wooshes by Benjamin Burnes /
+        Abstraction Music; pitched up to a quick bullet-whizz)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/Micro%20Pack%20-%20Organic%20Wooshes
+LICENSE: CC0 (pack _README.txt: "These sounds are public domain
+        (Creative Commons 0)")
+
 ----------------------------------------------------------------------
 AGGREGATE REPOSITORY (used as mirror for several sounds above):
   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds
@@ -93,3 +175,9 @@ KENNEY ASSET PACK:
 ----------------------------------------------------------------------
 All CC0 sounds may be used freely in personal, educational, and commercial
 projects without any attribution requirement.
+
+throw.ogg
+  Source: "Twirl 1.wav" - Micro Pack - Organic Wooshes
+  Repo: github.com/lavenderdotpet/CC0-Public-Domain-Sounds
+  License: CC0 1.0 (repo-wide LICENSE + pack _README)
+  Processing: trimmed to 1.2s with fade-out, mono 44.1kHz OGG (ffmpeg)
