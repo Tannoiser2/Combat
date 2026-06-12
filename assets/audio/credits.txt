@@ -175,3 +175,9 @@ KENNEY ASSET PACK:
 ----------------------------------------------------------------------
 All CC0 sounds may be used freely in personal, educational, and commercial
 projects without any attribution requirement.
+
+throw.ogg
+  Source: "Twirl 1.wav" - Micro Pack - Organic Wooshes
+  Repo: github.com/lavenderdotpet/CC0-Public-Domain-Sounds
+  License: CC0 1.0 (repo-wide LICENSE + pack _README)
+  Processing: trimmed to 1.2s with fade-out, mono 44.1kHz OGG (ffmpeg)

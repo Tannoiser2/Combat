@@ -327,10 +327,39 @@ static func _try_throw(state: GameState, thrower: Character, max_r := 3, min_r :
 	throw_grenade(state, thrower, best.position)
 
 
+# Fascia di gittata della granata per l'ordine corrente: [min, max].
+static func throw_range(c: Character) -> Array[int]:
+	if c.has_order and c.order == Domain.Order.RIFLE_GRENADE:
+		return [5, 12]
+	return [1, 3]
+
+
+# Hex bersaglio validi per il lancio: in gittata e con LOS dall'hex del
+# lanciatore (Rule 14). Per la UI: il giocatore clicca dove lanciare.
+static func valid_throw_hexes(state: GameState, thrower: Character) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var r := throw_range(thrower)
+	var origin := Move.to_cube(thrower.position)
+	for dq in range(-r[1], r[1] + 1):
+		for dr in range(-r[1], r[1] + 1):
+			var cube := origin + Vector3i(dq, dr, -dq - dr)
+			var hex := Move.from_cube(cube)
+			if not state.map.has(GameState.hex_key(hex.x, hex.y)):
+				continue
+			var d := Spotting.hex_distance(thrower.position, hex)
+			if d < r[0] or d > r[1]:
+				continue
+			if LOS.clear_hexes(state, thrower.position, hex):
+				out.append(hex)
+	return out
+
+
 # Lancio verso un hex (anche per la UI). Grenade Check: TQC; se fallisce
 # la granata scatta comunque ma con deviazione garantita.
 static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -> void:
 	var smoke := thrower.order == Domain.Order.SMOKE_GRENADE
+	state.audio_events.append({"type": "throw", "hex": thrower.position})
+	Replay.sfx(state, "throw")
 	var check := Checks.troop_quality_check(thrower, state.rng)
 	state.log_event("%s lancia una granata%s verso %02d.%02d (TQC %s)" % [
 		thrower.display_name, " fumogena" if smoke else "",
@@ -485,9 +514,13 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 	return allowed
 
 
-# Azione discrezionale del personaggio in questo impulse: FIRE, MOVE_n
-# o NOTHING. La UI la usa per decidere se mettere in pausa sui Friendly.
-enum Act { NONE, FIRE, MOVE }
+# Azione discrezionale del personaggio in questo impulse: FIRE, MOVE_n,
+# THROW (granate: il giocatore indica l'hex) o NOTHING. La UI la usa per
+# decidere se mettere in pausa sui Friendly.
+enum Act { NONE, FIRE, MOVE, THROW }
+
+const GRENADE_ORDERS := [Domain.Order.GRENADE, Domain.Order.SMOKE_GRENADE,
+	Domain.Order.RIFLE_GRENADE]
 
 
 static func discretionary_action(c: Character, impulse: int, state: GameState = null) -> Dictionary:
@@ -499,6 +532,9 @@ static func discretionary_action(c: Character, impulse: int, state: GameState = 
 		return {"kind": Act.NONE, "hexes": 0}
 	match Orders.impulse_action(c.order, impulse):
 		Domain.ImpulseAction.MAY_FIRE:
+			if c.order in GRENADE_ORDERS:
+				return {"kind": Act.NONE, "hexes": 0} if c.thrown \
+					else {"kind": Act.THROW, "hexes": 0}
 			return {"kind": Act.FIRE, "hexes": 0}
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
 			return {"kind": Act.MOVE, "hexes": 1}

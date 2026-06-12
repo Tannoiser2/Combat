@@ -163,7 +163,7 @@ func _load_sfx() -> void:
 	_sfx.clear()
 	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
-			"kill", "wound", "suppress", "miss"]:
+			"kill", "wound", "suppress", "miss", "throw"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -185,6 +185,7 @@ func _consume_audio_events() -> void:
 			"boom":  _play_sfx(AREA_SFX.get(ev["area_type"], "artillery"))
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
+			"throw": _play_sfx("throw")
 	state.audio_events.clear()
 
 
@@ -491,6 +492,12 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 		map_view.cue_color = Color(0.95, 0.2, 0.2, 0.9)
 		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
 		next_button.text = "Passa"
+	elif action_kind == TurnSequence.Act.THROW:
+		map_view.cue_hexes = TurnSequence.valid_throw_hexes(state, c)
+		map_view.cue_color = Color(0.95, 0.6, 0.15, 0.9)
+		hint_label.text = "%s: clicca l'hex bersaglio della granata (arancio) o premi Passa" % \
+			c.display_name
+		next_button.text = "Passa"
 	else:
 		map_view.cue_hexes = _passable_neighbors(c)
 		map_view.cue_color = Color(0.3, 0.9, 0.3, 0.9)
@@ -508,6 +515,9 @@ func _finish_friendly_action() -> void:
 
 func _end_action_phase() -> void:
 	TurnSequence.end_phase(state)
+	# Le granate esplodono in End Phase: senza questo i boom non suonano
+	# mai (gli eventi venivano azzerati all'impulse 1 del turno dopo).
+	_consume_audio_events()
 	replay_button.disabled = false
 	if state.game_over:
 		phase = Phase.GAME_OVER
@@ -592,6 +602,8 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 			return not TurnSequence.valid_fire_targets(state, c).is_empty()
 		TurnSequence.Act.MOVE:
 			return not _passable_neighbors(c).is_empty()
+		TurnSequence.Act.THROW:
+			return not TurnSequence.valid_throw_hexes(state, c).is_empty()
 		_:
 			return false
 
@@ -859,6 +871,12 @@ func _handle_action_click(hex: Vector2i) -> void:
 		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
 			return  # click non valido: si ignora
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		_consume_audio_events()
+		_finish_friendly_action()
+	elif action_kind == TurnSequence.Act.THROW:
+		if not hex in TurnSequence.valid_throw_hexes(state, acting):
+			return  # click non valido: si ignora
+		TurnSequence.throw_grenade(state, acting, hex)
 		_consume_audio_events()
 		_finish_friendly_action()
 	else:  # MOVE
