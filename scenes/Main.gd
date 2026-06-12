@@ -74,8 +74,9 @@ const REPLAY_PAUSE_T := 0.6     # coda del frame (esiti dei colpi)
 # Audio: player per tipo di suono (nil se il file non e' installato).
 var _sfx: Dictionary = {}
 const WEAPON_SFX := {
-	"M1 Garand": "rifle", "KAR 98K": "rifle",
-	"M3 Grease Gun": "mg", "BAR": "mg", "M1919": "mg", "MG42": "mg", "MP40": "mg",
+	"M1 Garand": "garand", "KAR 98K": "kar98", "Rifle": "kar98",
+	"M3 Grease Gun": "smg", "MP40": "smg", "SMG": "smg",
+	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
 }
@@ -83,6 +84,11 @@ const AREA_SFX := {
 	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
 	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
 	Area.Type.C4: "artillery",
+}
+# Esito del fuoco (Fire.fire_action) -> suono di reazione.
+const OUTCOME_SFX := {
+	"Ucciso!": "kill", "Ferito!": "wound",
+	"Soppresso!": "suppress", "Colpito!": "suppress", "Mancato": "miss",
 }
 
 
@@ -155,7 +161,9 @@ func _start_scenario(scenario_id: String) -> void:
 
 func _load_sfx() -> void:
 	_sfx.clear()
-	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream"]:
+	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
+			"garand", "kar98", "mg42", "m1919", "bar", "smg",
+			"kill", "wound", "suppress", "miss"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -171,7 +179,9 @@ func _play_sfx(key: String) -> void:
 func _consume_audio_events() -> void:
 	for ev in state.audio_events:
 		match ev["type"]:
-			"shot":  _play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+			"shot":
+				_play_sfx(WEAPON_SFX.get(ev["weapon"], "rifle"))
+				_play_sfx(OUTCOME_SFX.get(ev.get("outcome", ""), ""))
 			"boom":  _play_sfx(AREA_SFX.get(ev["area_type"], "artillery"))
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
@@ -642,6 +652,7 @@ func _process(delta: float) -> void:
 		for s in f["shots"]:
 			map_view.add_tracer(s)
 			_play_sfx(WEAPON_SFX.get(s.get("weapon", ""), "rifle"))
+			_play_sfx(OUTCOME_SFX.get(s.get("outcome", ""), ""))
 		for b in f["booms"]:
 			map_view.add_blast(b["hex"])
 			_play_sfx(AREA_SFX.get(b["type"], "artillery"))

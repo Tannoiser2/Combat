@@ -119,7 +119,8 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		"weapon": weapon,
 	})
 	Replay.shot(state, state.shots.back())
-	state.audio_events.append({"type": "shot", "weapon": weapon, "hex": firer.position})
+	state.audio_events.append({"type": "shot", "weapon": weapon,
+		"outcome": outcome, "hex": firer.position})
 
 
 # Ritorna {hit: bool, nine: bool}.
@@ -270,8 +271,8 @@ static func _resolve_wound(state: GameState, target: Character) -> bool:
 			while not target.is_dead():
 				target.wounds.append(D.Wound.BAD)
 			target.clear_order()
-			state.audio_events.append({"type": "scream", "hex": target.position})
-			Replay.sfx(state, "scream")
+			# Niente urlo qui: per il fuoco lo suona l'esito "Ucciso!" di
+			# fire_action; per le esplosioni ci pensa Area._blast_check.
 			return true
 		_:
 			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
