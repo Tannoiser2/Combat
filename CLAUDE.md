@@ -86,8 +86,8 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    oltre via Weapons.rof_at + rof_bands, usato in Fire.fire_action). Una pedina
    di scenario puo' sostituire l'arma del ruolo con "weapon"/"ws" (Scenario._make).
    Bande esatte dal Weapons Chart (repo privato). Test in Main._test_weapons.
-   DA FARE: M2 .50cal (solo veicoli, rimandata con la Rule 31-32); assegnare
-   le armi nuove ai soldati degli scenari Vol. 2.
+   M2 .50cal aggiunta con la Rule 31-32 (solo veicoli). DA FARE: assegnare
+   Thompson/Springfield a specifici soldati degli scenari Vol. 2 (richiede dati del libro).
 3. FATTO: Meteo e condizioni del terreno (Rule 28) in Weather.gd (class_name,
    enum Type/Ground). state.weather/ground/max_los. Malus WS oltre 2 hex
    (Rain/Heavy Rain/Mist -1, Fog -2; esente se entrambi nello stesso edificio)
@@ -166,7 +166,8 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Sprint altrimenti). Scenario: ruolo "Bazooka Man" (Bazooka M9), chiave "vehicles" lista
    opzionale. MapView: overlay rettangolo + freccia facing + badge hull_damage. Armi aggiunte:
    M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
-   Test in Main._test_vehicles. DA FARE: assegnare veicoli agli scenari Vol.2 che li prevedono.
+   Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
+   s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
 
 ## Bug noti / attenzioni
 

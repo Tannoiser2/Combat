@@ -81,14 +81,20 @@ const WEAPON_SFX := {
 	"M1 Thompson": "thompson", "StG 44": "stg44",
 	"M1903 Springfield": "springfield",
 	"Thrown Knife": "throw",
-	"BAR": "bar", "M1919": "m1919", "MG42": "mg42",
+	"BAR": "bar", "M1919": "m1919", "MG42": "mg42", "MG34 Vehicle": "mg42",
 	"M1911": "pistol", "P38": "pistol",
 	"M7 Grenade Launcher": "grenade",
+	# Rule 31-32: armi anticarro e cannoni.
+	"Bazooka M9": "grenade", "Panzerfaust 60": "grenade", "Panzerfaust 100": "grenade",
+	"75mm L40 HE": "artillery", "75mm L40 AP": "artillery",
+	"KwK 7.5cm HE": "artillery", "KwK 7.5cm AP": "artillery",
+	"M2 .50cal": "m1919",
 }
 const AREA_SFX := {
 	Area.Type.GRENADE: "grenade",   Area.Type.MORTAR_60: "grenade",
 	Area.Type.MORTAR_81: "artillery", Area.Type.ARTILLERY_105: "artillery",
 	Area.Type.C4: "artillery",
+	Area.Type.SMOKE: "smoke",
 }
 # Esito del fuoco (Fire.fire_action) -> suono di reazione.
 const OUTCOME_SFX := {
@@ -620,9 +626,12 @@ func _has_options(c: Character, act: Dictionary) -> bool:
 # --------------------------------------------------------------- replay
 
 # Replay del turno appena concluso (a fine partita: dell'ultimo turno).
+# Usa _merge_turn_frames per animare il turno come flusso continuo
+# (stesso effetto cinematografico del replay di fine partita).
 func _on_replay_turn() -> void:
 	var tno := state.turn - 1
-	_start_replay(state.replay.filter(func(f): return f["turn"] == tno))
+	var frames := state.replay.filter(func(f): return f["turn"] == tno)
+	_start_replay(_merge_turn_frames(frames))
 
 
 func _start_replay(frames: Array) -> void:
@@ -1059,7 +1068,7 @@ func _build_hud() -> void:
 	top_box.add_child(los_button)
 	replay_button = Button.new()
 	replay_button.text = "Replay turno"
-	replay_button.tooltip_text = "Rivedi il turno appena giocato: tutte le azioni\ndi ogni impulse animate in simultanea."
+	replay_button.tooltip_text = "Rivedi il turno appena giocato: percorsi e\ncombattimenti in flusso cinematografico continuo."
 	replay_button.custom_minimum_size = Vector2(120, 40)
 	replay_button.disabled = true
 	replay_button.pressed.connect(_on_replay_turn)
