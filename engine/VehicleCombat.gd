@@ -25,6 +25,7 @@ const VEHICLE_COUNTER := {
 	"PzIVH":         "EN-PZIVH-A",
 }
 
+
 const VEHICLE_DATA := {
 	"Jeep": {
 		"speed": Speed.FAST,
