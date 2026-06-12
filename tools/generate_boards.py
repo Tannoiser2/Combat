@@ -1,15 +1,25 @@
-# Genera engine/Boards.gd classificando le 4 scansioni in assets/maps/.
+# Genera engine/Boards.gd classificando le scansioni in assets/maps/.
 # Uso: python3 tools/generate_boards.py   (dalla radice del progetto)
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from collections import Counter, defaultdict
 from classify_terrain import Classifier, save_overlay
 
+# Origini (dal buildFile Vassal):
+#   farmhouse 72,106 - hill 73,109 - village 77,110 - hedgerows 70,110
+#   woods 67,103 - town 73,104 - abbey 73,104 - hamlet 73,105
+#   hedgerows2 73,104 - ridge 73,104
 MAPS = {
-    "farmhouse": ("assets/maps/farmhouse.jpg", 72, 106, False),
-    "hill": ("assets/maps/hill.jpg", 73, 109, True),
-    "village": ("assets/maps/village.jpg", 77, 110, False),
-    "hedgerows": ("assets/maps/hedgerows.jpg", 70, 110, False),
+    "farmhouse":  ("assets/maps/farmhouse.jpg",  72, 106, False),
+    "hill":       ("assets/maps/hill.jpg",        73, 109, True),
+    "village":    ("assets/maps/village.jpg",     77, 110, False),
+    "hedgerows":  ("assets/maps/hedgerows.jpg",   70, 110, False),
+    "woods":      ("assets/maps/woods.jpg",       67, 103, False),
+    "town":       ("assets/maps/town.jpg",        73, 104, False),
+    "abbey":      ("assets/maps/abbey.jpg",       73, 104, False),
+    "hamlet":     ("assets/maps/hamlet.jpg",      73, 105, False),
+    "hedgerows2": ("assets/maps/hedgerows2.jpg",  73, 104, False),
+    "ridge":      ("assets/maps/ridge.jpg",       73, 104, True),
 }
 
 # classe del classificatore -> membro di Domain.Terrain

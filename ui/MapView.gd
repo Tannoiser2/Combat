@@ -25,6 +25,13 @@ const BOARDS := {
 	"hill": {"file": "res://assets/maps/hill.jpg", "origin": Vector2(73, 109)},
 	"village": {"file": "res://assets/maps/village.jpg", "origin": Vector2(77, 110)},
 	"hedgerows": {"file": "res://assets/maps/hedgerows.jpg", "origin": Vector2(70, 110)},
+	# Vol. 2 — mappe 5-10
+	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(67, 103)},
+	"town":       {"file": "res://assets/maps/town.jpg",       "origin": Vector2(73, 104)},
+	"abbey":      {"file": "res://assets/maps/abbey.jpg",      "origin": Vector2(73, 104)},
+	"hamlet":     {"file": "res://assets/maps/hamlet.jpg",     "origin": Vector2(73, 105)},
+	"hedgerows2": {"file": "res://assets/maps/hedgerows2.jpg", "origin": Vector2(73, 104)},
+	"ridge":      {"file": "res://assets/maps/ridge.jpg",      "origin": Vector2(73, 104)},
 }
 
 # Modalita' procedurale (nessuna texture)
@@ -471,6 +478,8 @@ func _draw() -> void:
 			_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
 				c.morale, c.order if c.has_order else -1, c.display_name,
 				c == selected, c.order_move)
+			if c.is_vehicle and not hidden:
+				_draw_vehicle_overlay(radius, center, c)
 			if c.side == D.Side.FRIENDLY and c.spotted:
 				draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
 					radius * 0.12, Color(0.9, 0.15, 0.15))
@@ -517,6 +526,29 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
 				label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
 				Color(0.95, 0.95, 0.2))
+
+
+# Overlay per veicoli: rettangolo, freccia di facing, badge hull_damage.
+# Le 6 direzioni di schermo corrispondono alle 6 facce del hex flat-top,
+# partendo da basso-destra (facing 1) in senso orario.
+func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
+	# Direzioni di schermo per facing 1..6 (CUBE_DIRS[(facing-1)%6] -> 2D).
+	# 1=basso-dx, 2=alto-dx, 3=alto, 4=alto-sx, 5=basso-sx, 6=basso.
+	const FACE_DIRS := [
+		Vector2(0.866, 0.5), Vector2(0.866, -0.5), Vector2(0.0, -1.0),
+		Vector2(-0.866, -0.5), Vector2(-0.866, 0.5), Vector2(0.0, 1.0),
+	]
+	var hw := radius * 0.44
+	var hh := radius * 0.34
+	draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
+		Color(0, 0, 0, 0.75), false, radius * 0.05)
+	var fi: int = clamp(c.facing - 1, 0, 5)
+	var tip: Vector2 = center + (FACE_DIRS[fi] as Vector2) * radius * 0.40
+	draw_line(center, tip, Color(1.0, 1.0, 1.0, 0.9), radius * 0.07)
+	if c.hull_damage == 1:
+		var bp := center + Vector2(radius * 0.36, radius * 0.36)
+		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))
+		draw_circle(bp, radius * 0.18, Color(0, 0, 0, 0.6), false, radius * 0.03)
 
 
 func _draw_procedural_terrain(font: Font, radius: float) -> void:

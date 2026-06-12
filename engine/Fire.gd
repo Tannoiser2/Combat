@@ -92,6 +92,12 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 	var th := state.hex_at(target.position.x, target.position.y)
 	if th != null and th.terrain == D.Terrain.ABBEY_INTERIOR and not _in_abbey(state, firer.position):
 		return false
+	# Rule 31-32: un bersaglio-veicolo richiede un'arma AT o main_gun.
+	# Le armi normali non lo feriscono (al massimo morale check sull'equipaggio).
+	if target.is_vehicle:
+		var flags: Array = Weapons.info(weapon)["flags"]
+		if not ("at" in flags or "main_gun" in flags):
+			return false
 	return LOS.clear(state, firer, target)
 
 
@@ -112,7 +118,11 @@ static func _abbey_hexes_crossed(state: GameState, a: Vector2i, b: Vector2i) -> 
 
 
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
+# Se il bersaglio e' un veicolo instrada il fuoco AT a VehicleCombat.
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
+	if target.is_vehicle:
+		VehicleCombat.at_fire(state, firer, target, weapon)
+		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var rof := Weapons.rof_at(weapon, dist)
 	var any_hit := false
@@ -405,11 +415,13 @@ static func _draw_wound(state: GameState, firer: Character, target: Character) -
 
 # Rule 30.1: alla morte o ferita GRAVE di un Medico friendly, ogni friendly
 # con LOS reagisce (Injured/KIA Medic Morale Check): nat 0 +2, <=TQ +1,
-# nat 9 -1 (cap Berserk). Si attiva solo per i medici friendly.
+# nat 9 -1 (cap Berserk). Chi diventa Berserk esegue immediatamente i
+# prigionieri nemici adiacenti (revenge, Rule 30). Solo per medici friendly.
 static func _medic_shock(state: GameState, medic: Character) -> void:
 	if medic.side != D.Side.FRIENDLY or not medic.is_medic:
 		return
 	_log(state, "%s (medico) e' caduto: i compagni con LOS reagiscono" % medic.display_name)
+	var went_berserk: Array[Character] = []
 	for c in state.characters:
 		if c.side != D.Side.FRIENDLY or c == medic or c.is_dead():
 			continue
@@ -425,6 +437,30 @@ static func _medic_shock(state: GameState, medic: Character) -> void:
 			c.morale = D.raise_morale(c.morale, 1, D.Morale.BERSERK)
 		if c.morale != before:
 			_log(state, "  %s: tira %d -> %s" % [c.display_name, roll, D.MORALE_NAMES[c.morale]])
+		if c.morale == D.Morale.BERSERK and before != D.Morale.BERSERK:
+			went_berserk.append(c)
+	_revenge_on_prisoners(state, went_berserk)
+
+
+# Rule 30 (revenge): i friendly diventati Berserk per la morte del medico
+# eseguono immediatamente i prigionieri nemici (GUARD) nel loro hex o adiacenti.
+static func _revenge_on_prisoners(state: GameState, berserks: Array[Character]) -> void:
+	if berserks.is_empty():
+		return
+	for prisoner in state.characters:
+		if prisoner.side != D.Side.ENEMY or prisoner.is_dead():
+			continue
+		if prisoner.order != D.Order.GUARD:
+			continue
+		for b in berserks:
+			if Spotting.hex_distance(b.position, prisoner.position) <= 1:
+				_log(state, "%s (Berserk) esegue il prigioniero %s" % [
+					b.display_name, prisoner.display_name])
+				prisoner.wounds.append(D.Wound.BAD)
+				while not prisoner.is_dead():
+					prisoner.wounds.append(D.Wound.BAD)
+				prisoner.clear_order()
+				break
 
 
 # Pesca della ferita con una Friendly Card. Ritorna true se ferito/ucciso.

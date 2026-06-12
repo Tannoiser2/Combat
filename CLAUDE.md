@@ -131,7 +131,7 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    SEMPLIFICAZIONI: il fuoco emette fumo dal proprio hex (non genera la scia di
    fading smoke sottovento turno per turno); la duck-back forzata di chi non
    puo' avanzare per le fiamme non e' modellata.
-6. PARZIALE: Medici addestrati (Rule 30). Character.is_medic; ruolo "Medic"
+6. FATTO: Medici addestrati (Rule 30). Character.is_medic; ruolo "Medic"
    (ROLE) o entry "medic". Disarmati (weapon_skills vuoto -> no fuoco), +2 TQ
    in Medical Aid (TurnSequence._do_medic), mai mischia: se un avversario entra
    nel loro hex fuggono di 1 hex 1D6 (_medic_flee in _do_melee). Ordini di
@@ -141,12 +141,32 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    medico amico (30.1) in Fire._medic_shock (nat0 +2, <=TQ +1, nat9 -1).
    Micro-AI del medico nemico (30.2): cura il ferito adiacente, altrimenti
    Evade verso il ferito alleato entro 4 hex (bussola), altrimenti Hide
-   (TurnSequence._assign_medic_order). Test in Main._test_medic. DA FARE:
-   nemico che evita di sparare ai medici amici (TQ+2), revenge sui prigionieri.
-7. Scenari del Vol. 2 + 6 mappe nuove: servono gli zip dal repo
-   privato (scansioni mappe da classificare con tools/
-   classify_terrain.py e generate_boards.py) e lo Scenario Book.
-8. Veicoli e anticarro (Rule 31-32): il pezzo grosso, per ultimo.
+   (TurnSequence._assign_medic_order). Nemico evita di sparare al medico amico
+   con TQC+2 (TurnSequence._try_fire); revenge sui prigionieri GUARD quando
+   un medico friendly viene ucciso e un compagno diventa BERSERK
+   (Fire._revenge_on_prisoners). Test in Main._test_medic.
+7. FATTO: Scenari Vol. 2 (s11-s22) + 6 mappe nuove (woods, town, abbey,
+   hamlet, hedgerows2, ridge). Boards.gd rigenerato con tutte e 10 le mappe.
+   Ruoli SS (SS Schutze/Veteran/NCO/Officer) con skill Dodge/Tough; team Teal
+   e Purple; FULL_SQUAD_VOL2 (Perez + 11, team Able/Baker/Charlie con Leader2
+   Cpl Diaz). Scenari: s11 Payback Time, s12 Overrun, s13 Find That Radio,
+   s14 Defend the CP, s15 They're Falling Back, s16 Get Them Out of There,
+   s17 Clear Them Out, s18 Great Minds (notte), s19 No Man Left Behind,
+   s20 Long Run Home, s21 Machine-Gun Ridge, s22 Outflanked. Setup posizioni
+   derivate da analisi terreno (non dal libro scenari ufficiale): rifinibili
+   con i dati reali se disponibili.
+8. FATTO: Veicoli e anticarro (Rule 31-32). VehicleCombat.gd: dati armatura (Jeep, M3A1
+   Halftrack, M4A3 Sherman, PzIVH), faccia colpita via dot-product (FRONT/SIDE/REAR),
+   penetrazione (pen_base+1d{pen_die}), at_fire (WS check + pen vs armor_n/armor_g ->
+   hull_damage; 0=OK, 1=immobilizzato, 2=distrutto), he_fire (WS check + Area._explode
+   MORTAR_81). Character: is_vehicle, vehicle_type, hull_damage, is_buttoned_up, fire_mode.
+   Move: can_enter blocca VEHICLE_BLOCKED; FAST vehicle 2 hex per impulse. Fire: can_fire
+   richiede AT/main_gun vs veicolo; fire_action instrada a at_fire. TurnSequence: legal_orders
+   filtra VEHICLE_ORDERS; _assign_vehicle_order (Aimed Fire entro 20 LOS, RUN_AND_GUN<=6,
+   Sprint altrimenti). Scenario: ruolo "Bazooka Man" (Bazooka M9), chiave "vehicles" lista
+   opzionale. MapView: overlay rettangolo + freccia facing + badge hull_damage. Armi aggiunte:
+   M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
+   Test in Main._test_vehicles. DA FARE: assegnare veicoli agli scenari Vol.2 che li prevedono.
 
 ## Bug noti / attenzioni
 

@@ -25,8 +25,18 @@ const ROLE := {
 	"LMG": {"tq": 5, "ldr": 0, "weapon": "MG42", "ws": 5},
 	"Sniper": {"tq": 5, "ldr": 0, "weapon": "KAR 98K", "ws": 8},
 	"Maquis": {"tq": 4, "ldr": 0, "weapon": "M1911", "ws": 3},
+	# Truppe SS (Rule 24): Dodge di base; Veteran SS anche Tough.
+	"SS Schutze": {"tq": 6, "ldr": 0, "weapon": "StG 44", "ws": 5,
+		"skills": ["Dodge"]},
+	"SS Veteran": {"tq": 7, "ldr": 0, "weapon": "StG 44", "ws": 6,
+		"skills": ["Dodge", "Tough"]},
+	"SS NCO": {"tq": 7, "ldr": 1, "weapon": "StG 44", "ws": 6,
+		"skills": ["Dodge"]},
+	"SS Officer": {"tq": 8, "ldr": 2, "weapon": "MP40", "ws": 7,
+		"skills": ["Dodge"]},
 	# Friendly
 	"Leader": {"tq": 6, "ldr": 3, "weapon": "M3 Grease Gun", "ws": 7},
+	"Leader2": {"tq": 6, "ldr": 2, "weapon": "M1 Thompson", "ws": 6},
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	"BAR Gunner": {"tq": 5, "ldr": 0, "weapon": "BAR", "ws": 5},
 	"MG Gunner": {"tq": 5, "ldr": 0, "weapon": "M1919", "ws": 5},
@@ -35,6 +45,10 @@ const ROLE := {
 	"Medic": {"tq": 5, "ldr": 0, "weapon": "", "ws": 0, "medic": true},
 	# Pedina-esca: valori minimi, non combatte mai.
 	"Dummy": {"tq": 1, "ldr": 0, "weapon": "", "ws": 0},
+	# Rule 31-32: porta il bazooka (M9); stat. come rifleman ma arma AT.
+	"Bazooka Man": {"tq": 5, "ldr": 0, "weapon": "Bazooka M9", "ws": 5},
+	# Fanteria controcarri tedesca (Panzerfaust 60); stat. come Rifleman.
+	"AT Grenadier": {"tq": 5, "ldr": 0, "weapon": "Panzerfaust 60", "ws": 5},
 }
 
 # Zona di schieramento per la fase di deploy. Ritorna gli hex validi.
@@ -132,6 +146,35 @@ const TEAM_COUNTERS := {
 		"GE-WhiteTeam-Soldat-Stein-", "GE-WhiteTeam-Soldat-Walter",
 		"GE-WhiteTeam-Soldat-Zimmer",
 	],
+	# Vol. 2: reparti SS (OBSTM = Obersturmführer, OBSH = Oberscharführer,
+	# SCH = Scharführer). Rule 24 skills assegnate via ROLE "SS *".
+	"Teal": [
+		"GE-TealTeam-OBSTM-Brandt",
+		"GE-TealTeam-OBSH-Engel", "GE-TealTeam-OBSH-Sauer",
+		"GE-TealTeam-OBSH-Seidel", "GE-TealTeam-OBSH-Simon",
+		"GE-TealTeam-OBSH-Weber",
+		"GE-TealTeam-SCH-Arnold", "GE-TealTeam-SCH-Bahlow",
+		"GE-TealTeam-SCH-Haas", "GE-TealTeam-SCH-Horn",
+		"GE-TealTeam-SCH-Muller", "GE-TealTeam-SCH-Pfeiffer",
+		"GE-TealTeam-SCH-Pohl", "GE-TealTeam-SCH-Schmidt",
+		"GE-TealTeam-SCH-Scholz", "GE-TealTeam-SCH-Schreiber",
+		"GE-TealTeam-SCH-Schulte", "GE-TealTeam-SCH-Sommer",
+		"GE-TealTeam-SCH-Voight", "GE-TealTeam-SCH-Wolff",
+		"GE-TealTeam-SCH-Ziegler",
+	],
+	"Purple": [
+		"GE-PurpleTeam-OBSTM-Geiger",
+		"GE-PurpleTeam-OBSH-Bender", "GE-PurpleTeam-OBSH-Michel",
+		"GE-PurpleTeam-OBSH-Pohl", "GE-PurpleTeam-OBSH-Sauer",
+		"GE-PurpleTeam-OBSH-Schindler", "GE-PurpleTeam-OBSH-Wurst",
+		"GE-PurpleTeam-SCH-Blum", "GE-PurpleTeam-SCH-Bock",
+		"GE-PurpleTeam-SCH-Breuer", "GE-PurpleTeam-SCH-Frey",
+		"GE-PurpleTeam-SCH-Jahn", "GE-PurpleTeam-SCH-Kruse",
+		"GE-PurpleTeam-SCH-Nowak", "GE-PurpleTeam-SCH-Reuter",
+		"GE-PurpleTeam-SCH-Scherer", "GE-PurpleTeam-SCH-Stark",
+		"GE-PurpleTeam-SCH-Thiel", "GE-PurpleTeam-SCH-Thiele",
+		"GE-PurpleTeam-SCH-Voss", "GE-PurpleTeam-SCH-Witt",
+	],
 }
 const GERMAN_NAMES := ["Becker", "Fuchs", "Hoffmann", "Kaiser", "Krause",
 	"Lange", "Maier", "Neumann", "Richter", "Schafer", "Schmidt", "Vogt",
@@ -153,6 +196,36 @@ const FULL_SQUAD := [
 	{"name": "Pvt Stubbs", "role": "BAR Gunner", "team": "Charlie", "counter": "US-Charlie-Pvt-Stubbs"},
 ]
 
+# Squadra Vol. 2: nuovi personaggi (SSGT Perez + 11 soldati, mappe 5-10).
+const FULL_SQUAD_VOL2 := [
+	{"name": "SSgt Perez", "role": "Leader", "team": "Able",
+		"counter": "US-Able-SSGT-Perez"},
+	{"name": "Pvt Butler", "role": "BAR Gunner", "team": "Able",
+		"counter": "US-Able-Pvt-Butler"},
+	{"name": "Pvt Hatcher", "role": "US Rifleman", "team": "Able",
+		"counter": "US-Able-Pvt-Hatcher"},
+	{"name": "PVT Peterson", "role": "US Rifleman", "team": "Able",
+		"counter": "US-Able-PVT-Peterson"},
+	{"name": "Pvt James", "role": "US Rifleman", "team": "Baker",
+		"counter": "US-Baker-Pvt-James"},
+	{"name": "Pvt Moore", "role": "BAR Gunner", "team": "Baker",
+		"counter": "US-Baker-Pvt-Moore"},
+	{"name": "Pvt Lewist", "role": "US Rifleman", "team": "Baker",
+		"counter": "US-Baker-Pvt-Lewist"},
+	{"name": "Pvt Cruz", "role": "Bazooka Man", "team": "Baker",
+		"counter": "US-Baker-Pvt-Cruz"},
+	{"name": "Cpl Diaz", "role": "Leader2", "team": "Charlie",
+		"counter": "US-Charlie-Cpl-Diaz"},
+	{"name": "Pvt Bennett", "role": "US Rifleman", "team": "Charlie",
+		"counter": "US-Charlie-Pvt-Bennett"},
+	{"name": "Pvt Hall", "role": "US Rifleman", "team": "Charlie",
+		"counter": "US-Charlie-Pvt-Hall"},
+	{"name": "Pvt Holland", "role": "US Rifleman", "team": "Charlie",
+		"counter": "US-Charlie-Pvt-Holland"},
+	{"name": "Pvt Williams", "role": "MG Gunner", "team": "Charlie",
+		"counter": "US-Charlie-Pvt-Williams"},
+]
+
 
 # Genera la coppa nemica da una specifica per team: {"Blue": {"Recruit": 4,
 # "NCO": 1, ...}, "Red": {...}}. Ogni ruolo pesca una pedina del grado
@@ -168,9 +241,9 @@ static func make_cup(spec: Dictionary) -> Array:
 		var ncos: Array = []
 		var troops: Array = []
 		for id in TEAM_COUNTERS.get(team, []):
-			if "-Lt-" in id or "-Hptm-" in id:
+			if "-Lt-" in id or "-Hptm-" in id or "-OBSTM-" in id:
 				officers.append(id)
-			elif "-Obfr-" in id:
+			elif "-Obfr-" in id or "-OBSH-" in id:
 				ncos.append(id)
 			else:
 				troops.append(id)
@@ -178,9 +251,9 @@ static func make_cup(spec: Dictionary) -> Array:
 			for i in range(int(spec[team][role])):
 				var pool: Array
 				match role:
-					"Officer":
+					"Officer", "SS Officer":
 						pool = officers if not officers.is_empty() else ncos
-					"NCO", "Veteran":
+					"NCO", "Veteran", "SS NCO", "SS Veteran":
 						pool = ncos if not ncos.is_empty() else troops
 					_:
 						pool = troops
@@ -645,6 +718,277 @@ const SCENARIOS := {
 		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
 			"guns_required": true},
 	},
+
+	# ------------------------------------------------ Vol. 2 — Mappe 5-10
+
+	"s11": {
+		"name": "11. Payback Time",
+		"map": "woods", "turns": 14, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [31, 35], "rows": [0, 19]},
+		"desc": "I tedeschi si sono ritirati nel bosco pensando di essere al\nsicuro. Dimostriamo loro che si sbagliano.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 2, "SS Schutze": 6},
+			"Blue": {"NCO": 1, "Rifleman": 4, "Recruit": 3},
+		},
+		"dummies": 14,
+		"enemy_setup": ["10,9", "11,8", "12,8", "13,5", "14,10", "15,5",
+			"15,7", "16,6", "17,7", "17,8", "18,4", "19,4", "20,5", "21,4",
+			"22,3", "23,6", "24,2"],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1},
+	},
+
+	"s12": {
+		"name": "12. Overrun",
+		"map": "woods", "turns": 10, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [20, 28], "rows": [0, 19]},
+		"desc": "Ci hanno circondato nel bosco. Reggete finché la\nriserva non arriva: ogni uomo è vitale.",
+		"squad_vol2": true,
+		"enemy_morale": 1,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 8},
+			"Purple": {"SS NCO": 2, "SS Schutze": 6},
+		},
+		"dummies": 10,
+		"enemy_setup": ["1,3", "1,7", "1,11", "1,15", "2,5", "2,9", "2,13",
+			"3,4", "3,8", "3,12", "4,6", "4,10"],
+		"first_order_d6": ["EVADE 6/5", "SPRINT 6", "SPRINT 5", "SPRINT 6/5",
+			"RUN_AND_GUN 6", "RUN_AND_GUN 5"],
+		"waves": [
+			{"turn": 3, "hexes": ["1,3", "1,7", "1,11", "1,15", "2,5"]},
+			{"turn": 6, "hexes": ["1,4", "1,8", "1,12", "2,6", "2,10"]},
+		],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -3, "friendly_wounded": -1},
+	},
+
+	"s13": {
+		"name": "13. Find That Radio",
+		"map": "hamlet", "turns": 12, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
+		"desc": "Una radio tedesca trasmette ordini di attacco.\nTrovatela e distruggetela prima che sia troppo tardi.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Blue": {"NCO": 1, "Rifleman": 4, "Recruit": 4},
+			"Red": {"Rifleman": 3, "Recruit": 4},
+		},
+		"dummies": 14,
+		"enemy_setup": ["11,1", "11,4", "12,9", "13,5", "14,12", "15,14",
+			"16,6", "17,8", "18,4", "19,6", "20,6", "21,11", "22,4"],
+		"objective_hexes": ["11,1", "17,15", "21,11"],
+		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
+			"objective_each": 4},
+	},
+
+	"s14": {
+		"name": "14. Defend the CP",
+		"map": "hamlet", "turns": 15, "hand_limit": 3,
+		"compass": ["34,10", "35,10"],
+		"deploy": {"cols": [12, 20], "rows": [0, 19]},
+		"desc": "Il posto di comando è nel casolare. I tedeschi vengono\ndalle colline. Tenete la posizione a ogni costo.",
+		"squad_vol2": true,
+		"enemy_morale": 1,
+		"cup_spec": {
+			"Purple": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 7},
+			"Yellow": {"Officer": 1, "NCO": 2, "Rifleman": 4},
+		},
+		"dummies": 12,
+		"enemy_setup": ["31,3", "31,7", "31,11", "31,15", "32,5", "32,9",
+			"32,13", "33,4", "33,8", "33,12", "34,6", "34,10", "35,5", "35,9"],
+		"first_order_d6": ["SPRINT 5", "SPRINT 6", "RUN_AND_GUN 5",
+			"RUN_AND_GUN 6", "EVADE 6/5", "SPRINT 5/6"],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"no_enemy_in_building": 6},
+	},
+
+	"s15": {
+		"name": "15. They're Falling Back",
+		"map": "town", "turns": 12, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
+		"desc": "I tedeschi si ritirano nel paese. Non lasciateli\nriorganizzarsi: inseguiteli e sgombrate le strade.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Blue": {"Officer": 1, "NCO": 2, "Rifleman": 5, "Recruit": 3},
+			"Red": {"NCO": 1, "Rifleman": 4, "Recruit": 4},
+		},
+		"dummies": 18,
+		"enemy_setup": ["17,8", "20,4", "21,2", "21,13", "22,1", "23,3",
+			"23,7", "23,17", "27,14", "30,7", "30,11", "33,2", "33,3"],
+		"building_tqc_aimed": true,
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"no_enemy_in_building": 6},
+	},
+
+	"s16": {
+		"name": "16. Get Them Out of There",
+		"map": "abbey", "turns": 14, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
+		"desc": "Un partigiano è intrappolato nell'abbazia occupata dai\ntedeschi. Entrate, prendetelo, uscite subito.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 5},
+			"Blue": {"NCO": 1, "Rifleman": 3, "Recruit": 3},
+		},
+		"dummies": 12,
+		"enemy_setup": ["18,8", "19,10", "19,12", "20,8", "20,10",
+			"21,10", "22,11", "23,11", "24,9", "25,10"],
+		"maquis_hex": "21,12",
+		"exit_col": 2,
+		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
+			"maquis_rescued": 12, "friendly_exited": 1},
+	},
+
+	"s17": {
+		"name": "17. Clear Them Out",
+		"map": "town", "turns": 15, "hand_limit": 3,
+		"compass": ["2,5", "3,5"],
+		"deploy": {"cols": [31, 35], "rows": [0, 19]},
+		"desc": "Il paese va ripreso casa per casa. Ogni edificio\nnasconde un pericolo: procedate con cautela.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Purple": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2, "SS Schutze": 6},
+			"White": {"NCO": 2, "Rifleman": 5, "Recruit": 3},
+		},
+		"dummies": 20,
+		"enemy_setup": ["3,14", "3,15", "5,6", "5,14", "9,11", "9,14",
+			"11,6", "15,11", "16,1", "17,8", "20,4", "21,2", "22,1",
+			"23,3", "23,5", "23,7", "24,2", "27,14", "30,7", "30,8",
+			"30,11", "33,2"],
+		"building_tqc_aimed": true,
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"no_enemy_in_building": 8},
+	},
+
+	"s18": {
+		"name": "18. Great Minds",
+		"map": "abbey", "turns": 12, "hand_limit": 3,
+		"compass": ["2,5", "3,5"],
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
+		"desc": "Entrambe le parti vogliono l'abbazia. Chi ci arriva\nper primo controlla la posizione chiave.",
+		"night": true,
+		"squad_vol2": true,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 2, "SS Schutze": 6},
+			"Purple": {"SS NCO": 2, "SS Schutze": 4},
+		},
+		"dummies": 10,
+		"enemy_setup": ["31,3", "31,7", "31,11", "32,5", "32,9", "32,13",
+			"33,4", "33,8", "33,12", "34,6"],
+		"first_order_d6": ["SPRINT 6/5", "SPRINT 5/6", "RUN_AND_GUN 5",
+			"RUN_AND_GUN 6", "EVADE 5/6", "SPRINT 6"],
+		"objective_hexes": ["19,12", "22,11", "23,11"],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"objective_each": 4},
+	},
+
+	"s19": {
+		"name": "19. No Man Left Behind",
+		"map": "hedgerows2", "turns": 14, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
+		"desc": "Un soldato ferito è rimasto indietro tra le siepi.\nRecuperate Mitchell e riportarlo alle linee.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Blue": {"NCO": 1, "Rifleman": 4, "Recruit": 5},
+			"Red": {"NCO": 1, "Rifleman": 4, "Recruit": 4},
+		},
+		"dummies": 14,
+		"enemy_setup": ["11,7", "12,4", "13,3", "14,9", "15,6", "16,8",
+			"17,3", "18,8", "19,2", "20,3", "21,5", "22,4", "24,2"],
+		"maquis_hex": "17,14",
+		"exit_col": 2,
+		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
+			"maquis_rescued": 10, "friendly_exited": 1},
+	},
+
+	"s20": {
+		"name": "20. Long Run Home",
+		"map": "hedgerows2", "turns": 12, "hand_limit": 3,
+		"compass": ["2,5", "3,5"],
+		"deploy": {"cols": [14, 20], "rows": [0, 19]},
+		"desc": "Intrappolati tra le siepi, circondati. La via di\nfuga è verso ovest: raggiungete le linee alleate.",
+		"squad_vol2": true,
+		"enemy_morale": 2,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 2, "SS Schutze": 5},
+			"Yellow": {"NCO": 1, "Rifleman": 4, "Recruit": 4},
+		},
+		"dummies": 12,
+		"enemy_setup": ["1,4", "1,8", "1,12", "2,6", "2,10", "3,5", "3,9",
+			"28,4", "28,8", "28,12", "29,6", "29,10"],
+		"exit_col": 2,
+		"vehicles": [
+			{"type": "M3A1 Halftrack", "side": "friendly", "team": "Baker",
+				"pos": "17,10", "facing": 4},
+		],
+		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
+			"friendly_exited": 3},
+	},
+
+	"s21": {
+		"name": "21. Machine-Gun Ridge",
+		"map": "ridge", "turns": 15, "hand_limit": 3,
+		"compass": ["34,5", "33,5"],
+		"deploy": {"cols": [31, 35], "rows": [0, 19]},
+		"desc": "Una mitragliatrice tedesca controlla tutta la cresta.\nNeutralizzatela prima che l'avanzata sia bloccata.",
+		"squad_vol2": true,
+		"cup_spec": {
+			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2,
+				"SS Schutze": 4, "AT Grenadier": 1},
+			"Purple": {"SS NCO": 2, "SS Schutze": 3, "AT Grenadier": 1},
+		},
+		"dummies": 16,
+		"enemy_setup": ["10,6", "11,4", "11,12", "13,8", "13,11",
+			"15,3", "15,5", "15,13", "17,7", "17,9", "17,15",
+			"19,10", "21,7", "22,3", "23,15", "24,9"],
+		"gun_hexes": ["13,11", "17,9"],
+		"c4": true,
+		"vehicles": [
+			{"type": "M4A3 Sherman", "side": "friendly", "team": "Able",
+				"pos": "32,10", "facing": 4},
+		],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"guns_required": true},
+	},
+
+	"s22": {
+		"name": "22. Outflanked",
+		"map": "ridge", "turns": 12, "hand_limit": 3,
+		"compass": ["34,10", "35,10"],
+		"deploy": {"cols": [14, 22], "rows": [0, 19]},
+		"desc": "Ci hanno aggirato su entrambi i fianchi sulla cresta.\nReggetevi finché l'artiglieria alleata non parla.",
+		"squad_vol2": true,
+		"enemy_morale": 1,
+		"cup_spec": {
+			"Purple": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2, "SS Schutze": 6},
+			"Teal": {"SS NCO": 2, "SS Schutze": 4},
+		},
+		"dummies": 14,
+		"enemy_setup": ["1,4", "1,8", "1,12", "2,6", "2,10", "3,5",
+			"31,4", "31,8", "31,12", "32,6", "32,10", "33,5", "35,3", "35,9"],
+		"first_order_d6": ["SPRINT 6", "SPRINT 5", "RUN_AND_GUN 6",
+			"RUN_AND_GUN 5", "SPRINT 6/5", "SPRINT 5/6"],
+		"waves": [
+			{"turn": 4, "hexes": ["1,5", "1,9", "1,13", "35,5", "35,9"]},
+		],
+		"vehicles": [
+			{"type": "PzIVH", "side": "enemy", "team": "Purple",
+				"pos": "33,10", "facing": 4},
+		],
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -3, "friendly_wounded": -1},
+	},
 }
 
 
@@ -662,6 +1006,8 @@ static func build(state: GameState, scenario_id: String) -> void:
 	var roster: Array = sc.get("friendly", [])
 	if sc.get("squad_full", false):
 		roster = FULL_SQUAD
+	elif sc.get("squad_vol2", false):
+		roster = FULL_SQUAD_VOL2
 	var spawn := deploy_hexes(state, scenario_id)
 	var spawn_i := 0
 	for f in roster:
@@ -733,6 +1079,33 @@ static func build(state: GameState, scenario_id: String) -> void:
 	# Bombardamento iniziale (se previsto dallo scenario, es. s2).
 	if sc.has("opening_barrage"):
 		_run_opening_barrage(state, sc["opening_barrage"])
+
+	# Veicoli (Rule 31-32): lista opzionale di veicoli schierati nello scenario.
+	# Ogni voce: {"type": "M4A3 Sherman", "team": "Able", "pos": "5,10",
+	#   "facing": 4, "weapon": "", "side": "friendly"/"enemy"}.
+	for ve in sc.get("vehicles", []):
+		var vtype: String = ve["type"]
+		var vdata: Dictionary = VehicleCombat.VEHICLE_DATA.get(vtype, {})
+		var vside_str: String = ve.get("side",
+			"friendly" if int(vdata.get("side", D.Side.FRIENDLY)) == D.Side.FRIENDLY
+			else "enemy")
+		var vside: int = D.Side.FRIENDLY if vside_str == "friendly" else D.Side.ENEMY
+		var vteam: String = ve.get("team", "Able")
+		var vfacing: int = ve.get("facing", 4)
+		var vweapon: String = ve.get("weapon", "")
+		var vc := VehicleCombat.make_vehicle(vtype, vside, vteam, Vector2i(0, 0), vfacing, vweapon)
+		if ve.has("pos"):
+			var vp: PackedStringArray = String(ve["pos"]).split(",")
+			vc.position = Vector2i(int(vp[0]), int(vp[1]))
+		if vside == D.Side.ENEMY:
+			vc.alerted = true
+			vc.known = true   # un veicolo e' sempre visibile (non si nasconde)
+			vc.morale = int(sc.get("enemy_morale", D.Morale.NORMAL))
+		else:
+			vc.spotted = true  # il carro amico e' visibile anche ai nemici
+		state.characters.append(vc)
+		state.log_event("Veicolo schierato: %s (%s) in %02d.%02d" % [
+			vtype, vteam, vc.position.x, vc.position.y])
 
 	# Mano iniziale (Starting Hand Size).
 	for i in range(state.hand_limit):
