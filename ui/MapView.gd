@@ -25,6 +25,13 @@ const BOARDS := {
 	"hill": {"file": "res://assets/maps/hill.jpg", "origin": Vector2(73, 109)},
 	"village": {"file": "res://assets/maps/village.jpg", "origin": Vector2(77, 110)},
 	"hedgerows": {"file": "res://assets/maps/hedgerows.jpg", "origin": Vector2(70, 110)},
+	# Vol. 2 — mappe 5-10
+	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(67, 103)},
+	"town":       {"file": "res://assets/maps/town.jpg",       "origin": Vector2(73, 104)},
+	"abbey":      {"file": "res://assets/maps/abbey.jpg",      "origin": Vector2(73, 104)},
+	"hamlet":     {"file": "res://assets/maps/hamlet.jpg",     "origin": Vector2(73, 105)},
+	"hedgerows2": {"file": "res://assets/maps/hedgerows2.jpg", "origin": Vector2(73, 104)},
+	"ridge":      {"file": "res://assets/maps/ridge.jpg",      "origin": Vector2(73, 104)},
 }
 
 # Modalita' procedurale (nessuna texture)
