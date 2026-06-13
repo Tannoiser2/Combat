@@ -55,6 +55,10 @@ var los_button: Button
 var los_mode := false
 var los_first := Vector2i(-99, -99)
 
+# Editor di mappa: pannello pittura terreno (tasto E).
+var editor_panel: PanelContainer
+var editor_brush: int = -1  # Domain.Terrain selezionato, -1 = nessuno
+
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
 var action_queue: Array = []
@@ -815,6 +819,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_label.text = "Overlay terreno: %s (T per cambiare)" % \
 			("ON - confronta i colori con la mappa" if map_view.debug_terrain else "off")
 		return
+	# Tasto E: editor di mappa (pittura terreno + slider opacita').
+	if event is InputEventKey and event.pressed and event.keycode == KEY_E \
+			and map_view != null:
+		map_view.editor_mode = not map_view.editor_mode
+		editor_panel.visible = map_view.editor_mode
+		map_view.debug_terrain = map_view.editor_mode
+		overlay_legend.visible = false
+		map_view.queue_redraw()
+		hint_label.text = "Editor mappa: %s (E per uscire)" % \
+			("ON — clicca hex + trascina per dipingere terreno" if map_view.editor_mode else "off")
+		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
@@ -823,9 +838,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				_zoom(1.0 / 1.15)
 			MOUSE_BUTTON_LEFT:
 				_on_map_clicked()
-	elif event is InputEventMouseMotion \
-			and event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
-		camera.position -= event.relative / camera.zoom.x
+	elif event is InputEventMouseMotion:
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT \
+				and map_view != null and map_view.editor_mode:
+			var drag_hex := map_view.pick_hex(map_view.get_local_mouse_position())
+			if drag_hex.x > -99:
+				_editor_paint(drag_hex)
+		elif event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+			camera.position -= event.relative / camera.zoom.x
 
 
 func _zoom(factor: float) -> void:
@@ -879,6 +899,9 @@ func _on_map_clicked() -> void:
 	if hex.x <= -99:
 		return
 	_play_sfx("click")
+	if map_view.editor_mode:
+		_editor_paint(hex)
+		return
 	if los_mode:
 		_handle_los_click(hex)
 		return
@@ -1074,6 +1097,54 @@ func _make_theme() -> Theme:
 	theme.set_color("font_color", "Label", Color(0.92, 0.92, 0.85))
 	theme.set_color("default_color", "RichTextLabel", Color(0.92, 0.92, 0.85))
 	return theme
+
+
+# --------------------------------------------------------- editor mappa
+
+func _editor_paint(hex: Vector2i) -> void:
+	if editor_brush < 0:
+		hint_label.text = "Editor: scegli un terreno dal pannello a sinistra"
+		return
+	var key := GameState.hex_key(hex.x, hex.y)
+	if not state.map.has(key):
+		return
+	state.map[key].terrain = editor_brush
+	map_view.queue_redraw()
+
+
+func _export_map_data() -> void:
+	var map_name: String = Scenario.SCENARIOS[state.scenario_id]["map"]
+	# Raggruppa hex per terreno.
+	var by_terrain: Dictionary = {}
+	for key in state.map:
+		var hex: GameState.MapHex = state.map[key]
+		if hex.terrain == Domain.Terrain.OPEN_LEVEL_0:
+			continue  # non serve esportare il terreno di default
+		if not by_terrain.has(hex.terrain):
+			by_terrain[hex.terrain] = []
+		by_terrain[hex.terrain].append(key)
+	# Genera codice GDScript compatibile con Boards.gd.
+	var lines: Array[String] = []
+	lines.append("# Dati esportati dall'editor — incolla in Boards.gd sotto \"%s\":" % map_name)
+	lines.append('"%s": {' % map_name)
+	for t in by_terrain:
+		var tname: String = Domain.Terrain.keys()[t]
+		var entries: Array = by_terrain[t]
+		entries.sort()
+		var quoted: Array[String] = []
+		for e in entries:
+			quoted.append('"%s"' % e)
+		lines.append('\tD.Terrain.%s: [%s],' % [tname, ", ".join(quoted)])
+	lines.append("},")
+	var text := "\n".join(lines)
+	var path := "/tmp/map_export_%s.txt" % map_name
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f != null:
+		f.store_string(text)
+		f.close()
+		hint_label.text = "Esportato in %s (%d terreni modificati)" % [path, by_terrain.size()]
+	else:
+		hint_label.text = "Errore scrittura %s" % path
 
 
 func _build_hud() -> void:
@@ -1325,6 +1396,88 @@ func _build_hud() -> void:
 	order_desc.custom_minimum_size = Vector2(300, 430)
 	order_desc.add_theme_font_size_override("normal_font_size", 15)
 	order_h.add_child(order_desc)
+
+	# Pannello editor mappa (tasto E): opacita' + palette terreni + export.
+	editor_panel = PanelContainer.new()
+	editor_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	editor_panel.offset_right = 220
+	editor_panel.offset_top = 46
+	editor_panel.offset_bottom = -8
+	editor_panel.hide()
+	root.add_child(editor_panel)
+	var ep_box := VBoxContainer.new()
+	ep_box.add_theme_constant_override("separation", 4)
+	editor_panel.add_child(ep_box)
+	ep_box.add_child(_section_label("EDITOR MAPPA (E per uscire)"))
+	var op_label := Label.new()
+	op_label.text = "Opacita' mappa:"
+	op_label.add_theme_font_size_override("font_size", 12)
+	ep_box.add_child(op_label)
+	var op_slider := HSlider.new()
+	op_slider.min_value = 0.0
+	op_slider.max_value = 1.0
+	op_slider.step = 0.05
+	op_slider.value = 1.0
+	op_slider.custom_minimum_size = Vector2(200, 24)
+	op_slider.value_changed.connect(func(v: float):
+		map_view.map_opacity = v
+		map_view.queue_redraw())
+	ep_box.add_child(op_slider)
+	ep_box.add_child(HSeparator.new())
+	ep_box.add_child(_section_label("Terreno da dipingere:"))
+	var ep_scroll := ScrollContainer.new()
+	ep_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ep_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	ep_box.add_child(ep_scroll)
+	var ep_list := VBoxContainer.new()
+	ep_list.add_theme_constant_override("separation", 2)
+	ep_scroll.add_child(ep_list)
+	# Pulsante "Nessuno" per deselezionare il pennello.
+	var none_btn := Button.new()
+	none_btn.text = "— Nessuno —"
+	none_btn.toggle_mode = true
+	none_btn.custom_minimum_size = Vector2(200, 28)
+	none_btn.pressed.connect(func(): editor_brush = -1)
+	ep_list.add_child(none_btn)
+	var brush_buttons: Array = [none_btn]
+	for t in Domain.TERRAIN_NAMES:
+		var tname: String = Domain.TERRAIN_NAMES[t]
+		var tb := Button.new()
+		tb.text = tname
+		tb.toggle_mode = true
+		tb.custom_minimum_size = Vector2(200, 28)
+		var tint: Color = MapView.OVERLAY_TINTS.get(t,
+			Color(MapView.BASE_COLORS.get(t, Color.MAGENTA)))
+		tb.add_theme_color_override("font_color",
+			Color.WHITE if tint.get_luminance() < 0.5 else Color.BLACK)
+		tb.add_theme_stylebox_override("normal",
+			_colored_stylebox(Color(tint.r, tint.g, tint.b, 0.7)))
+		tb.add_theme_stylebox_override("pressed",
+			_colored_stylebox(Color(tint.r, tint.g, tint.b, 1.0)))
+		var t_val: int = t
+		tb.pressed.connect(func():
+			editor_brush = t_val
+			for b in brush_buttons:
+				if b != tb:
+					b.button_pressed = false)
+		brush_buttons.append(tb)
+		ep_list.add_child(tb)
+	ep_box.add_child(HSeparator.new())
+	var export_btn := Button.new()
+	export_btn.text = "Esporta dati mappa"
+	export_btn.custom_minimum_size = Vector2(200, 36)
+	export_btn.pressed.connect(_export_map_data)
+	ep_box.add_child(export_btn)
+
+
+func _colored_stylebox(col: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.corner_radius_top_left = 4
+	sb.corner_radius_top_right = 4
+	sb.corner_radius_bottom_left = 4
+	sb.corner_radius_bottom_right = 4
+	return sb
 
 
 func _section_label(text: String) -> Label:
