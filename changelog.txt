@@ -1,3 +1,13 @@
+v0.27 — 2026-06-13
+- Granate a mano: frammentazione fedele alla Rule 14.2
+  - chi e' nell'hex riceve un esito Near/Far (controllo sul WS del
+    lanciatore modificato dalla Order/Terrain Chart del bersaglio)
+  - Near = 3 dadi (Frag 4), Far = 1 dado (Frag 2); ogni dado <= Frag
+    (mod. copertura) e' una scheggia a segno -> pesca ferita
+  - chi e' adiacente fa solo un Morale Check (niente scheggia)
+  - allontanarsi dall'hex prima della fine del turno evita le schegge
+  - mortai/artiglieria/C4 restano sul modello blast (TQ - potenza)
+
 v0.26 — 2026-06-13
 - Facing veicoli: il counter PNG ruota in base al facing invece della freccia
   procedurale (draw_set_transform, rotazione calcolata da FACE_DIRS)

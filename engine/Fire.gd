@@ -200,6 +200,20 @@ static func _fire_ws(state: GameState, firer: Character, target: Character) -> i
 	return int(_compute_ws(state, firer, target, weapon)["ws"])
 
 
+# Modificatore Order/Terrain del bersaglio nel suo hex (Order/Terrain Chart):
+# negativo = piu' copertura. Le granate (Rule 14.2) lo usano per i dadi di
+# frammentazione e per il controllo Near/Far. Per l'abbazia si usa la riga
+# "interno" (la granata parte dall'hex stesso).
+static func cover_modifier(state: GameState, target: Character) -> int:
+	var hex := state.hex_at(target.position.x, target.position.y)
+	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
+	var group: int = WS_GROUP.get(target.order, NO_ORDER_GROUP) \
+		if target.has_order else NO_ORDER_GROUP
+	if Domain.is_abbey(terrain):
+		return ABBEY_WS_INSIDE[group]
+	return WS_MOD[terrain][group]
+
+
 # Calcolo del WS modificato con la scomposizione per il log (Fire Resolution
 # Chart + "MODIFIES WS"). Estratto da _resolve_attack cosi' e' testabile a
 # parte. Ritorna {"ws": int, "bits": Array[String]}.

@@ -1563,6 +1563,51 @@ func _test_rules() -> int:
 	fails += _test_wire()
 	fails += _test_abbey()
 	fails += _test_vehicles()
+	fails += _test_grenade()
+	return fails
+
+
+# Granata a mano: frammentazione Near/Far (Rule 14.2).
+func _test_grenade() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 5
+	Boards.fill(st, "farmhouse")
+	st.turn = 1
+	st.max_turns = 12
+	# Terreno aperto per un modificatore di copertura noto.
+	st.hex_at(10, 10).terrain = Domain.Terrain.OPEN_LEVEL_0
+	var tgt := Character.new("t", "Tgt", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.weapon_skills = {"KAR 98K": 3}
+	tgt.position = Vector2i(10, 10)
+	var adj := Character.new("j", "Adj", Domain.Side.ENEMY, "Red")
+	adj.troop_quality = 5
+	adj.position = Vector2i(10, 11)  # adiacente
+	st.characters.append(tgt)
+	st.characters.append(adj)
+	# Bersaglio senza ordine in aperto: gruppo "no order" -> +1 alla Order/Terrain Chart.
+	if Fire.cover_modifier(st, tgt) != 1:
+		print("TEST granata: cover_modifier errato (%d)" % Fire.cover_modifier(st, tgt))
+		fails += 1
+	# Granata che esplode nell'hex del bersaglio.
+	st.area_markers = [{"type": Area.Type.GRENADE, "hex": Vector2i(10, 10),
+		"placed_turn": 1, "turns_left": 1, "thrower_ws": 4}]
+	Area.end_phase(st)
+	# Il marcatore granata deve essere consumato dall'esplosione.
+	for m in st.area_markers:
+		if m["type"] == Area.Type.GRENADE:
+			print("TEST granata: marcatore non consumato")
+			fails += 1
+			break
+	# Chi e' nell'hex viene investito (rivelato dall'attacco).
+	if not tgt.known:
+		print("TEST granata: bersaglio nell'hex non investito")
+		fails += 1
+	# L'adiacente fa solo un MC: non viene rivelato dalla scheggia.
+	if adj.known:
+		print("TEST granata: adiacente rivelato per errore")
+		fails += 1
 	return fails
 
 

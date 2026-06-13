@@ -510,6 +510,10 @@ static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -
 			target = dev
 	Area.place_with_scatter(state,
 		Area.Type.SMOKE if smoke else Area.Type.GRENADE, target)
+	# Granata esplosiva: ricorda il WS del lanciatore per il controllo Near/Far
+	# alla deflagrazione (Rule 14.2). Il fumogeno non fa danno.
+	if not smoke and not state.area_markers.is_empty():
+		state.area_markers.back()["thrower_ws"] = Area.GRENADE_WS
 	thrower.thrown = true  # un lancio per turno; la track prosegue (move)
 
 

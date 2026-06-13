@@ -169,6 +169,17 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
    s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
 
+## Granate (Rule 14.2)
+
+Le granate a mano usano la frammentazione fedele al regolamento (NON il
+modello blast TQ-potenza): in Area._explode_grenade, chi e' nell'hex
+riceve Near/Far (d10 <= WS lanciatore + copertura via Fire.cover_modifier),
+poi tira i dadi (Near 3xFrag4, Far 1xFrag2; ogni d10 <= Frag + copertura =
+ferita via Fire._resolve_wound). Gli adiacenti fanno solo un MC
+(Area._grenade_mc). Il WS del lanciatore (Area.GRENADE_WS = 4) e' timbrato
+sul marcatore in TurnSequence.throw_grenade. Mortai/artiglieria/C4 restano
+sul modello blast (Area._blast_check con POWER). Test: Main._test_grenade.
+
 ## Bug noti / attenzioni
 
 - character_at() preferisce i vivi (i corpi restano nell'array per
