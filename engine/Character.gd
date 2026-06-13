@@ -60,6 +60,11 @@ var role: String = ""
 # Medico addestrato (Rule 30): disarmato, mai fuoco/mischia, +2 TQ alle cure,
 # fugge se un avversario entra nel suo hex. Vale per friendly ed enemy.
 var is_medic: bool = false
+# MG Operator/Assistant (Rule 14.3): belt-fed senza assistente vivo
+# adiacente = -3 WS; l'assistente prende il controllo al Bad Wound/KIA.
+var mg_role: String = ""         # "operator" | "assistant" | ""
+var mg_partner_id: String = ""   # ID del partner (assistente o operatore)
+
 # Pedina-esca (Dummy): nessun valore reale; quando viene individuata si
 # rivela e sparisce. removed = tolta dal gioco (esca rivelata o uscita).
 var is_dummy: bool = false

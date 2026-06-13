@@ -47,6 +47,7 @@ var played_card_text: RichTextLabel
 var hand_discard_button: Button  # "Carte in mano (N)" visibile fuori dalla CARD phase
 var discard_popup: PanelContainer  # popup con le DISCARD cards rimanenti
 var vehicle_popup: PanelContainer  # Vehicle Display: equipaggio e stato del mezzo
+var _initiative_card_pending: bool = false  # carta Initiative giocata: attende click su un uomo
 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
@@ -414,6 +415,7 @@ func _start_turn() -> void:
 	next_button.disabled = true
 	next_button.text = "Avanti"
 	hint_label.text = "Friendly Card Phase: scegli una carta dalla mano e giocala"
+	_initiative_card_pending = false
 	played_card_bar.hide()
 	if hand_discard_button != null:
 		hand_discard_button.hide()
@@ -881,6 +883,16 @@ func _on_map_clicked() -> void:
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	# Carta Initiative (DISCARD): click su un friendly per cambiarne l'ordine.
+	if _initiative_card_pending:
+		_initiative_card_pending = false
+		order_panel.hide()
+		vehicle_popup.hide()
+		if c != null and c.side == Domain.Side.FRIENDLY and not c.is_dead():
+			_open_order_panel(c)
+		else:
+			hint_label.text = "Initiative annullata (nessun uomo selezionato)"
+		return
 	# Clic su un veicolo: apre il Vehicle Display con l'equipaggio.
 	if c != null and c.is_vehicle:
 		_show_vehicle_display(c)
@@ -1500,6 +1512,22 @@ func _toggle_discard_popup() -> void:
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.add_theme_font_size_override("font_size", 13)
 		row.add_child(lbl)
+		# Carta Initiative (14/18): pulsante "Usa" per cambiare l'ordine di
+		# un uomo immediatamente (giocabile in ORDERS e ACTION phase).
+		if s in FriendlyCards.INITIATIVE and phase in [Phase.ORDERS, Phase.ACTION]:
+			var use_btn := Button.new()
+			use_btn.text = "Usa"
+			use_btn.custom_minimum_size = Vector2(50, 0)
+			var serial_cap: int = s
+			use_btn.pressed.connect(func():
+				discard_popup.hide()
+				FriendlyCards.use_from_hand(state, [serial_cap],
+					"cambia l'ordine di un uomo")
+				_initiative_card_pending = true
+				hint_label.text = "Carta Initiative: clicca un uomo per cambiarne l'ordine"
+				_update_played_card_bar()
+				_refresh())
+			row.add_child(use_btn)
 		var desc := Label.new()
 		desc.text = FriendlyCards.text_of(s)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

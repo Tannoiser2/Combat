@@ -157,6 +157,11 @@ static func end_phase(state: GameState) -> void:
 			continue
 		if t in [Type.GRENADE, Type.MORTAR_60, Type.MORTAR_81, Type.ARTILLERY_105]:
 			_explode(state, m)
+			# Scia di fumo residua dopo l'esplosione (Rule 18): granata ->
+			# fading (1 turno), mortaio/artiglieria -> fumo pieno (2 turni).
+			keep.append({"type": Type.SMOKE, "hex": m["hex"],
+				"placed_turn": state.turn,
+				"turns_left": 1 if t == Type.GRENADE else 2})
 			# L'artiglieria/mortaio puo' accendere il terreno (Rule 29.1).
 			if t != Type.GRENADE:
 				_try_kindle(state, m["hex"], keep)
@@ -167,6 +172,8 @@ static func end_phase(state: GameState) -> void:
 			var armed: bool = m["placed_turn"] < state.turn
 			if last_turn or (armed and Checks.roll_d10(state.rng) <= 2):
 				_explode(state, m)
+				keep.append({"type": Type.SMOKE, "hex": m["hex"],
+					"placed_turn": state.turn, "turns_left": 2})
 				continue
 			keep.append(m)
 			continue

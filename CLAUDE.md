@@ -183,6 +183,24 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    ESTENSIBILE al modello completo: i crew sono gia' Character, basta aggiungere
    spotting/LOS/Target Marker per ruolo e boccaporto aperto/chiuso. Test:
    Main._test_vehicles (sezione equipaggio).
+9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
+   artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
+   granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).
+   Il fumo deriva col vento e si dissolve normalmente nei turni successivi.
+   Implementato in Area.end_phase (keep.append fumo dopo _explode) e in
+   Scenario._run_opening_barrage (state.area_markers.append).
+10. FATTO (v0.30): MG Operator/Assistant (Rule 14.3). Character.mg_role
+   ("operator"/"assistant") e mg_partner_id. Pvt Nolan aggiunto a
+   FULL_SQUAD_VOL2 come MG Assistant di Pvt Williams (M1919). Effetti:
+   Fire._has_mg_assistant (partner vivo adiacente), Fire._compute_ws (-3 WS
+   senza assistente), Fire.fire_action (singolo 9 = ammo senza assistente,
+   doppio 9 con), Fire._mg_transfer_if_operator (al Bad Wound/KIA
+   dell'operatore l'assistente prende l'MG e diventa il nuovo operatore).
+   Scenario._make imposta c.mg_role e c.mg_partner_id da entry.
+11. FATTO (v0.30): Carte Initiative (14/18) giocabili manualmente dal
+   popup "Carte (N)". Il pulsante "Usa" scarta la carta e attende che il
+   giocatore clicchi un uomo; apre il pannello ordini per quel personaggio.
+   Funziona in Order Phase e Action Phase. FriendlyCards.INITIATIVE = [14, 18].
 
 ## Granate (Rule 14.2)
 

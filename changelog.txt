@@ -1,3 +1,19 @@
+v0.30 — 2026-06-13
+- Scia di fumo post-esplosione (Rule 18):
+  - granate lasciano Fading Smoke (1 turno) nell'hex dell'esplosione
+  - mortai/artiglieria/C4 lasciano Smoke pieno (2 turni) che poi degrada
+  - il fumo si comporta normalmente: deriva col vento e si dissolve
+- MG Operator/Assistant (Rule 14.3):
+  - Pvt Nolan aggiunto a FULL_SQUAD_VOL2 come MG Assistant di Pvt Williams
+  - senza assistente vivo adiacente: -3 WS all'operatore della belt-fed
+  - senza assistente: un singolo 9 consuma le munizioni (con assistente: doppio 9)
+  - al Bad Wound/KIA dell'operatore: l'assistente prende il controllo dell'MG
+  - Character.mg_role/"mg_partner_id": collegamento operatore <-> assistente
+- Carte DISCARD giocabili manualmente:
+  - carte Initiative (14/18) ora hanno un pulsante "Usa" nel popup "Carte (N)"
+  - usare la carta apre il pannello ordini sul personaggio cliccato
+  - funziona sia in Order Phase che in Action Phase
+
 v0.29 — 2026-06-13
 - Equipaggio dei carri (Rule 31, livello intermedio):
   - ogni veicolo ha un equipaggio vero (Commander/Driver/Gunner/Loader/

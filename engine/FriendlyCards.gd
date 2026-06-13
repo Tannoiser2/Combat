@@ -206,6 +206,7 @@ const KEEP_HEAD_DOWN := [1]    # colpo nemico subito -> solo Duck Back
 const LUCKY_BOUNCE := [4]      # ritira un Grenade Check fallito
 const ENOUGH := [7]            # +2 morale a un personaggio
 const FALSE_ALARM := [8]       # rimuove una Light Wound
+const INITIATIVE := [14, 18]   # 1 personaggio cambia ordine subito (giocabile manualmente)
 const EXTRA_MAG := [15]        # ricarica immediata
 const CRACK_SHOT := [21]       # colpo su nemico -> ucciso automaticamente
 const REROLL_WS := [28, 40]    # Good Shot / Lucky: ritira un tiro di WS

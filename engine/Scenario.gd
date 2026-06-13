@@ -44,6 +44,7 @@ const ROLE := {
 	"US Rifleman": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	"BAR Gunner": {"tq": 5, "ldr": 0, "weapon": "BAR", "ws": 5},
 	"MG Gunner": {"tq": 5, "ldr": 0, "weapon": "M1919", "ws": 5},
+	"MG Assistant": {"tq": 5, "ldr": 0, "weapon": "M1 Garand", "ws": 5},
 	# Medico addestrato (Rule 30): disarmato, +2 TQ alle cure. Vale per
 	# entrambi i lati (lo schiera lo scenario).
 	"Medic": {"tq": 5, "ldr": 0, "weapon": "", "ws": 0, "medic": true},
@@ -227,7 +228,11 @@ const FULL_SQUAD_VOL2 := [
 	{"name": "Pvt Holland", "role": "US Rifleman", "team": "Charlie",
 		"counter": "US-Charlie-Pvt-Holland", "weapon": "M1903 Springfield", "ws": 5},
 	{"name": "Pvt Williams", "role": "MG Gunner", "team": "Charlie",
-		"counter": "US-Charlie-Pvt-Williams"},
+		"counter": "US-Charlie-Pvt-Williams",
+		"mg_role": "operator", "mg_partner_id": "pvt_nolan"},
+	{"name": "Pvt Nolan", "role": "MG Assistant", "team": "Charlie",
+		"counter": "US-Charlie-Pvt-Nolan",
+		"mg_role": "assistant", "mg_partner_id": "pvt_williams"},
 ]
 
 
@@ -1202,6 +1207,9 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	if bool(prof.get("medic", false)) or bool(entry.get("medic", false)):
 		c.is_medic = true
 		c.weapon_skills = {}
+	# MG Operator/Assistant (Rule 14.3): collegamento operatore <-> assistente.
+	c.mg_role = entry.get("mg_role", "")
+	c.mg_partner_id = entry.get("mg_partner_id", "")
 	c.counter = entry.get("counter", "")
 	c.role = entry["role"]
 	c.is_dummy = entry["role"] == "Dummy"
@@ -1386,6 +1394,9 @@ static func _run_opening_barrage(state: GameState, spec: Dictionary) -> void:
 					hex = dev
 		var marker := {"type": atype, "hex": hex, "placed_turn": 0, "turns_left": 1}
 		Area._explode(state, marker)
+		# Scia di fumo residua (Rule 18): il bombardamento iniziale lascia fumo.
+		state.area_markers.append({"type": Area.Type.SMOKE, "hex": hex,
+			"placed_turn": 0, "turns_left": 2})
 
 
 static func _shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
