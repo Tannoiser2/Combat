@@ -1,3 +1,13 @@
+v0.25 — 2026-06-13
+- Segnalini d'area con artwork originale invece di cerchi procedurali:
+  - Smoke / Fading Smoke: PNG semi-trasparente (alpha 0.75 / 0.60)
+  - Illuminazione: PNG semi-trasparente
+  - Granate/mortai/artiglieria in attesa: marker Target (mirino)
+  - Carica C4: marker Charge Placed
+- Marker KIA sul tabellone: Enemy KIA (rosso) e Friendly KIA (verde)
+  per le pedine eliminate, disegnati sotto le unita' vive
+- Marker Target sul bersaglio evidenziato durante selezione fuoco/granata
+
 v0.24 — 2026-06-13
 - Ultimi segnalini azione placeholder sostituiti con gli originali:
   - Suppressive Fire (US crema / GE verde)
