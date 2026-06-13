@@ -181,7 +181,8 @@ func _load_sfx() -> void:
 	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
 			"thompson", "springfield", "stg44",
-			"kill", "wound", "suppress", "miss", "throw"]:
+			"kill", "wound", "suppress", "miss", "throw",
+			"footstep", "run", "vehicle", "click"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -204,6 +205,9 @@ func _consume_audio_events() -> void:
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
 			"throw": _play_sfx("throw")
+			"footstep": _play_sfx("footstep")
+			"run":      _play_sfx("run")
+			"vehicle":  _play_sfx("vehicle")
 	state.audio_events.clear()
 
 
@@ -874,6 +878,7 @@ func _on_map_clicked() -> void:
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
 		return
+	_play_sfx("click")
 	if los_mode:
 		_handle_los_click(hex)
 		return
@@ -995,6 +1000,9 @@ func _handle_action_click(hex: Vector2i) -> void:
 		var from := acting.position
 		if not Move.step_to(state, acting, hex):
 			return
+		_play_sfx("vehicle" if acting.is_vehicle else \
+			("run" if acting.order in [Domain.Order.SPRINT, Domain.Order.RUN_AND_GUN,
+				Domain.Order.CHARGE] else "footstep"))
 		moves_left -= 1
 		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
 		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:

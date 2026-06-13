@@ -750,6 +750,10 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 	var from := c.position
 	var n := Move.move_character(state, c, hexes)
 	if n > 0:
+		var sfx := "vehicle" if c.is_vehicle else \
+			("run" if c.order in [Domain.Order.SPRINT, Domain.Order.RUN_AND_GUN,
+				Domain.Order.CHARGE] else "footstep")
+		Replay.sfx(state, sfx)
 		var how := "verso il nemico" if Move.advances(c.order) else "via dal nemico"
 		if c.side == Domain.Side.ENEMY and not Move.parse_dirs(c.order_move).is_empty() \
 				and c.order != Domain.Order.CHARGE:

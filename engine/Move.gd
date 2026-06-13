@@ -249,4 +249,9 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 		# Scavalcare un BOCAGE (argine alto) esaurisce il movimento.
 		if state.hexside_between(from, mover.position) == D.Terrain.BOCAGE:
 			break
+	if moved > 0:
+		var sfx := "vehicle" if mover.is_vehicle else \
+			("run" if mover.order in [D.Order.SPRINT, D.Order.RUN_AND_GUN,
+				D.Order.CHARGE] else "footstep")
+		state.audio_events.append({"type": sfx, "hex": mover.position})
 	return moved
