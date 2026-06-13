@@ -1,3 +1,13 @@
+v0.24 — 2026-06-13
+- Ultimi segnalini azione placeholder sostituiti con gli originali:
+  - Suppressive Fire (US crema / GE verde)
+  - Rapid Fire (US/GE), dal retro del counter Aimed Fire
+  - marker olive condivisi sul lato GE (stesso artwork del lato US):
+    Plan, Guard, Charge, Medical Aid, Rifle Grenade
+- Fix: GE Carry/Drag ora usa il retro di Rifle Grenade (era una
+  illustrazione di granata per errore in v0.23)
+- Nessun segnalino ordine resta generato proceduralmente
+
 v0.23 — 2026-06-13
 - Segnalini azione: Melee (US e GE) ora usa il marker originale
   GEN-Normal-Marker-10-r dal Vol.1 invece del segnaposto generato
