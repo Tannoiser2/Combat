@@ -342,6 +342,23 @@ func _order_tex(order: int, side: int) -> Texture2D:
 	return _counter_cache[name]
 
 
+# Texture generica da assets/counters/{name}.png, condivide la cache.
+func _named_tex(name: String) -> Texture2D:
+	if not _counter_cache.has(name):
+		var path := "res://assets/counters/%s.png" % name
+		_counter_cache[name] = load(path) if ResourceLoader.exists(path) else null
+	return _counter_cache[name]
+
+
+# Disegna una texture centrata sull'hex con opacita' variabile.
+func _draw_marker(tex: Texture2D, center: Vector2, radius: float, alpha: float = 1.0) -> void:
+	if tex == null:
+		return
+	var s := radius * 1.5
+	draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)),
+		false, Color(1.0, 1.0, 1.0, alpha))
+
+
 func _draw() -> void:
 	if state == null:
 		return
@@ -384,10 +401,11 @@ func _draw() -> void:
 		var ac := hex_center(m["hex"].x, m["hex"].y)
 		match m["type"]:
 			Area.Type.SMOKE:
-				var alpha := 0.55 if m["turns_left"] >= 2 else 0.30
-				draw_circle(ac, radius * 0.85, Color(0.85, 0.85, 0.85, alpha))
+				var is_full: bool = int(m["turns_left"]) >= 2
+				_draw_marker(_named_tex("marker-SMOKE-f" if is_full else "marker-SMOKE-r"),
+					ac, radius, 0.75 if is_full else 0.60)
 			Area.Type.ILLUM:
-				draw_circle(ac, radius * 0.9, Color(1.0, 0.95, 0.5, 0.25))
+				_draw_marker(_named_tex("marker-ILLUM"), ac, radius, 0.70)
 			Area.Type.FIRE:
 				draw_circle(ac, radius * 0.55, Color(0.95, 0.45, 0.1, 0.8))
 				draw_circle(ac, radius * 0.30, Color(1.0, 0.85, 0.2, 0.9))
@@ -396,16 +414,10 @@ func _draw() -> void:
 				draw_circle(ac, radius * 0.5, Color(1.0, 0.6, 0.1, 0.95))
 				draw_circle(ac, radius * 0.22, Color(1.0, 0.95, 0.5, 1.0))
 			Area.Type.C4:
-				draw_rect(Rect2(ac - Vector2(radius, radius) * 0.25,
-					Vector2(radius, radius) * 0.5), Color(0.8, 0.7, 0.2))
-				draw_string(font, ac + Vector2(-radius * 0.22, radius * 0.12),
-					"C4", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3), Color.BLACK)
+				_draw_marker(_named_tex("marker-C4"), ac, radius)
 			_:
-				# ordigni in attesa di esplodere: cerchio arancio pulsante
-				draw_circle(ac, radius * 0.4, Color(0.95, 0.5, 0.1, 0.85))
-				draw_arc(ac, radius * 0.55, 0, TAU, 20, Color(0.9, 0.2, 0.1, 0.9), radius * 0.06)
-				draw_string(font, ac + Vector2(-radius * 0.2, radius * 0.12),
-					"!", HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.5), Color.WHITE)
+				# ordigni in attesa di esplodere: marker Target
+				_draw_marker(_named_tex("marker-TARGET"), ac, radius)
 	# Strumento LOS: linea spessa tra i due hex scelti.
 	if not los_tool.is_empty():
 		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \
@@ -451,11 +463,13 @@ func _draw() -> void:
 		var pts := _hex_points(cc, radius * 0.9)
 		draw_colored_polygon(pts, Color(cue_color.r, cue_color.g, cue_color.b, 0.22))
 		draw_polyline(_closed(pts), cue_color, radius * 0.07)
-	# Evidenziazione dell'hex selezionato
+	# Evidenziazione dell'hex selezionato; marker Target se e' un bersaglio.
 	if highlight_hex.x > -99:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)
 		draw_polyline(_closed(_hex_points(hc, radius * 0.96)),
 			Color(1.0, 1.0, 0.3, 0.9), radius * 0.06)
+		if highlight_hex in cue_hexes:
+			_draw_marker(_named_tex("marker-TARGET"), hc, radius, 0.85)
 	# Lampi delle esplosioni: anello che si espande e svanisce.
 	for b in _blasts:
 		var bt: float = b["age"] / 1.0
@@ -473,6 +487,12 @@ func _draw() -> void:
 			_draw_unit(font, radius, _replay_pos(idx), u["counter"], u["side"],
 				u["team"], u["hidden"], u["morale"], u["order"], u["name"], false)
 	else:
+		# Primo passaggio: marker KIA sotto le pedine vive.
+		for c in state.characters:
+			if not c.is_dead():
+				continue
+			var kia_name := "kia-ENEMY" if c.side == D.Side.ENEMY else "kia-FRIENDLY"
+			_draw_marker(_named_tex(kia_name), _pos_of(c), radius)
 		for c in state.characters:
 			if c.is_dead():
 				continue
