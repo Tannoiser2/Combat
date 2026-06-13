@@ -1,3 +1,12 @@
+v0.22 — 2026-06-13
+- Segnalini azione originali dai retro dei counter (fronte/retro):
+  - US: Sprint, Rally, Carry/Drag, Hide, Sneak ora con l'artwork vero
+  - GE: Rally, Hide, Sneak originali
+  - i counter di Combat! hanno due ordini per pedina: il retro contiene
+    l'ordine "nascosto" (es. retro di Plan = Rally, retro di Run&Gun = Sprint)
+- Melee resta senza marker dedicato: nel gioco fisico si risolve subito
+  senza posare un counter
+
 v0.21 — 2026-06-12
 - Segnalini azione: Smoke Grenade (US-Smk-Gren, GE-Smk-Disc) e Search
   (GEN-Search) ora usano i marker originali dedicati del Vol.2
