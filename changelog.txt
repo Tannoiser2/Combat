@@ -1,3 +1,59 @@
+v0.30 — 2026-06-13
+- Scia di fumo post-esplosione (Rule 18):
+  - granate lasciano Fading Smoke (1 turno) nell'hex dell'esplosione
+  - mortai/artiglieria/C4 lasciano Smoke pieno (2 turni) che poi degrada
+  - il fumo si comporta normalmente: deriva col vento e si dissolve
+- MG Operator/Assistant (Rule 14.3):
+  - Pvt Nolan aggiunto a FULL_SQUAD_VOL2 come MG Assistant di Pvt Williams
+  - senza assistente vivo adiacente: -3 WS all'operatore della belt-fed
+  - senza assistente: un singolo 9 consuma le munizioni (con assistente: doppio 9)
+  - al Bad Wound/KIA dell'operatore: l'assistente prende il controllo dell'MG
+  - Character.mg_role/"mg_partner_id": collegamento operatore <-> assistente
+- Carte DISCARD giocabili manualmente:
+  - carte Initiative (14/18) ora hanno un pulsante "Usa" nel popup "Carte (N)"
+  - usare la carta apre il pannello ordini sul personaggio cliccato
+  - funziona sia in Order Phase che in Action Phase
+
+v0.29 — 2026-06-13
+- Equipaggio dei carri (Rule 31, livello intermedio):
+  - ogni veicolo ha un equipaggio vero (Commander/Driver/Gunner/Loader/
+    Co-Driver secondo il tipo), feribile e uccidibile individualmente
+  - colpo penetrante: ferisce un membro dell'equipaggio (pesca ferita)
+  - veicolo immobilizzato: l'equipaggio superstite abbandona il mezzo
+    (Bail Out) e scende in mappa come fanteria
+  - veicolo distrutto: tutti i crew ancora a bordo muoiono
+  - colpo di striscio: ogni crew fa un Morale Check individuale
+  - clic su un veicolo -> Vehicle Display con ruoli, morale e ferite
+  - architettura estensibile verso il modello completo (spotting/LOS
+    per ruolo, boccaporto aperto/chiuso) in futuro
+
+v0.28 — 2026-06-13
+- Scelta della carta (Rule 5.0): la mano torna a 5 carte ogni turno
+  (era: nessuna pesca se la mano non era vuota)
+- UI carta: iniziative A/B/C, tipo ferita (MC/LW/BW/KIA) e badge
+  ORDER/DISCARD/EVENT visibili sotto ogni carta senza hover
+- Banner carta giocata: dal primo ORDER phase in poi appare in basso
+  il titolo e l'effetto della carta in gioco durante tutto il turno
+- Pulsante "Carte (N)": visibile durante ORDER/ACTION/END_TURN,
+  apre il popup con le DISCARD cards rimaste in mano e il loro testo
+
+v0.27 — 2026-06-13
+- Granate a mano: frammentazione fedele alla Rule 14.2
+  - chi e' nell'hex riceve un esito Near/Far (controllo sul WS del
+    lanciatore modificato dalla Order/Terrain Chart del bersaglio)
+  - Near = 3 dadi (Frag 4), Far = 1 dado (Frag 2); ogni dado <= Frag
+    (mod. copertura) e' una scheggia a segno -> pesca ferita
+  - chi e' adiacente fa solo un Morale Check (niente scheggia)
+  - allontanarsi dall'hex prima della fine del turno evita le schegge
+  - mortai/artiglieria/C4 restano sul modello blast (TQ - potenza)
+
+v0.26 — 2026-06-13
+- Facing veicoli: il counter PNG ruota in base al facing invece della freccia
+  procedurale (draw_set_transform, rotazione calcolata da FACE_DIRS)
+- Filo spinato: marker GEN-Wire-Marker-f.png sugli hex con wire=true
+- Roster sinistro: bordo sinistro 6px (colore morale), simboli ferite ♥,
+  icone ammo ⊘AMM / ↓amm, 👁 se spotted
+
 v0.25 — 2026-06-13
 - Segnalini d'area con artwork originale invece di cerchi procedurali:
   - Smoke / Fading Smoke: PNG semi-trasparente (alpha 0.75 / 0.60)

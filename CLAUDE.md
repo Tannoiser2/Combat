@@ -168,6 +168,50 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
    Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
    s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
+   EQUIPAGGIO (Rule 31, livello intermedio, FATTO v0.29): VehicleCombat.VEHICLE_CREW
+   mappa tipo->ruoli; populate_crew (chiamata da make_vehicle) crea i crew come
+   Character veri dentro vehicle.crew (Character.crew/embarked/crew_role), TQ e morale
+   ereditati dal mezzo (sync_crew_morale a inizio scenario), una pistola per il bail-out.
+   I crew restano FUORI da state.characters finche' imbarcati (no spotting/attivazione
+   separati: scope intermedio). at_fire: penetrazione -> _crew_casualty (pesca 1 ferita
+   a un crew a caso); distrutto -> _kill_embarked_crew (tutti i crew a bordo muoiono);
+   immobilizzato -> bail_out (i superstiti scendono in mappa, si aggiungono a
+   state.characters, diventano fanteria); striscio -> _crew_morale_checks individuali
+   (morale del mezzo = il peggiore). NIENTE ciclo RefCounted: embarked e' un bool, la
+   lista vehicle.crew e' la fonte di verita' (no back-ref forte al mezzo). UI:
+   Main._show_vehicle_display (clic su veicolo -> Vehicle Display con ruoli/morale/ferite).
+   ESTENSIBILE al modello completo: i crew sono gia' Character, basta aggiungere
+   spotting/LOS/Target Marker per ruolo e boccaporto aperto/chiuso. Test:
+   Main._test_vehicles (sezione equipaggio).
+9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
+   artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
+   granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).
+   Il fumo deriva col vento e si dissolve normalmente nei turni successivi.
+   Implementato in Area.end_phase (keep.append fumo dopo _explode) e in
+   Scenario._run_opening_barrage (state.area_markers.append).
+10. FATTO (v0.30): MG Operator/Assistant (Rule 14.3). Character.mg_role
+   ("operator"/"assistant") e mg_partner_id. Pvt Nolan aggiunto a
+   FULL_SQUAD_VOL2 come MG Assistant di Pvt Williams (M1919). Effetti:
+   Fire._has_mg_assistant (partner vivo adiacente), Fire._compute_ws (-3 WS
+   senza assistente), Fire.fire_action (singolo 9 = ammo senza assistente,
+   doppio 9 con), Fire._mg_transfer_if_operator (al Bad Wound/KIA
+   dell'operatore l'assistente prende l'MG e diventa il nuovo operatore).
+   Scenario._make imposta c.mg_role e c.mg_partner_id da entry.
+11. FATTO (v0.30): Carte Initiative (14/18) giocabili manualmente dal
+   popup "Carte (N)". Il pulsante "Usa" scarta la carta e attende che il
+   giocatore clicchi un uomo; apre il pannello ordini per quel personaggio.
+   Funziona in Order Phase e Action Phase. FriendlyCards.INITIATIVE = [14, 18].
+
+## Granate (Rule 14.2)
+
+Le granate a mano usano la frammentazione fedele al regolamento (NON il
+modello blast TQ-potenza): in Area._explode_grenade, chi e' nell'hex
+riceve Near/Far (d10 <= WS lanciatore + copertura via Fire.cover_modifier),
+poi tira i dadi (Near 3xFrag4, Far 1xFrag2; ogni d10 <= Frag + copertura =
+ferita via Fire._resolve_wound). Gli adiacenti fanno solo un MC
+(Area._grenade_mc). Il WS del lanciatore (Area.GRENADE_WS = 4) e' timbrato
+sul marcatore in TurnSequence.throw_grenade. Mortai/artiglieria/C4 restano
+sul modello blast (Area._blast_check con POWER). Test: Main._test_grenade.
 
 ## Bug noti / attenzioni
 

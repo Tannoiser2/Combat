@@ -12,12 +12,13 @@ extends RefCounted
 # Step 1 - Friendly Card Phase (Rule 5.0), in due meta' cosi' la UI puo'
 # mostrare la mano e far scegliere il giocatore tra prepare e play.
 
-# SOP 1a-1c: pesca se la mano e' vuota, scarta oltre il limite.
+# SOP 1a-1c: pesca fino al limite di mano, scarta l'eccesso.
 static func friendly_card_phase_prepare(state: GameState) -> void:
-	if state.friendly_hand.is_empty():
+	# SOP 1a: riporta la mano a hand_limit (5) pescando nuove carte.
+	while state.friendly_hand.size() < state.hand_limit:
 		state.friendly_hand.append(state.draw_friendly_card())
 	# TODO SOP 1b: aggiungere le carte messe da parte da un Plan riuscito.
-	# SOP 1c: scelta del giocatore; policy provvisoria: si scartano le prime.
+	# SOP 1c: se la mano supera il limite (es. da Plan), scarta le piu' vecchie.
 	while state.friendly_hand.size() > state.hand_limit:
 		state.friendly_discard.append(state.friendly_hand.pop_front())
 
@@ -510,6 +511,10 @@ static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -
 			target = dev
 	Area.place_with_scatter(state,
 		Area.Type.SMOKE if smoke else Area.Type.GRENADE, target)
+	# Granata esplosiva: ricorda il WS del lanciatore per il controllo Near/Far
+	# alla deflagrazione (Rule 14.2). Il fumogeno non fa danno.
+	if not smoke and not state.area_markers.is_empty():
+		state.area_markers.back()["thrower_ws"] = Area.GRENADE_WS
 	thrower.thrown = true  # un lancio per turno; la track prosegue (move)
 
 

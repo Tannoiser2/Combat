@@ -138,10 +138,13 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 			any_hit = true
 		if res["nine"]:
 			nines += 1
-	# Munizioni: un 9 naturale le intacca; le belt-fed con assistente
-	# richiedono due 9 nello stesso fuoco (nota 3 del chart).
+	# Munizioni: un 9 naturale le intacca. Le belt-fed con assistente
+	# richiedono doppio 9 (nota 3 del chart, Rule 14.3); senza assistente
+	# basta un singolo 9 (piu' vulnerabili senza il secondo tiratore).
 	var belt: bool = "belt" in Weapons.info(weapon)["flags"]
-	if nines >= (2 if belt else 1):
+	var belt_has_asst: bool = belt and firer.mg_role == "operator" \
+		and _has_mg_assistant(state, firer)
+	if nines >= (2 if belt_has_asst else 1):
 		_spend_ammo(state, firer, weapon)
 	# Esito sintetico per la UI (balloon sul bersaglio).
 	var outcome := "Mancato"
@@ -198,6 +201,20 @@ static func _in_cover(state: GameState, c: Character) -> bool:
 static func _fire_ws(state: GameState, firer: Character, target: Character) -> int:
 	var weapon: String = firer.weapon_skills.keys()[0]
 	return int(_compute_ws(state, firer, target, weapon)["ws"])
+
+
+# Modificatore Order/Terrain del bersaglio nel suo hex (Order/Terrain Chart):
+# negativo = piu' copertura. Le granate (Rule 14.2) lo usano per i dadi di
+# frammentazione e per il controllo Near/Far. Per l'abbazia si usa la riga
+# "interno" (la granata parte dall'hex stesso).
+static func cover_modifier(state: GameState, target: Character) -> int:
+	var hex := state.hex_at(target.position.x, target.position.y)
+	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
+	var group: int = WS_GROUP.get(target.order, NO_ORDER_GROUP) \
+		if target.has_order else NO_ORDER_GROUP
+	if Domain.is_abbey(terrain):
+		return ABBEY_WS_INSIDE[group]
+	return WS_MOD[terrain][group]
 
 
 # Calcolo del WS modificato con la scomposizione per il log (Fire Resolution
@@ -306,7 +323,11 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 	if m != 0:
 		bits.append("%+d ambiente (fumo/notte/meteo)" % m)
 	ws += m
-	# TODO: filo spinato per-hex.
+	# MG Operator senza assistente (Rule 14.3): -3 WS con arma a nastro.
+	if "belt" in Weapons.info(weapon)["flags"] and firer.mg_role == "operator" \
+			and not _has_mg_assistant(state, firer):
+		bits.append("-3 senza assistente MG")
+		ws -= 3
 	return {"ws": ws, "bits": bits}
 
 
@@ -481,6 +502,7 @@ static func _resolve_wound(state: GameState, firer: Character, target: Character
 			target.clear_order()
 			# Niente urlo qui: per il fuoco lo suona l'esito "Ucciso!" di
 			# fire_action; per le esplosioni ci pensa Area._blast_check.
+			_mg_transfer_if_operator(state, target)
 			_medic_shock(state, target)
 			return true
 		_:
@@ -492,9 +514,11 @@ static func _resolve_wound(state: GameState, firer: Character, target: Character
 			if target.is_dead():
 				_log(state, "  le ferite uccidono %s" % target.display_name)
 				target.clear_order()
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 				return true
 			if w == D.Wound.BAD:
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 			target.set_order(D.Order.DUCK_BACK)
 			var res := Checks.wound_morale_check(target, state.rng)
@@ -592,6 +616,36 @@ static func _smoke_modifier(state: GameState, a: Vector2i, b: Vector2i) -> int:
 	for hex in line:
 		mod += Area.smoke_penalty(state, hex)
 	return mod
+
+
+# L'operatore MG ha un assistente vivo adiacente (Rule 14.3)?
+static func _has_mg_assistant(state: GameState, operator: Character) -> bool:
+	if operator.mg_partner_id.is_empty():
+		return false
+	for c in state.characters:
+		if c.id == operator.mg_partner_id and not c.is_dead():
+			return Spotting.hex_distance(c.position, operator.position) <= 1
+	return false
+
+
+# Al Bad Wound o KIA dell'operatore MG, l'assistente prende il controllo
+# dell'arma a nastro (Rule 14.3): il partner diventa il nuovo operatore.
+static func _mg_transfer_if_operator(state: GameState, operator: Character) -> void:
+	if operator.mg_role != "operator" or operator.mg_partner_id.is_empty():
+		return
+	for c in state.characters:
+		if c.id != operator.mg_partner_id or c.is_dead():
+			continue
+		for w_name in operator.weapon_skills.duplicate():
+			if "belt" in Weapons.info(w_name)["flags"]:
+				c.weapon_skills[w_name] = operator.weapon_skills[w_name]
+				operator.weapon_skills.erase(w_name)
+				c.mg_role = "operator"
+				c.mg_partner_id = ""
+				operator.mg_partner_id = ""
+				_log(state, "%s prende il controllo della %s" % [c.display_name, w_name])
+				break
+		break
 
 
 static func _log(state: GameState, msg: String) -> void:

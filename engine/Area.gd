@@ -65,14 +65,22 @@ static func _terrain_at(state: GameState, hex: Vector2i) -> int:
 	var h := state.hex_at(hex.x, hex.y)
 	return h.terrain if h != null else D.Terrain.OPEN_LEVEL_0
 
-# Potenza: [danno nell'hex, danno negli adiacenti]
+# Potenza: [danno nell'hex, danno negli adiacenti] (modello a blast per
+# mortai/artiglieria/C4: 1D10 <= TQ - potenza -> illeso).
 const POWER := {
-	Type.GRENADE: [3, 1],          # US MkII / Stielhandgranate: Damage 3/1
 	Type.MORTAR_60: [3, 2],
 	Type.MORTAR_81: [4, 2],
 	Type.ARTILLERY_105: [5, 3],
 	Type.C4: [3, 3],               # intro3 SR15: Blast 3 / Frag 3
 }
+
+# Granata a mano (Rule 14.2): WS del lanciatore per il controllo Near/Far,
+# numero di dadi di frammentazione e relativa Frag (colpo se d10 <= Frag,
+# modificata dalla Order/Terrain Chart del bersaglio). Near = 3 dadi (Frag 4),
+# Far = 1 dado (Frag 2). WS standard del lanciatore = 4 (segnalino "Granate").
+const GRENADE_WS := 4
+const GRENADE_NEAR := {"dice": 3, "frag": 4}
+const GRENADE_FAR := {"dice": 1, "frag": 2}
 
 
 # C4 (intro3): resta nell'hex e a ogni End Phase esplode con 0-2 su 1D10
@@ -149,6 +157,11 @@ static func end_phase(state: GameState) -> void:
 			continue
 		if t in [Type.GRENADE, Type.MORTAR_60, Type.MORTAR_81, Type.ARTILLERY_105]:
 			_explode(state, m)
+			# Scia di fumo residua dopo l'esplosione (Rule 18): granata ->
+			# fading (1 turno), mortaio/artiglieria -> fumo pieno (2 turni).
+			keep.append({"type": Type.SMOKE, "hex": m["hex"],
+				"placed_turn": state.turn,
+				"turns_left": 1 if t == Type.GRENADE else 2})
 			# L'artiglieria/mortaio puo' accendere il terreno (Rule 29.1).
 			if t != Type.GRENADE:
 				_try_kindle(state, m["hex"], keep)
@@ -159,6 +172,8 @@ static func end_phase(state: GameState) -> void:
 			var armed: bool = m["placed_turn"] < state.turn
 			if last_turn or (armed and Checks.roll_d10(state.rng) <= 2):
 				_explode(state, m)
+				keep.append({"type": Type.SMOKE, "hex": m["hex"],
+					"placed_turn": state.turn, "turns_left": 2})
 				continue
 			keep.append(m)
 			continue
@@ -243,7 +258,6 @@ static func _try_kindle(state: GameState, hex: Vector2i, into: Array) -> void:
 
 static func _explode(state: GameState, m: Dictionary) -> void:
 	var hex: Vector2i = m["hex"]
-	var pw: Array = POWER[m["type"]]
 	state.log_event("%s esplode in %02d.%02d!" % [NAMES[m["type"]], hex.x, hex.y])
 	state.booms.append({"hex": hex, "type": m["type"]})
 	Replay.boom(state, hex, m["type"])
@@ -256,6 +270,12 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 			state.guns_destroyed.append(key)
 			state.log_event("  CANNONE DISTRUTTO! (%d/%d)" % [
 				state.guns_destroyed.size(), guns.size()])
+	# Granata a mano: modello Near/Far con dadi di frammentazione (Rule 14.2).
+	if m["type"] == Type.GRENADE:
+		_explode_grenade(state, m)
+		return
+	# Mortai/artiglieria/C4: blast su TQ - potenza.
+	var pw: Array = POWER[m["type"]]
 	for c in state.characters:
 		if c.is_dead():
 			continue
@@ -264,6 +284,62 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 			continue
 		var power: int = pw[0] if dist == 0 else pw[1]
 		_blast_check(state, c, power)
+
+
+# Esplosione di una granata a mano (Rule 14.2): chi e' nell'hex riceve un
+# marcatore Near/Far (controllo sul WS del lanciatore modificato dalla
+# Order/Terrain Chart), poi tira i dadi di frammentazione; chi e' adiacente
+# fa solo un MC. Chi lascia l'hex prima della fine del Turno (impulso 4)
+# semplicemente non e' piu' qui: il movimento "scrolla" la granata di dosso.
+static func _explode_grenade(state: GameState, m: Dictionary) -> void:
+	var hex: Vector2i = m["hex"]
+	var thrower_ws: int = m.get("thrower_ws", GRENADE_WS)
+	for c in state.characters:
+		if c.is_dead():
+			continue
+		var dist := Spotting.hex_distance(c.position, hex)
+		if dist > 1:
+			continue
+		if c.is_dummy:
+			if dist == 0:
+				c.removed = true
+				state.log_event("  un'esca salta in aria")
+			continue
+		var cover := Fire.cover_modifier(state, c)
+		if dist == 1:
+			# Adiacente: solo Morale Check (niente frammentazione).
+			_grenade_mc(state, c)
+			continue
+		# Nell'hex: controllo Near/Far col WS del lanciatore, poi i dadi.
+		c.known = true
+		var near: bool = Checks.roll_d10(state.rng) <= thrower_ws + cover
+		var spec: Dictionary = GRENADE_NEAR if near else GRENADE_FAR
+		state.log_event("  %s e' %s alla granata" % [
+			c.display_name, "investito in pieno" if near else "preso di striscio"])
+		var dead_before := c.is_dead()
+		var hits := 0
+		for i in range(int(spec["dice"])):
+			if c.is_dead():
+				break
+			if Checks.roll_d10(state.rng) <= int(spec["frag"]) + cover:
+				hits += 1
+				Fire._resolve_wound(state, null, c)
+		# Niente scheggia a segno: resta il Morale Check obbligatorio.
+		if hits == 0 and not c.is_dead():
+			_grenade_mc(state, c)
+		if c.is_dead() and not dead_before:
+			state.audio_events.append({"type": "scream", "hex": c.position})
+			Replay.sfx(state, "scream")
+
+
+# MC obbligatorio per chi e' nell'hex o adiacente a una granata che esplode
+# (Rule 14.2): se il morale cede, l'ordine diventa Duck Back.
+static func _grenade_mc(state: GameState, c: Character) -> void:
+	var res := Checks.morale_check(c, state.rng)
+	if res["after"] < res["before"]:
+		c.set_order(D.Order.DUCK_BACK)
+		state.log_event("  %s tira %d al Morale Check: Duck Back" % [
+			c.display_name, res["roll"]])
 
 
 # Esplosione su un personaggio: 1D10 <= TQ - potenza -> illeso, altrimenti

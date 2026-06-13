@@ -42,6 +42,12 @@ var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
 var roster_box: VBoxContainer   # elenco della squadra a sinistra
 var overlay_legend: PanelContainer  # legenda dell'overlay terreno (tasto T)
+var played_card_bar: PanelContainer  # banner carta giocata (ORDER phase in poi)
+var played_card_text: RichTextLabel
+var hand_discard_button: Button  # "Carte in mano (N)" visibile fuori dalla CARD phase
+var discard_popup: PanelContainer  # popup con le DISCARD cards rimanenti
+var vehicle_popup: PanelContainer  # Vehicle Display: equipaggio e stato del mezzo
+var _initiative_card_pending: bool = false  # carta Initiative giocata: attende click su un uomo
 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
@@ -408,7 +414,13 @@ func _start_turn() -> void:
 	_show_hand()
 	next_button.disabled = true
 	next_button.text = "Avanti"
-	hint_label.text = "Friendly Card Phase: gioca una carta dalla mano"
+	hint_label.text = "Friendly Card Phase: scegli una carta dalla mano e giocala"
+	_initiative_card_pending = false
+	played_card_bar.hide()
+	if hand_discard_button != null:
+		hand_discard_button.hide()
+	if discard_popup != null:
+		discard_popup.hide()
 	_refresh()
 
 
@@ -419,6 +431,7 @@ func _on_card_chosen(index: int) -> void:
 	hand_panel.hide()
 	phase = Phase.ORDERS
 	hint_label.text = "Order Phase: clicca i tuoi uomini e assegna gli ordini"
+	_update_played_card_bar()
 	_update_orders_button()
 	_refresh()
 
@@ -870,6 +883,21 @@ func _on_map_clicked() -> void:
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	# Carta Initiative (DISCARD): click su un friendly per cambiarne l'ordine.
+	if _initiative_card_pending:
+		_initiative_card_pending = false
+		order_panel.hide()
+		vehicle_popup.hide()
+		if c != null and c.side == Domain.Side.FRIENDLY and not c.is_dead():
+			_open_order_panel(c)
+		else:
+			hint_label.text = "Initiative annullata (nessun uomo selezionato)"
+		return
+	# Clic su un veicolo: apre il Vehicle Display con l'equipaggio.
+	if c != null and c.is_vehicle:
+		_show_vehicle_display(c)
+	else:
+		vehicle_popup.hide()
 	# Deselezione o selezione di altro: il pannello ordini si chiude.
 	order_panel.hide()
 	if phase == Phase.ORDERS and c != null \
@@ -1148,8 +1176,65 @@ func _build_hud() -> void:
 	hand_panel.offset_bottom = -12
 	hand_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	root.add_child(hand_panel)
+	var hand_vbox := VBoxContainer.new()
+	hand_vbox.add_theme_constant_override("separation", 4)
+	hand_panel.add_child(hand_vbox)
+	var hand_header := Label.new()
+	hand_header.text = "— Scegli la carta da giocare sull'Initiative Track —"
+	hand_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hand_header.add_theme_font_size_override("font_size", 13)
+	hand_header.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	hand_vbox.add_child(hand_header)
 	hand_box = HBoxContainer.new()
-	hand_panel.add_child(hand_box)
+	hand_box.add_theme_constant_override("separation", 6)
+	hand_vbox.add_child(hand_box)
+
+	# Banner carta giocata: visibile da ORDER phase in poi, in basso al centro.
+	played_card_bar = PanelContainer.new()
+	played_card_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	played_card_bar.offset_top = -68
+	played_card_bar.offset_bottom = -12
+	played_card_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	root.add_child(played_card_bar)
+	played_card_text = RichTextLabel.new()
+	played_card_text.bbcode_enabled = true
+	played_card_text.fit_content = true
+	played_card_text.custom_minimum_size = Vector2(400, 0)
+	played_card_text.add_theme_font_size_override("normal_font_size", 13)
+	played_card_bar.add_child(played_card_text)
+	played_card_bar.hide()
+
+	# Pulsante "Carte (%d)" per vedere le DISCARD cards in mano.
+	hand_discard_button = Button.new()
+	hand_discard_button.text = "Carte in mano"
+	hand_discard_button.custom_minimum_size = Vector2(120, 36)
+	hand_discard_button.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hand_discard_button.offset_left = 8
+	hand_discard_button.offset_bottom = -12
+	hand_discard_button.offset_top = -56
+	hand_discard_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	hand_discard_button.pressed.connect(_toggle_discard_popup)
+	hand_discard_button.hide()
+	root.add_child(hand_discard_button)
+
+	# Popup carte DISCARD in mano (nascosto di default).
+	discard_popup = PanelContainer.new()
+	discard_popup.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	discard_popup.offset_left = 8
+	discard_popup.offset_bottom = -52
+	discard_popup.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	discard_popup.grow_horizontal = Control.GROW_DIRECTION_END
+	discard_popup.hide()
+	root.add_child(discard_popup)
+
+	# Vehicle Display: pannello equipaggio del mezzo (clic su un veicolo).
+	vehicle_popup = PanelContainer.new()
+	vehicle_popup.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	vehicle_popup.offset_right = -340
+	vehicle_popup.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	vehicle_popup.grow_vertical = Control.GROW_DIRECTION_BOTH
+	vehicle_popup.hide()
+	root.add_child(vehicle_popup)
 
 	# Carta nemica pescata (grafica originale), in alto a sinistra.
 	enemy_card_rect = TextureRect.new()
@@ -1236,38 +1321,94 @@ func _section_label(text: String) -> Label:
 	return l
 
 
+const WOUND_SYMBOLS := {
+	FriendlyCards.WoundDraw.CLOSE_CALL: "MC",
+	FriendlyCards.WoundDraw.LIGHT_WOUND: "LW",
+	FriendlyCards.WoundDraw.BAD_WOUND: "BW",
+	FriendlyCards.WoundDraw.KIA: "KIA",
+}
+const WOUND_COLORS := {
+	FriendlyCards.WoundDraw.CLOSE_CALL: Color(0.7, 0.85, 0.7),
+	FriendlyCards.WoundDraw.LIGHT_WOUND: Color(0.95, 0.85, 0.35),
+	FriendlyCards.WoundDraw.BAD_WOUND: Color(0.95, 0.50, 0.20),
+	FriendlyCards.WoundDraw.KIA: Color(0.95, 0.25, 0.20),
+}
+const KIND_LABELS := {
+	FriendlyCards.Kind.ORDER: "ORDER",
+	FriendlyCards.Kind.DISCARD: "DISCARD",
+	FriendlyCards.Kind.EVENT: "EVENT",
+}
+
+
 func _show_hand() -> void:
 	for child in hand_box.get_children():
 		child.queue_free()
 	for i in range(state.friendly_hand.size()):
 		var serial: int = state.friendly_hand[i]
-		var tip := "Carta %d - %s\nAble %d  Baker %d  Charlie %d\n%s" % [
-			serial, FriendlyCards.title_of(serial),
+		var kind: int = FriendlyCards.kind_of(serial)
+		var wound: int = FriendlyCards.wound_of(serial)
+		var tip := "Carta %d - %s [%s]\nAble %d  Baker %d  Charlie %d\nFerita: %s\n%s" % [
+			serial, FriendlyCards.title_of(serial), KIND_LABELS.get(kind, ""),
 			FriendlyCards.initiative_for(serial, "Able"),
 			FriendlyCards.initiative_for(serial, "Baker"),
 			FriendlyCards.initiative_for(serial, "Charlie"),
+			WOUND_SYMBOLS.get(wound, "?"),
 			FriendlyCards.text_of(serial),
 		]
+		# Wrapper verticale: immagine + riga info + pulsante Gioca
+		var cv := VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 2)
+		hand_box.add_child(cv)
 		var img := FriendlyCards.image(serial)
+		var tex_to_preview: Texture2D = null
 		if not img.is_empty():
-			# Grafica originale della carta, cliccabile; hover = ingrandimento.
 			var tb := TextureButton.new()
 			tb.texture_normal = load(img)
 			tb.ignore_texture_size = true
 			tb.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-			tb.custom_minimum_size = Vector2(150, 208)
+			tb.custom_minimum_size = Vector2(150, 188)
 			tb.tooltip_text = tip
 			tb.pressed.connect(_on_card_chosen.bind(i))
-			tb.mouse_entered.connect(_show_card_preview.bind(tb.texture_normal))
+			tex_to_preview = tb.texture_normal
+			tb.mouse_entered.connect(_show_card_preview.bind(tex_to_preview))
 			tb.mouse_exited.connect(_hide_card_preview)
-			hand_box.add_child(tb)
+			cv.add_child(tb)
 		else:
-			var button := Button.new()  # ripiego testuale
-			button.custom_minimum_size = Vector2(150, 195)
-			button.text = "Carta %d\n%s" % [serial, FriendlyCards.title_of(serial)]
+			var button := Button.new()
+			button.custom_minimum_size = Vector2(150, 120)
+			button.text = "%s\n%s" % [FriendlyCards.title_of(serial), FriendlyCards.text_of(serial)]
 			button.tooltip_text = tip
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.pressed.connect(_on_card_chosen.bind(i))
-			hand_box.add_child(button)
+			cv.add_child(button)
+		# Riga: iniziative A/B/C + tipo ferita + tipo carta
+		var info_row := HBoxContainer.new()
+		info_row.add_theme_constant_override("separation", 4)
+		cv.add_child(info_row)
+		var init_lbl := Label.new()
+		var ia := FriendlyCards.initiative_for(serial, "Able")
+		var ib := FriendlyCards.initiative_for(serial, "Baker")
+		var ic := FriendlyCards.initiative_for(serial, "Charlie")
+		init_lbl.text = "A:%d B:%d C:%d" % [ia, ib, ic] if ia >= 0 else "EVENT"
+		init_lbl.add_theme_font_size_override("font_size", 11)
+		init_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		init_lbl.add_theme_color_override("font_color", Color(0.80, 0.85, 0.75))
+		info_row.add_child(init_lbl)
+		if wound >= 0:
+			var wound_lbl := Label.new()
+			wound_lbl.text = WOUND_SYMBOLS.get(wound, "")
+			wound_lbl.add_theme_font_size_override("font_size", 11)
+			wound_lbl.add_theme_color_override("font_color", WOUND_COLORS.get(wound, Color.WHITE))
+			info_row.add_child(wound_lbl)
+		# Badge tipo carta
+		var kind_lbl := Label.new()
+		kind_lbl.text = KIND_LABELS.get(kind, "")
+		kind_lbl.add_theme_font_size_override("font_size", 10)
+		var kind_col := Color(0.65, 0.80, 0.95) if kind == FriendlyCards.Kind.DISCARD \
+			else Color(0.95, 0.88, 0.55) if kind == FriendlyCards.Kind.ORDER \
+			else Color(0.95, 0.60, 0.30)
+		kind_lbl.add_theme_color_override("font_color", kind_col)
+		cv.add_child(kind_lbl)
 	hand_panel.show()
 
 
@@ -1293,6 +1434,179 @@ func _update_los_lines(c: Character) -> void:
 				"clear": true,
 			})
 	map_view.queue_redraw()
+
+
+func _update_played_card_bar() -> void:
+	if state == null or state.friendly_card_played < 0:
+		played_card_bar.hide()
+		if hand_discard_button != null:
+			hand_discard_button.hide()
+		return
+	var serial := state.friendly_card_played
+	var kind := FriendlyCards.kind_of(serial)
+	var wound := FriendlyCards.wound_of(serial)
+	var kind_str: String = KIND_LABELS.get(kind, "")
+	var wound_str: String = WOUND_SYMBOLS.get(wound, "")
+	var wound_color: Color = WOUND_COLORS.get(wound, Color.WHITE)
+	var wound_col: String = wound_color.to_html(false)
+	var effect := FriendlyCards.text_of(serial)
+	var lines: Array[String] = []
+	lines.append("[b]Carta giocata:[/b] %s [color=#%s][b]%s[/b][/color]  " % [
+		FriendlyCards.title_of(serial), kind_col_hex(kind), kind_str])
+	if not effect.is_empty():
+		lines.append("[i]%s[/i]  " % effect)
+	lines.append("Ferita: [color=#%s][b]%s[/b][/color]" % [wound_col, wound_str])
+	played_card_text.text = "  ".join(lines)
+	played_card_bar.show()
+	# Mostra il pulsante "Carte in mano" se ci sono DISCARD cards rimanenti.
+	var discard_count := _count_discard_in_hand()
+	if hand_discard_button != null:
+		if discard_count > 0:
+			hand_discard_button.text = "Carte (%d)" % discard_count
+			hand_discard_button.show()
+		else:
+			hand_discard_button.hide()
+
+
+func kind_col_hex(kind: int) -> String:
+	match kind:
+		FriendlyCards.Kind.ORDER:   return "f3e88a"
+		FriendlyCards.Kind.DISCARD: return "88ccff"
+		_:                          return "ff9944"
+
+
+func _count_discard_in_hand() -> int:
+	var n := 0
+	for s in state.friendly_hand:
+		if FriendlyCards.kind_of(s) == FriendlyCards.Kind.DISCARD:
+			n += 1
+	return n
+
+
+# Apre/chiude il popup con le DISCARD cards rimaste in mano durante il turno.
+func _toggle_discard_popup() -> void:
+	if discard_popup.visible:
+		discard_popup.hide()
+		return
+	# Ricostruisce il contenuto ogni volta.
+	for child in discard_popup.get_children():
+		child.queue_free()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.custom_minimum_size = Vector2(280, 0)
+	discard_popup.add_child(box)
+	var title := Label.new()
+	title.text = "Carte DISCARD in mano"
+	title.add_theme_color_override("font_color", Color(0.88, 0.95, 0.65))
+	box.add_child(title)
+	box.add_child(HSeparator.new())
+	var found := false
+	for s in state.friendly_hand:
+		if FriendlyCards.kind_of(s) != FriendlyCards.Kind.DISCARD:
+			continue
+		found = true
+		var row := HBoxContainer.new()
+		box.add_child(row)
+		var lbl := Label.new()
+		lbl.text = "[%d] %s" % [s, FriendlyCards.title_of(s)]
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.add_theme_font_size_override("font_size", 13)
+		row.add_child(lbl)
+		# Carta Initiative (14/18): pulsante "Usa" per cambiare l'ordine di
+		# un uomo immediatamente (giocabile in ORDERS e ACTION phase).
+		if s in FriendlyCards.INITIATIVE and phase in [Phase.ORDERS, Phase.ACTION]:
+			var use_btn := Button.new()
+			use_btn.text = "Usa"
+			use_btn.custom_minimum_size = Vector2(50, 0)
+			var serial_cap: int = s
+			use_btn.pressed.connect(func():
+				discard_popup.hide()
+				FriendlyCards.use_from_hand(state, [serial_cap],
+					"cambia l'ordine di un uomo")
+				_initiative_card_pending = true
+				hint_label.text = "Carta Initiative: clicca un uomo per cambiarne l'ordine"
+				_update_played_card_bar()
+				_refresh())
+			row.add_child(use_btn)
+		var desc := Label.new()
+		desc.text = FriendlyCards.text_of(s)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.add_theme_font_size_override("font_size", 11)
+		desc.modulate = Color(0.78, 0.78, 0.70)
+		desc.custom_minimum_size = Vector2(280, 0)
+		box.add_child(desc)
+	if not found:
+		var empty := Label.new()
+		empty.text = "(nessuna carta DISCARD in mano)"
+		empty.modulate = Color(0.6, 0.6, 0.6)
+		box.add_child(empty)
+	var close := Button.new()
+	close.text = "Chiudi"
+	close.pressed.connect(func(): discard_popup.hide())
+	box.add_child(close)
+	discard_popup.show()
+
+
+# Vehicle Display (Rule 31): stato del mezzo + roster dell'equipaggio.
+# Mostra ruolo, morale e ferite di ogni crew, e se e' a bordo o sceso.
+func _show_vehicle_display(vehicle: Character) -> void:
+	for child in vehicle_popup.get_children():
+		child.queue_free()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.custom_minimum_size = Vector2(250, 0)
+	vehicle_popup.add_child(box)
+	var title := Label.new()
+	title.text = vehicle.vehicle_type
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color(0.95, 0.88, 0.55))
+	box.add_child(title)
+	# Stato dello scafo.
+	var hull_str := "Intatto"
+	var hull_col := Color(0.6, 0.85, 0.6)
+	if vehicle.hull_damage >= 2:
+		hull_str = "DISTRUTTO"
+		hull_col = Color(0.95, 0.30, 0.20)
+	elif vehicle.hull_damage == 1:
+		hull_str = "Immobilizzato"
+		hull_col = Color(0.95, 0.70, 0.25)
+	var hull := Label.new()
+	hull.text = "Scafo: %s" % hull_str
+	hull.add_theme_color_override("font_color", hull_col)
+	box.add_child(hull)
+	box.add_child(HSeparator.new())
+	var crew_head := _section_label("EQUIPAGGIO")
+	box.add_child(crew_head)
+	if vehicle.crew.is_empty():
+		var none := Label.new()
+		none.text = "(nessun equipaggio modellato)"
+		none.modulate = Color(0.6, 0.6, 0.6)
+		box.add_child(none)
+	for cm in vehicle.crew:
+		var row := RichTextLabel.new()
+		row.bbcode_enabled = true
+		row.fit_content = true
+		row.add_theme_font_size_override("normal_font_size", 13)
+		var state_str: String
+		if cm.is_dead():
+			state_str = "[color=#d04030]KIA[/color]" if cm.is_killed() else "[color=#d04030]fuori[/color]"
+		elif not cm.embarked:
+			state_str = "[color=#e0c060]sceso[/color]"
+		else:
+			state_str = "[color=#80c880]a bordo[/color]"
+		var wound_str := ""
+		if not cm.wounds.is_empty() and not cm.is_dead():
+			wound_str = " " + "♥".repeat(cm.wounds.size())
+		var mcol: String = MapView.MORALE_COLORS[cm.morale].to_html(false)
+		row.text = "[b]%s[/b] — %s [bgcolor=#%s]  [/bgcolor]%s" % [
+			cm.crew_role, state_str, mcol, wound_str]
+		box.add_child(row)
+	box.add_child(HSeparator.new())
+	var close := Button.new()
+	close.text = "Chiudi"
+	close.pressed.connect(func(): vehicle_popup.hide())
+	box.add_child(close)
+	vehicle_popup.show()
 
 
 func _show_card_preview(tex: Texture2D) -> void:
@@ -1348,25 +1662,25 @@ func _refresh_roster() -> void:
 			flags = "  [KIA]" if c.is_killed() else "  [INCAP]"
 		else:
 			if not c.wounds.is_empty():
-				flags += " +%d ferite" % c.wounds.size() if c.wounds.size() > 1 else " ferito"
+				flags += " " + "♥".repeat(c.wounds.size())
 			if c.no_ammo:
-				flags += " NO AMMO"
+				flags += " ⊘AMM"
 			elif c.low_ammo:
-				flags += " low ammo"
+				flags += " ↓amm"
 			if c.spotted:
-				flags += " visto!"
+				flags += " 👁"
 		b.text = "%s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
 		b.disabled = c.is_dead()
 		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
 		if not c.is_dead():
 			b.add_theme_color_override("font_color", Color.WHITE)
-			# il pallino eredita il colore del morale via icona... semplice:
-			# coloriamo la prima riga con un modulate leggero non e' possibile
-			# per singolo carattere: usiamo il bordo del bottone.
 			var sb := StyleBoxFlat.new()
 			sb.bg_color = Color(0.18, 0.22, 0.13)
 			sb.border_color = MapView.MORALE_COLORS[c.morale]
-			sb.set_border_width_all(2)
+			sb.border_width_left = 6
+			sb.border_width_right = 1
+			sb.border_width_top = 1
+			sb.border_width_bottom = 1
 			sb.set_corner_radius_all(4)
 			sb.set_content_margin_all(6)
 			b.add_theme_stylebox_override("normal", sb)
@@ -1384,6 +1698,8 @@ func _refresh() -> void:
 	turn_label.text = "  Turno %d/%d  " % [mini(state.turn, state.max_turns), state.max_turns]
 	_update_enemy_card()
 	_refresh_roster()
+	if phase != Phase.CARD:
+		_update_played_card_bar()
 	for line in state.drain_log():
 		log_history.append(line)
 		if log_show_detail or not line.begins_with("·"):
@@ -1563,6 +1879,51 @@ func _test_rules() -> int:
 	fails += _test_wire()
 	fails += _test_abbey()
 	fails += _test_vehicles()
+	fails += _test_grenade()
+	return fails
+
+
+# Granata a mano: frammentazione Near/Far (Rule 14.2).
+func _test_grenade() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 5
+	Boards.fill(st, "farmhouse")
+	st.turn = 1
+	st.max_turns = 12
+	# Terreno aperto per un modificatore di copertura noto.
+	st.hex_at(10, 10).terrain = Domain.Terrain.OPEN_LEVEL_0
+	var tgt := Character.new("t", "Tgt", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.weapon_skills = {"KAR 98K": 3}
+	tgt.position = Vector2i(10, 10)
+	var adj := Character.new("j", "Adj", Domain.Side.ENEMY, "Red")
+	adj.troop_quality = 5
+	adj.position = Vector2i(10, 11)  # adiacente
+	st.characters.append(tgt)
+	st.characters.append(adj)
+	# Bersaglio senza ordine in aperto: gruppo "no order" -> +1 alla Order/Terrain Chart.
+	if Fire.cover_modifier(st, tgt) != 1:
+		print("TEST granata: cover_modifier errato (%d)" % Fire.cover_modifier(st, tgt))
+		fails += 1
+	# Granata che esplode nell'hex del bersaglio.
+	st.area_markers = [{"type": Area.Type.GRENADE, "hex": Vector2i(10, 10),
+		"placed_turn": 1, "turns_left": 1, "thrower_ws": 4}]
+	Area.end_phase(st)
+	# Il marcatore granata deve essere consumato dall'esplosione.
+	for m in st.area_markers:
+		if m["type"] == Area.Type.GRENADE:
+			print("TEST granata: marcatore non consumato")
+			fails += 1
+			break
+	# Chi e' nell'hex viene investito (rivelato dall'attacco).
+	if not tgt.known:
+		print("TEST granata: bersaglio nell'hex non investito")
+		fails += 1
+	# L'adiacente fa solo un MC: non viene rivelato dalla scheggia.
+	if adj.known:
+		print("TEST granata: adiacente rivelato per errore")
+		fails += 1
 	return fails
 
 
@@ -2454,6 +2815,54 @@ func _test_vehicles() -> int:
 	var res := VehicleCombat.at_fire(az, bz2, target_pz, "Bazooka M9")
 	if not res["hit"]:
 		print("TEST veicoli: at_fire nat0 non colpisce (res=%s)" % str(res))
+		fails += 1
+
+	# --- Equipaggio (Rule 31, livello intermedio) ---
+	# populate_crew: il Sherman ha 5 uomini, tutti imbarcati.
+	var sh := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 4)
+	if sh.crew.size() != 5:
+		print("TEST equipaggio: Sherman deve avere 5 crew (%d)" % sh.crew.size())
+		fails += 1
+	var all_embarked := true
+	for cm in sh.crew:
+		if not cm.embarked or not cm.is_crew():
+			all_embarked = false
+	if not all_embarked:
+		print("TEST equipaggio: crew non imbarcati correttamente")
+		fails += 1
+
+	# Bail out: i crew vivi scendono in mappa e lasciano il mezzo.
+	var bs := GameState.new()
+	bs.rng.seed = 7
+	Boards.fill(bs, "farmhouse")
+	var sh2 := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(6, 6), 4)
+	bs.characters = [sh2]
+	VehicleCombat.bail_out(bs, sh2)
+	if bs.characters.size() != 6:  # 1 mezzo + 5 crew scesi
+		print("TEST equipaggio: bail_out non aggiunge i crew (%d)" % bs.characters.size())
+		fails += 1
+	for cm in sh2.crew:
+		if cm.embarked:
+			print("TEST equipaggio: crew ancora imbarcato dopo il bail out")
+			fails += 1
+			break
+
+	# Distruzione: tutti i crew ancora a bordo muoiono.
+	var ks := GameState.new()
+	ks.rng.seed = 3
+	Boards.fill(ks, "farmhouse")
+	var pz3 := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(7, 7), 4)
+	ks.characters = [pz3]
+	VehicleCombat._kill_embarked_crew(ks, pz3)
+	var all_dead := true
+	for cm in pz3.crew:
+		if not cm.is_dead():
+			all_dead = false
+	if not all_dead:
+		print("TEST equipaggio: distruzione non uccide tutto l'equipaggio")
 		fails += 1
 	return fails
 
