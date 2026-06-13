@@ -623,14 +623,19 @@ static func _melee_attack_tq(state: GameState, attacker: Character) -> int:
 static func _do_melee(state: GameState, attacker: Character) -> void:
 	# Bersaglio nello stesso hex (non adiacente).
 	var target: Character = null
+	var rivals_in_hex := 0
 	for d in state.characters:
 		if d.side == attacker.side or d.is_dead():
 			continue
 		if d.position == attacker.position:
-			target = d
-			break
+			rivals_in_hex += 1
+			if target == null:
+				target = d
 	if target == null:
 		return
+	if rivals_in_hex > 1:
+		state.log_event("Mischia: %d avversari nell'hex — %s attacca %s" % [
+			rivals_in_hex, attacker.display_name, target.display_name])
 	target.known = true
 	if target.is_dummy:
 		target.removed = true

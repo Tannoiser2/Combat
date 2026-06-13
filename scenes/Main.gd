@@ -519,10 +519,16 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
 		next_button.text = "Passa"
 	elif action_kind == TurnSequence.Act.THROW:
-		map_view.cue_hexes = TurnSequence.valid_throw_hexes(state, c)
+		var throw_hexes := TurnSequence.valid_throw_hexes(state, c)
+		map_view.cue_hexes = throw_hexes
 		map_view.cue_color = Color(0.95, 0.6, 0.15, 0.9)
-		hint_label.text = "%s: clicca l'hex bersaglio della granata (arancio) o premi Passa" % \
-			c.display_name
+		var r := TurnSequence.throw_range(c)
+		if throw_hexes.is_empty():
+			hint_label.text = "%s: nessun hex valido (gittata %d-%d hex, LOS necessaria)" % [
+				c.display_name, r[0], r[1]]
+		else:
+			hint_label.text = "%s: clicca l'hex bersaglio arancio (%d-%d hex, LOS necessaria) o premi Passa" % [
+				c.display_name, r[0], r[1]]
 		next_button.text = "Passa"
 	else:
 		map_view.cue_hexes = _passable_neighbors(c)
@@ -1420,19 +1426,14 @@ func _update_los_lines(c: Character) -> void:
 	if c == null or c.is_dead():
 		map_view.queue_redraw()
 		return
-	for other in state.characters:
-		if other.side == c.side or other.is_dead():
-			continue
-		# verso i nemici noti (o, per un nemico selezionato, i tuoi uomini)
-		if other.side == Domain.Side.ENEMY and not other.known:
-			continue
-		# solo le LOS LIBERE (le rosse affollavano la mappa); per un
-		# controllo puntuale c'e' lo strumento LOS.
-		if LOS.clear(state, c, other):
-			map_view.los_lines.append({
-				"to": map_view.hex_center(other.position.x, other.position.y),
-				"clear": true,
-			})
+	# Mostra solo i bersagli effettivamente colpibili, non tutti i visibili:
+	# evita di evidenziare nemici fuori gittata, in abbazia, incompatibili
+	# con l'arma corrente, ecc.
+	for target in TurnSequence.valid_fire_targets(state, c):
+		map_view.los_lines.append({
+			"to": map_view.hex_center(target.position.x, target.position.y),
+			"clear": true,
+		})
 	map_view.queue_redraw()
 
 
