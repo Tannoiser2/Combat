@@ -75,6 +75,16 @@ var hull_damage: int = 0        # 0=OK, 1=immobilizzato, 2=distrutto
 var is_buttoned_up: bool = false
 # fire_mode per cannoni principali: "HE" (antipersonnel) o "AP" (anticarro)
 var fire_mode: String = "HE"
+# Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello
+# intermedio sono feribili/uccidibili individualmente e possono abbandonare
+# il mezzo (bail out). Tenerli come Character (non semplici contatori) rende
+# incrementale il futuro modello completo (spotting/LOS/Target Marker per ruolo).
+var crew: Array = []              # solo sul veicolo: i Character dell'equipaggio
+var embarked: bool = false        # crew: ancora a bordo del mezzo (false = sceso/a piedi)
+var crew_role: String = ""        # "Commander"/"Driver"/"Gunner"/"Loader"/"Co-Driver"
+# Evitiamo un riferimento forte al veicolo (ciclo RefCounted): la lista
+# vehicle.crew e' la fonte di verita' sull'appartenenza. Per il futuro
+# modello completo il mezzo si ritrova cercando in state.characters.
 
 
 func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
@@ -87,6 +97,11 @@ func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
 # Possiede una skill speciale (Rule 24)?
 func has_skill(skill: String) -> bool:
 	return skill in skills
+
+
+# Membro di equipaggio (Rule 31), dentro o fuori dal mezzo.
+func is_crew() -> bool:
+	return not crew_role.is_empty()
 
 
 func set_order(p_order: int, p_move: String = "", p_grenade: bool = false, p_charge: bool = false) -> void:

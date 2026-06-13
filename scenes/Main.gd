@@ -46,6 +46,7 @@ var played_card_bar: PanelContainer  # banner carta giocata (ORDER phase in poi)
 var played_card_text: RichTextLabel
 var hand_discard_button: Button  # "Carte in mano (N)" visibile fuori dalla CARD phase
 var discard_popup: PanelContainer  # popup con le DISCARD cards rimanenti
+var vehicle_popup: PanelContainer  # Vehicle Display: equipaggio e stato del mezzo
 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
@@ -880,6 +881,11 @@ func _on_map_clicked() -> void:
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	# Clic su un veicolo: apre il Vehicle Display con l'equipaggio.
+	if c != null and c.is_vehicle:
+		_show_vehicle_display(c)
+	else:
+		vehicle_popup.hide()
 	# Deselezione o selezione di altro: il pannello ordini si chiude.
 	order_panel.hide()
 	if phase == Phase.ORDERS and c != null \
@@ -1209,6 +1215,15 @@ func _build_hud() -> void:
 	discard_popup.hide()
 	root.add_child(discard_popup)
 
+	# Vehicle Display: pannello equipaggio del mezzo (clic su un veicolo).
+	vehicle_popup = PanelContainer.new()
+	vehicle_popup.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	vehicle_popup.offset_right = -340
+	vehicle_popup.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	vehicle_popup.grow_vertical = Control.GROW_DIRECTION_BOTH
+	vehicle_popup.hide()
+	root.add_child(vehicle_popup)
+
 	# Carta nemica pescata (grafica originale), in alto a sinistra.
 	enemy_card_rect = TextureRect.new()
 	enemy_card_rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -1502,6 +1517,68 @@ func _toggle_discard_popup() -> void:
 	close.pressed.connect(func(): discard_popup.hide())
 	box.add_child(close)
 	discard_popup.show()
+
+
+# Vehicle Display (Rule 31): stato del mezzo + roster dell'equipaggio.
+# Mostra ruolo, morale e ferite di ogni crew, e se e' a bordo o sceso.
+func _show_vehicle_display(vehicle: Character) -> void:
+	for child in vehicle_popup.get_children():
+		child.queue_free()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.custom_minimum_size = Vector2(250, 0)
+	vehicle_popup.add_child(box)
+	var title := Label.new()
+	title.text = vehicle.vehicle_type
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color(0.95, 0.88, 0.55))
+	box.add_child(title)
+	# Stato dello scafo.
+	var hull_str := "Intatto"
+	var hull_col := Color(0.6, 0.85, 0.6)
+	if vehicle.hull_damage >= 2:
+		hull_str = "DISTRUTTO"
+		hull_col = Color(0.95, 0.30, 0.20)
+	elif vehicle.hull_damage == 1:
+		hull_str = "Immobilizzato"
+		hull_col = Color(0.95, 0.70, 0.25)
+	var hull := Label.new()
+	hull.text = "Scafo: %s" % hull_str
+	hull.add_theme_color_override("font_color", hull_col)
+	box.add_child(hull)
+	box.add_child(HSeparator.new())
+	var crew_head := _section_label("EQUIPAGGIO")
+	box.add_child(crew_head)
+	if vehicle.crew.is_empty():
+		var none := Label.new()
+		none.text = "(nessun equipaggio modellato)"
+		none.modulate = Color(0.6, 0.6, 0.6)
+		box.add_child(none)
+	for cm in vehicle.crew:
+		var row := RichTextLabel.new()
+		row.bbcode_enabled = true
+		row.fit_content = true
+		row.add_theme_font_size_override("normal_font_size", 13)
+		var state_str: String
+		if cm.is_dead():
+			state_str = "[color=#d04030]KIA[/color]" if cm.is_killed() else "[color=#d04030]fuori[/color]"
+		elif not cm.embarked:
+			state_str = "[color=#e0c060]sceso[/color]"
+		else:
+			state_str = "[color=#80c880]a bordo[/color]"
+		var wound_str := ""
+		if not cm.wounds.is_empty() and not cm.is_dead():
+			wound_str = " " + "♥".repeat(cm.wounds.size())
+		var mcol: String = MapView.MORALE_COLORS[cm.morale].to_html(false)
+		row.text = "[b]%s[/b] — %s [bgcolor=#%s]  [/bgcolor]%s" % [
+			cm.crew_role, state_str, mcol, wound_str]
+		box.add_child(row)
+	box.add_child(HSeparator.new())
+	var close := Button.new()
+	close.text = "Chiudi"
+	close.pressed.connect(func(): vehicle_popup.hide())
+	box.add_child(close)
+	vehicle_popup.show()
 
 
 func _show_card_preview(tex: Texture2D) -> void:
@@ -2710,6 +2787,54 @@ func _test_vehicles() -> int:
 	var res := VehicleCombat.at_fire(az, bz2, target_pz, "Bazooka M9")
 	if not res["hit"]:
 		print("TEST veicoli: at_fire nat0 non colpisce (res=%s)" % str(res))
+		fails += 1
+
+	# --- Equipaggio (Rule 31, livello intermedio) ---
+	# populate_crew: il Sherman ha 5 uomini, tutti imbarcati.
+	var sh := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 4)
+	if sh.crew.size() != 5:
+		print("TEST equipaggio: Sherman deve avere 5 crew (%d)" % sh.crew.size())
+		fails += 1
+	var all_embarked := true
+	for cm in sh.crew:
+		if not cm.embarked or not cm.is_crew():
+			all_embarked = false
+	if not all_embarked:
+		print("TEST equipaggio: crew non imbarcati correttamente")
+		fails += 1
+
+	# Bail out: i crew vivi scendono in mappa e lasciano il mezzo.
+	var bs := GameState.new()
+	bs.rng.seed = 7
+	Boards.fill(bs, "farmhouse")
+	var sh2 := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(6, 6), 4)
+	bs.characters = [sh2]
+	VehicleCombat.bail_out(bs, sh2)
+	if bs.characters.size() != 6:  # 1 mezzo + 5 crew scesi
+		print("TEST equipaggio: bail_out non aggiunge i crew (%d)" % bs.characters.size())
+		fails += 1
+	for cm in sh2.crew:
+		if cm.embarked:
+			print("TEST equipaggio: crew ancora imbarcato dopo il bail out")
+			fails += 1
+			break
+
+	# Distruzione: tutti i crew ancora a bordo muoiono.
+	var ks := GameState.new()
+	ks.rng.seed = 3
+	Boards.fill(ks, "farmhouse")
+	var pz3 := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(7, 7), 4)
+	ks.characters = [pz3]
+	VehicleCombat._kill_embarked_crew(ks, pz3)
+	var all_dead := true
+	for cm in pz3.crew:
+		if not cm.is_dead():
+			all_dead = false
+	if not all_dead:
+		print("TEST equipaggio: distruzione non uccide tutto l'equipaggio")
 		fails += 1
 	return fails
 

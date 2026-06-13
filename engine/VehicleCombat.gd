@@ -72,6 +72,16 @@ const VEHICLE_ORDERS := [
 	D.Order.RALLY,
 ]
 
+# Composizione dell'equipaggio per tipo di veicolo (Rule 31). L'ordine e'
+# quello di attivazione del regolamento (Commander/Driver/Gunner/Loader/
+# Co-driver). Estendibile: aggiungere ruoli o LOS per ruolo qui.
+const VEHICLE_CREW := {
+	"Jeep":            ["Driver", "Co-Driver"],
+	"M3A1 Halftrack":  ["Driver", "Co-Driver", "Gunner"],
+	"M4A3 Sherman":    ["Commander", "Driver", "Gunner", "Loader", "Co-Driver"],
+	"PzIVH":           ["Commander", "Driver", "Gunner", "Loader", "Co-Driver"],
+}
+
 
 # Crea un Character che rappresenta un veicolo dalla chiave VEHICLE_DATA.
 # La weapon opzionale sovrascrive quella di default (es. Jeep con M2 .50cal).
@@ -95,7 +105,124 @@ static func make_vehicle(v_name: String, side: int, team: String,
 		c.weapon_skills["75mm L40 AP"] = int(vd["ws"])
 	elif w == "KwK 7.5cm HE":
 		c.weapon_skills["KwK 7.5cm AP"] = int(vd["ws"])
+	populate_crew(c)
 	return c
+
+
+# Crea i Character dell'equipaggio dentro vehicle.crew (Rule 31). I crew
+# ereditano TQ e morale del veicolo e una pistola per il bail-out. Restano
+# "imbarcati" (embarked_in = vehicle), fuori da state.characters finche' non
+# abbandonano: cosi' non vengono attivati/spottati separatamente (livello
+# intermedio). Il Commander porta una Leadership di comando (Rule 31.11.6).
+static func populate_crew(vehicle: Character) -> void:
+	var roles: Array = VEHICLE_CREW.get(vehicle.vehicle_type, [])
+	var vd: Dictionary = VEHICLE_DATA.get(vehicle.vehicle_type, {})
+	var tq := int(vd.get("tq", 6))
+	var pistol := "M1911" if vehicle.side == D.Side.FRIENDLY else "P38"
+	vehicle.crew = []
+	for role in roles:
+		var uid := "%s_%s" % [vehicle.id, String(role).to_lower().replace("-", "")]
+		var cm := Character.new(uid, "%s del %s" % [role, vehicle.vehicle_type],
+			vehicle.side, vehicle.team)
+		cm.troop_quality = tq
+		cm.morale = vehicle.morale
+		cm.crew_role = role
+		cm.embarked = true
+		cm.position = vehicle.position
+		cm.weapon_skills[pistol] = maxi(2, tq - 3)
+		if role == "Commander":
+			cm.leadership = 1
+		vehicle.crew.append(cm)
+
+
+# Sincronizza il morale dei crew imbarcati con quello del veicolo (a inizio
+# scenario, quando lo scenario imposta il morale del mezzo).
+static func sync_crew_morale(vehicle: Character) -> void:
+	for cm in vehicle.crew:
+		if not cm.is_dead():
+			cm.morale = vehicle.morale
+
+
+# I crew vivi ancora a bordo.
+static func _embarked_alive(vehicle: Character) -> Array:
+	var out: Array = []
+	for cm in vehicle.crew:
+		if cm.embarked and not cm.is_dead():
+			out.append(cm)
+	return out
+
+
+# Uccide un Character (crew) accumulando ferite gravi finche' e' fuori gioco.
+static func _kill(victim: Character) -> void:
+	victim.wounds.append(D.Wound.BAD)
+	while not victim.is_dead():
+		victim.wounds.append(D.Wound.BAD)
+	victim.clear_order()
+
+
+# Una scheggia/penetrazione ferisce un crew a caso ancora a bordo (Rule
+# 31.10.8). Pesca una Friendly Card per la gravita' (come la fanteria).
+static func _crew_casualty(state: GameState, vehicle: Character) -> void:
+	var alive := _embarked_alive(vehicle)
+	if alive.is_empty():
+		return
+	var victim: Character = alive[state.rng.randi_range(0, alive.size() - 1)]
+	var serial := state.draw_friendly_card()
+	state.friendly_discard.append(serial)
+	var wound: int = FriendlyCards.wound_of(serial)
+	match wound:
+		FriendlyCards.WoundDraw.CLOSE_CALL:
+			state.log_event("  %s: scheggia di striscio, regge" % victim.display_name)
+		FriendlyCards.WoundDraw.KIA:
+			_kill(victim)
+			state.log_event("  %s UCCISO nel mezzo" % victim.display_name)
+		_:
+			var w: int = D.Wound.LIGHT if wound == FriendlyCards.WoundDraw.LIGHT_WOUND else D.Wound.BAD
+			victim.wounds.append(w)
+			state.log_event("  %s ferito (%s)" % [victim.display_name,
+				"Light Wound" if w == D.Wound.LIGHT else "Bad Wound"])
+			if victim.is_dead():
+				_kill(victim)
+				state.log_event("  le ferite uccidono %s" % victim.display_name)
+
+
+# Uccide tutti i crew ancora a bordo (esplosione/distruzione, Rule 31.10.8
+# "Vehicle Explodes - All crew still in the Vehicle are killed").
+static func _kill_embarked_crew(state: GameState, vehicle: Character) -> void:
+	for cm in _embarked_alive(vehicle):
+		_kill(cm)
+		state.log_event("  %s muore con il mezzo" % cm.display_name)
+
+
+# Hex libero piu' vicino dove far scendere un crew (il mezzo o un adiacente).
+static func _free_hex_near(state: GameState, pos: Vector2i) -> Vector2i:
+	if state.character_at(pos.x, pos.y) == null:
+		return pos
+	for n in Move.neighbors(state, pos):
+		if state.character_at(n.x, n.y) == null:
+			return n
+	return pos
+
+
+# Bail Out (Rule 31.9.3): i crew vivi a bordo scendono nell'hex del mezzo
+# (o adiacente), diventano fanteria normale e si aggiungono a state.characters.
+# Scendono scossi (sotto il fuoco) e senza ordine.
+static func bail_out(state: GameState, vehicle: Character) -> void:
+	for cm in vehicle.crew:
+		if not cm.embarked or cm.is_dead():
+			continue
+		cm.embarked = false
+		cm.position = _free_hex_near(state, vehicle.position)
+		cm.clear_order()
+		cm.morale = D.lower_morale(cm.morale, 1)
+		if cm.side == D.Side.ENEMY:
+			cm.known = true
+			cm.alerted = true
+		else:
+			cm.spotted = true
+		state.characters.append(cm)
+		state.log_event("%s abbandona il %s su %02d.%02d" % [
+			cm.display_name, vehicle.display_name, cm.position.x, cm.position.y])
 
 
 # Vero se il tipo di veicolo e' FAST (Jeep, Halftrack).
@@ -177,25 +304,49 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 		vehicle.hull_damage += 1
 		state.log_event("  Penetrazione (%s)! pen %d > arm_g %d -> hull_damage %d" % [
 			FACE_NAMES[face], pen, armor_g, vehicle.hull_damage])
+		# Il colpo penetrante ferisce un membro dell'equipaggio (Rule 31.10.8).
+		_crew_casualty(state, vehicle)
 		if vehicle.hull_damage >= 2:
 			state.log_event("  %s DISTRUTTO!" % vehicle.display_name)
 			state.audio_events.append({"type": "explosion", "hex": vehicle.position})
+			# Esplosione: tutti i crew ancora a bordo muoiono (Rule 31.10.8).
+			_kill_embarked_crew(state, vehicle)
 		elif vehicle.hull_damage == 1:
 			state.log_event("  %s immobilizzato (hull_damage 1)" % vehicle.display_name)
+			# Immobilizzato: l'equipaggio superstite abbandona il mezzo.
+			bail_out(state, vehicle)
 	elif pen > armor_n:
 		result = "striscio"
 		state.log_event("  Colpo di striscio (%s): pen %d in [%d..%d] -> MC equipaggio" % [
 			FACE_NAMES[face], pen, armor_n, armor_g])
-		var mc := Checks.morale_check(vehicle, state.rng)
-		if not mc["passed"]:
-			vehicle.morale = D.lower_morale(vehicle.morale, 1)
-			state.log_event("  MC fallito: %s morale -> %s" % [
-				vehicle.display_name, D.MORALE_NAMES[vehicle.morale]])
+		# Ogni crew a bordo fa un MC individuale (Rule 31.10.6/31.10.9).
+		_crew_morale_checks(state, vehicle)
 	else:
 		result = "rimbalzo"
 		state.log_event("  Rimbalzo (%s): pen %d <= armor %d" % [
 			FACE_NAMES[face], pen, armor_n])
 	return {"hit": true, "result": result}
+
+
+# MC individuali dei crew a bordo (colpo di striscio). Il morale del veicolo
+# segue quello peggiore dell'equipaggio (usato da AI e display).
+static func _crew_morale_checks(state: GameState, vehicle: Character) -> void:
+	var alive := _embarked_alive(vehicle)
+	if alive.is_empty():
+		# Veicolo senza crew modellato: ripiego sul vecchio MC del mezzo.
+		var mc := Checks.morale_check(vehicle, state.rng)
+		if not mc["passed"]:
+			vehicle.morale = D.lower_morale(vehicle.morale, 1)
+		return
+	var worst: int = vehicle.morale
+	for cm in alive:
+		var mc := Checks.morale_check(cm, state.rng)
+		if not mc["passed"]:
+			cm.morale = D.lower_morale(cm.morale, 1)
+			state.log_event("  %s: MC fallito -> %s" % [
+				cm.display_name, D.MORALE_NAMES[cm.morale]])
+		worst = maxi(worst, cm.morale)
+	vehicle.morale = worst
 
 
 # Fuoco HE del cannone principale vs fanteria: come un'esplosione di mortaio

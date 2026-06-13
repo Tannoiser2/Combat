@@ -168,6 +168,21 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
    Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
    s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
+   EQUIPAGGIO (Rule 31, livello intermedio, FATTO v0.29): VehicleCombat.VEHICLE_CREW
+   mappa tipo->ruoli; populate_crew (chiamata da make_vehicle) crea i crew come
+   Character veri dentro vehicle.crew (Character.crew/embarked/crew_role), TQ e morale
+   ereditati dal mezzo (sync_crew_morale a inizio scenario), una pistola per il bail-out.
+   I crew restano FUORI da state.characters finche' imbarcati (no spotting/attivazione
+   separati: scope intermedio). at_fire: penetrazione -> _crew_casualty (pesca 1 ferita
+   a un crew a caso); distrutto -> _kill_embarked_crew (tutti i crew a bordo muoiono);
+   immobilizzato -> bail_out (i superstiti scendono in mappa, si aggiungono a
+   state.characters, diventano fanteria); striscio -> _crew_morale_checks individuali
+   (morale del mezzo = il peggiore). NIENTE ciclo RefCounted: embarked e' un bool, la
+   lista vehicle.crew e' la fonte di verita' (no back-ref forte al mezzo). UI:
+   Main._show_vehicle_display (clic su veicolo -> Vehicle Display con ruoli/morale/ferite).
+   ESTENSIBILE al modello completo: i crew sono gia' Character, basta aggiungere
+   spotting/LOS/Target Marker per ruolo e boccaporto aperto/chiuso. Test:
+   Main._test_vehicles (sezione equipaggio).
 
 ## Granate (Rule 14.2)
 

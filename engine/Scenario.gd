@@ -1107,6 +1107,7 @@ static func build(state: GameState, scenario_id: String) -> void:
 			vc.morale = int(sc.get("enemy_morale", D.Morale.NORMAL))
 		else:
 			vc.spotted = true  # il carro amico e' visibile anche ai nemici
+		VehicleCombat.sync_crew_morale(vc)  # l'equipaggio eredita il morale del mezzo
 		state.characters.append(vc)
 		state.log_event("Veicolo schierato: %s (%s) in %02d.%02d" % [
 			vtype, vteam, vc.position.x, vc.position.y])

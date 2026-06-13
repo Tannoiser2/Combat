@@ -1,3 +1,16 @@
+v0.29 — 2026-06-13
+- Equipaggio dei carri (Rule 31, livello intermedio):
+  - ogni veicolo ha un equipaggio vero (Commander/Driver/Gunner/Loader/
+    Co-Driver secondo il tipo), feribile e uccidibile individualmente
+  - colpo penetrante: ferisce un membro dell'equipaggio (pesca ferita)
+  - veicolo immobilizzato: l'equipaggio superstite abbandona il mezzo
+    (Bail Out) e scende in mappa come fanteria
+  - veicolo distrutto: tutti i crew ancora a bordo muoiono
+  - colpo di striscio: ogni crew fa un Morale Check individuale
+  - clic su un veicolo -> Vehicle Display con ruoli, morale e ferite
+  - architettura estensibile verso il modello completo (spotting/LOS
+    per ruolo, boccaporto aperto/chiuso) in futuro
+
 v0.28 — 2026-06-13
 - Scelta della carta (Rule 5.0): la mano torna a 5 carte ogni turno
   (era: nessuna pesca se la mano non era vuota)
