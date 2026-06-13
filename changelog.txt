@@ -1,3 +1,10 @@
+v0.26 — 2026-06-13
+- Facing veicoli: il counter PNG ruota in base al facing invece della freccia
+  procedurale (draw_set_transform, rotazione calcolata da FACE_DIRS)
+- Filo spinato: marker GEN-Wire-Marker-f.png sugli hex con wire=true
+- Roster sinistro: bordo sinistro 6px (colore morale), simboli ferite ♥,
+  icone ammo ⊘AMM / ↓amm, 👁 se spotted
+
 v0.25 — 2026-06-13
 - Segnalini d'area con artwork originale invece di cerchi procedurali:
   - Smoke / Fading Smoke: PNG semi-trasparente (alpha 0.75 / 0.60)

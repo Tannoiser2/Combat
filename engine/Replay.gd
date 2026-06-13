@@ -41,6 +41,7 @@ static func _snapshot(state: GameState) -> Dictionary:
 			"team": c.team, "morale": c.morale, "name": c.display_name,
 			"order": c.order if c.has_order else -1,
 			"hidden": c.side == Domain.Side.ENEMY and not c.known,
+			"facing": c.facing if c.is_vehicle else 0,
 		}
 	return units
 

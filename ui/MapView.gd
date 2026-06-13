@@ -113,6 +113,14 @@ var debug_terrain := false
 var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
 
+# Direzioni di schermo per i 6 facing dell'hex flat-top (facing 1..6).
+# 1=basso-dx, 2=alto-dx, 3=alto, 4=alto-sx, 5=basso-sx, 6=basso.
+# I counter veicolo puntano verso l'alto nel PNG (facing 3 = nessuna rotazione).
+const FACE_DIRS := [
+	Vector2(0.866, 0.5), Vector2(0.866, -0.5), Vector2(0.0, -1.0),
+	Vector2(-0.866, -0.5), Vector2(-0.866, 0.5), Vector2(0.0, 1.0),
+]
+
 # Animazioni: posizione "visiva" dei segnalini (insegue quella logica)
 # e traccianti dei colpi (eta' per dissolvenza e proiettile in volo).
 var _display_pos := {}              # Character -> Vector2
@@ -418,6 +426,14 @@ func _draw() -> void:
 			_:
 				# ordigni in attesa di esplodere: marker Target
 				_draw_marker(_named_tex("marker-TARGET"), ac, radius)
+	# Filo spinato: marker su tutti gli hex con MapHex.wire = true.
+	var wire_tex := _named_tex("GEN-Wire-Marker-f")
+	if wire_tex != null:
+		for key in state.map:
+			var wh: GameState.MapHex = state.map[key]
+			if wh.wire:
+				var wc := _key_to_cell(key)
+				_draw_marker(wire_tex, hex_center(wc.x, wc.y), radius, 0.85)
 	# Strumento LOS: linea spessa tra i due hex scelti.
 	if not los_tool.is_empty():
 		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \
@@ -485,7 +501,8 @@ func _draw() -> void:
 		for idx in replay_units:
 			var u: Dictionary = replay_units[idx]
 			_draw_unit(font, radius, _replay_pos(idx), u["counter"], u["side"],
-				u["team"], u["hidden"], u["morale"], u["order"], u["name"], false)
+				u["team"], u["hidden"], u["morale"], u["order"], u["name"], false,
+				"", u.get("facing", 0))
 	else:
 		# Primo passaggio: marker KIA sotto le pedine vive.
 		for c in state.characters:
@@ -498,9 +515,10 @@ func _draw() -> void:
 				continue
 			var hidden := c.side == D.Side.ENEMY and not c.known
 			var center := _pos_of(c)
+			var facing_arg := c.facing if c.is_vehicle and not hidden else 0
 			_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
 				c.morale, c.order if c.has_order else -1, c.display_name,
-				c == selected, c.order_move)
+				c == selected, c.order_move, facing_arg)
 			if c.is_vehicle and not hidden:
 				_draw_vehicle_overlay(radius, center, c)
 			if c.side == D.Side.FRIENDLY and c.spotted:
@@ -512,7 +530,8 @@ func _draw() -> void:
 # morale, badge dell'ordine. Usato sia per il gioco vivo sia per il replay.
 func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 		side: int, team: String, hidden: bool, morale: int, order: int,
-		name: String, is_selected: bool, order_move: String = "") -> void:
+		name: String, is_selected: bool, order_move: String = "",
+		facing: int = 0) -> void:
 	if is_selected:
 		draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
 	# Segnalino vero se disponibile (dummy se nemico non identificato),
@@ -521,7 +540,13 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 	var tex := _counter_tex(counter_id)
 	if tex != null:
 		var s := radius * 1.5
-		draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+		if facing > 0:
+			var rot := atan2(FACE_DIRS[facing - 1].y, FACE_DIRS[facing - 1].x) + PI / 2.0
+			draw_set_transform(center, rot, Vector2.ONE)
+			draw_texture_rect(tex, Rect2(Vector2(-s, -s) * 0.5, Vector2(s, s)), false)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		else:
+			draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
 	else:
 		draw_circle(center, radius * 0.45,
 			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[side])
@@ -551,23 +576,13 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 				Color(0.95, 0.95, 0.2))
 
 
-# Overlay per veicoli: rettangolo, freccia di facing, badge hull_damage.
-# Le 6 direzioni di schermo corrispondono alle 6 facce del hex flat-top,
-# partendo da basso-destra (facing 1) in senso orario.
+# Overlay per veicoli: bordo rettangolare e badge hull_damage.
+# Il counter e' gia' ruotato in base al facing da _draw_unit.
 func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
-	# Direzioni di schermo per facing 1..6 (CUBE_DIRS[(facing-1)%6] -> 2D).
-	# 1=basso-dx, 2=alto-dx, 3=alto, 4=alto-sx, 5=basso-sx, 6=basso.
-	const FACE_DIRS := [
-		Vector2(0.866, 0.5), Vector2(0.866, -0.5), Vector2(0.0, -1.0),
-		Vector2(-0.866, -0.5), Vector2(-0.866, 0.5), Vector2(0.0, 1.0),
-	]
 	var hw := radius * 0.44
 	var hh := radius * 0.34
 	draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
 		Color(0, 0, 0, 0.75), false, radius * 0.05)
-	var fi: int = clamp(c.facing - 1, 0, 5)
-	var tip: Vector2 = center + (FACE_DIRS[fi] as Vector2) * radius * 0.40
-	draw_line(center, tip, Color(1.0, 1.0, 1.0, 0.9), radius * 0.07)
 	if c.hull_damage == 1:
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))

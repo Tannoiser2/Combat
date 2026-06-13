@@ -1348,25 +1348,25 @@ func _refresh_roster() -> void:
 			flags = "  [KIA]" if c.is_killed() else "  [INCAP]"
 		else:
 			if not c.wounds.is_empty():
-				flags += " +%d ferite" % c.wounds.size() if c.wounds.size() > 1 else " ferito"
+				flags += " " + "♥".repeat(c.wounds.size())
 			if c.no_ammo:
-				flags += " NO AMMO"
+				flags += " ⊘AMM"
 			elif c.low_ammo:
-				flags += " low ammo"
+				flags += " ↓amm"
 			if c.spotted:
-				flags += " visto!"
+				flags += " 👁"
 		b.text = "%s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
 		b.disabled = c.is_dead()
 		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
 		if not c.is_dead():
 			b.add_theme_color_override("font_color", Color.WHITE)
-			# il pallino eredita il colore del morale via icona... semplice:
-			# coloriamo la prima riga con un modulate leggero non e' possibile
-			# per singolo carattere: usiamo il bordo del bottone.
 			var sb := StyleBoxFlat.new()
 			sb.bg_color = Color(0.18, 0.22, 0.13)
 			sb.border_color = MapView.MORALE_COLORS[c.morale]
-			sb.set_border_width_all(2)
+			sb.border_width_left = 6
+			sb.border_width_right = 1
+			sb.border_width_top = 1
+			sb.border_width_bottom = 1
 			sb.set_corner_radius_all(4)
 			sb.set_content_margin_all(6)
 			b.add_theme_stylebox_override("normal", sb)
