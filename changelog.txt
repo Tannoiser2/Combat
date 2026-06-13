@@ -1,3 +1,8 @@
+v0.23 — 2026-06-13
+- Segnalini azione: Melee (US e GE) ora usa il marker originale
+  GEN-Normal-Marker-10-r dal Vol.1 invece del segnaposto generato
+- GE Carry/Drag: marker originale dal retro del counter GE Grenade
+
 v0.22 — 2026-06-13
 - Segnalini azione originali dai retro dei counter (fronte/retro):
   - US: Sprint, Rally, Carry/Drag, Hide, Sneak ora con l'artwork vero
