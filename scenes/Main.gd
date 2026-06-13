@@ -42,6 +42,10 @@ var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
 var roster_box: VBoxContainer   # elenco della squadra a sinistra
 var overlay_legend: PanelContainer  # legenda dell'overlay terreno (tasto T)
+var played_card_bar: PanelContainer  # banner carta giocata (ORDER phase in poi)
+var played_card_text: RichTextLabel
+var hand_discard_button: Button  # "Carte in mano (N)" visibile fuori dalla CARD phase
+var discard_popup: PanelContainer  # popup con le DISCARD cards rimanenti
 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
@@ -408,7 +412,12 @@ func _start_turn() -> void:
 	_show_hand()
 	next_button.disabled = true
 	next_button.text = "Avanti"
-	hint_label.text = "Friendly Card Phase: gioca una carta dalla mano"
+	hint_label.text = "Friendly Card Phase: scegli una carta dalla mano e giocala"
+	played_card_bar.hide()
+	if hand_discard_button != null:
+		hand_discard_button.hide()
+	if discard_popup != null:
+		discard_popup.hide()
 	_refresh()
 
 
@@ -419,6 +428,7 @@ func _on_card_chosen(index: int) -> void:
 	hand_panel.hide()
 	phase = Phase.ORDERS
 	hint_label.text = "Order Phase: clicca i tuoi uomini e assegna gli ordini"
+	_update_played_card_bar()
 	_update_orders_button()
 	_refresh()
 
@@ -1148,8 +1158,56 @@ func _build_hud() -> void:
 	hand_panel.offset_bottom = -12
 	hand_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	root.add_child(hand_panel)
+	var hand_vbox := VBoxContainer.new()
+	hand_vbox.add_theme_constant_override("separation", 4)
+	hand_panel.add_child(hand_vbox)
+	var hand_header := Label.new()
+	hand_header.text = "— Scegli la carta da giocare sull'Initiative Track —"
+	hand_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hand_header.add_theme_font_size_override("font_size", 13)
+	hand_header.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	hand_vbox.add_child(hand_header)
 	hand_box = HBoxContainer.new()
-	hand_panel.add_child(hand_box)
+	hand_box.add_theme_constant_override("separation", 6)
+	hand_vbox.add_child(hand_box)
+
+	# Banner carta giocata: visibile da ORDER phase in poi, in basso al centro.
+	played_card_bar = PanelContainer.new()
+	played_card_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	played_card_bar.offset_top = -68
+	played_card_bar.offset_bottom = -12
+	played_card_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	root.add_child(played_card_bar)
+	played_card_text = RichTextLabel.new()
+	played_card_text.bbcode_enabled = true
+	played_card_text.fit_content = true
+	played_card_text.custom_minimum_size = Vector2(400, 0)
+	played_card_text.add_theme_font_size_override("normal_font_size", 13)
+	played_card_bar.add_child(played_card_text)
+	played_card_bar.hide()
+
+	# Pulsante "Carte (%d)" per vedere le DISCARD cards in mano.
+	hand_discard_button = Button.new()
+	hand_discard_button.text = "Carte in mano"
+	hand_discard_button.custom_minimum_size = Vector2(120, 36)
+	hand_discard_button.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hand_discard_button.offset_left = 8
+	hand_discard_button.offset_bottom = -12
+	hand_discard_button.offset_top = -56
+	hand_discard_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	hand_discard_button.pressed.connect(_toggle_discard_popup)
+	hand_discard_button.hide()
+	root.add_child(hand_discard_button)
+
+	# Popup carte DISCARD in mano (nascosto di default).
+	discard_popup = PanelContainer.new()
+	discard_popup.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	discard_popup.offset_left = 8
+	discard_popup.offset_bottom = -52
+	discard_popup.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	discard_popup.grow_horizontal = Control.GROW_DIRECTION_END
+	discard_popup.hide()
+	root.add_child(discard_popup)
 
 	# Carta nemica pescata (grafica originale), in alto a sinistra.
 	enemy_card_rect = TextureRect.new()
@@ -1236,38 +1294,94 @@ func _section_label(text: String) -> Label:
 	return l
 
 
+const WOUND_SYMBOLS := {
+	FriendlyCards.WoundDraw.CLOSE_CALL: "MC",
+	FriendlyCards.WoundDraw.LIGHT_WOUND: "LW",
+	FriendlyCards.WoundDraw.BAD_WOUND: "BW",
+	FriendlyCards.WoundDraw.KIA: "KIA",
+}
+const WOUND_COLORS := {
+	FriendlyCards.WoundDraw.CLOSE_CALL: Color(0.7, 0.85, 0.7),
+	FriendlyCards.WoundDraw.LIGHT_WOUND: Color(0.95, 0.85, 0.35),
+	FriendlyCards.WoundDraw.BAD_WOUND: Color(0.95, 0.50, 0.20),
+	FriendlyCards.WoundDraw.KIA: Color(0.95, 0.25, 0.20),
+}
+const KIND_LABELS := {
+	FriendlyCards.Kind.ORDER: "ORDER",
+	FriendlyCards.Kind.DISCARD: "DISCARD",
+	FriendlyCards.Kind.EVENT: "EVENT",
+}
+
+
 func _show_hand() -> void:
 	for child in hand_box.get_children():
 		child.queue_free()
 	for i in range(state.friendly_hand.size()):
 		var serial: int = state.friendly_hand[i]
-		var tip := "Carta %d - %s\nAble %d  Baker %d  Charlie %d\n%s" % [
-			serial, FriendlyCards.title_of(serial),
+		var kind: int = FriendlyCards.kind_of(serial)
+		var wound: int = FriendlyCards.wound_of(serial)
+		var tip := "Carta %d - %s [%s]\nAble %d  Baker %d  Charlie %d\nFerita: %s\n%s" % [
+			serial, FriendlyCards.title_of(serial), KIND_LABELS.get(kind, ""),
 			FriendlyCards.initiative_for(serial, "Able"),
 			FriendlyCards.initiative_for(serial, "Baker"),
 			FriendlyCards.initiative_for(serial, "Charlie"),
+			WOUND_SYMBOLS.get(wound, "?"),
 			FriendlyCards.text_of(serial),
 		]
+		# Wrapper verticale: immagine + riga info + pulsante Gioca
+		var cv := VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 2)
+		hand_box.add_child(cv)
 		var img := FriendlyCards.image(serial)
+		var tex_to_preview: Texture2D = null
 		if not img.is_empty():
-			# Grafica originale della carta, cliccabile; hover = ingrandimento.
 			var tb := TextureButton.new()
 			tb.texture_normal = load(img)
 			tb.ignore_texture_size = true
 			tb.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-			tb.custom_minimum_size = Vector2(150, 208)
+			tb.custom_minimum_size = Vector2(150, 188)
 			tb.tooltip_text = tip
 			tb.pressed.connect(_on_card_chosen.bind(i))
-			tb.mouse_entered.connect(_show_card_preview.bind(tb.texture_normal))
+			tex_to_preview = tb.texture_normal
+			tb.mouse_entered.connect(_show_card_preview.bind(tex_to_preview))
 			tb.mouse_exited.connect(_hide_card_preview)
-			hand_box.add_child(tb)
+			cv.add_child(tb)
 		else:
-			var button := Button.new()  # ripiego testuale
-			button.custom_minimum_size = Vector2(150, 195)
-			button.text = "Carta %d\n%s" % [serial, FriendlyCards.title_of(serial)]
+			var button := Button.new()
+			button.custom_minimum_size = Vector2(150, 120)
+			button.text = "%s\n%s" % [FriendlyCards.title_of(serial), FriendlyCards.text_of(serial)]
 			button.tooltip_text = tip
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.pressed.connect(_on_card_chosen.bind(i))
-			hand_box.add_child(button)
+			cv.add_child(button)
+		# Riga: iniziative A/B/C + tipo ferita + tipo carta
+		var info_row := HBoxContainer.new()
+		info_row.add_theme_constant_override("separation", 4)
+		cv.add_child(info_row)
+		var init_lbl := Label.new()
+		var ia := FriendlyCards.initiative_for(serial, "Able")
+		var ib := FriendlyCards.initiative_for(serial, "Baker")
+		var ic := FriendlyCards.initiative_for(serial, "Charlie")
+		init_lbl.text = "A:%d B:%d C:%d" % [ia, ib, ic] if ia >= 0 else "EVENT"
+		init_lbl.add_theme_font_size_override("font_size", 11)
+		init_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		init_lbl.add_theme_color_override("font_color", Color(0.80, 0.85, 0.75))
+		info_row.add_child(init_lbl)
+		if wound >= 0:
+			var wound_lbl := Label.new()
+			wound_lbl.text = WOUND_SYMBOLS.get(wound, "")
+			wound_lbl.add_theme_font_size_override("font_size", 11)
+			wound_lbl.add_theme_color_override("font_color", WOUND_COLORS.get(wound, Color.WHITE))
+			info_row.add_child(wound_lbl)
+		# Badge tipo carta
+		var kind_lbl := Label.new()
+		kind_lbl.text = KIND_LABELS.get(kind, "")
+		kind_lbl.add_theme_font_size_override("font_size", 10)
+		var kind_col := Color(0.65, 0.80, 0.95) if kind == FriendlyCards.Kind.DISCARD \
+			else Color(0.95, 0.88, 0.55) if kind == FriendlyCards.Kind.ORDER \
+			else Color(0.95, 0.60, 0.30)
+		kind_lbl.add_theme_color_override("font_color", kind_col)
+		cv.add_child(kind_lbl)
 	hand_panel.show()
 
 
@@ -1293,6 +1407,101 @@ func _update_los_lines(c: Character) -> void:
 				"clear": true,
 			})
 	map_view.queue_redraw()
+
+
+func _update_played_card_bar() -> void:
+	if state == null or state.friendly_card_played < 0:
+		played_card_bar.hide()
+		if hand_discard_button != null:
+			hand_discard_button.hide()
+		return
+	var serial := state.friendly_card_played
+	var kind := FriendlyCards.kind_of(serial)
+	var wound := FriendlyCards.wound_of(serial)
+	var kind_str: String = KIND_LABELS.get(kind, "")
+	var wound_str: String = WOUND_SYMBOLS.get(wound, "")
+	var wound_color: Color = WOUND_COLORS.get(wound, Color.WHITE)
+	var wound_col: String = wound_color.to_html(false)
+	var effect := FriendlyCards.text_of(serial)
+	var lines: Array[String] = []
+	lines.append("[b]Carta giocata:[/b] %s [color=#%s][b]%s[/b][/color]  " % [
+		FriendlyCards.title_of(serial), kind_col_hex(kind), kind_str])
+	if not effect.is_empty():
+		lines.append("[i]%s[/i]  " % effect)
+	lines.append("Ferita: [color=#%s][b]%s[/b][/color]" % [wound_col, wound_str])
+	played_card_text.text = "  ".join(lines)
+	played_card_bar.show()
+	# Mostra il pulsante "Carte in mano" se ci sono DISCARD cards rimanenti.
+	var discard_count := _count_discard_in_hand()
+	if hand_discard_button != null:
+		if discard_count > 0:
+			hand_discard_button.text = "Carte (%d)" % discard_count
+			hand_discard_button.show()
+		else:
+			hand_discard_button.hide()
+
+
+func kind_col_hex(kind: int) -> String:
+	match kind:
+		FriendlyCards.Kind.ORDER:   return "f3e88a"
+		FriendlyCards.Kind.DISCARD: return "88ccff"
+		_:                          return "ff9944"
+
+
+func _count_discard_in_hand() -> int:
+	var n := 0
+	for s in state.friendly_hand:
+		if FriendlyCards.kind_of(s) == FriendlyCards.Kind.DISCARD:
+			n += 1
+	return n
+
+
+# Apre/chiude il popup con le DISCARD cards rimaste in mano durante il turno.
+func _toggle_discard_popup() -> void:
+	if discard_popup.visible:
+		discard_popup.hide()
+		return
+	# Ricostruisce il contenuto ogni volta.
+	for child in discard_popup.get_children():
+		child.queue_free()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.custom_minimum_size = Vector2(280, 0)
+	discard_popup.add_child(box)
+	var title := Label.new()
+	title.text = "Carte DISCARD in mano"
+	title.add_theme_color_override("font_color", Color(0.88, 0.95, 0.65))
+	box.add_child(title)
+	box.add_child(HSeparator.new())
+	var found := false
+	for s in state.friendly_hand:
+		if FriendlyCards.kind_of(s) != FriendlyCards.Kind.DISCARD:
+			continue
+		found = true
+		var row := HBoxContainer.new()
+		box.add_child(row)
+		var lbl := Label.new()
+		lbl.text = "[%d] %s" % [s, FriendlyCards.title_of(s)]
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.add_theme_font_size_override("font_size", 13)
+		row.add_child(lbl)
+		var desc := Label.new()
+		desc.text = FriendlyCards.text_of(s)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.add_theme_font_size_override("font_size", 11)
+		desc.modulate = Color(0.78, 0.78, 0.70)
+		desc.custom_minimum_size = Vector2(280, 0)
+		box.add_child(desc)
+	if not found:
+		var empty := Label.new()
+		empty.text = "(nessuna carta DISCARD in mano)"
+		empty.modulate = Color(0.6, 0.6, 0.6)
+		box.add_child(empty)
+	var close := Button.new()
+	close.text = "Chiudi"
+	close.pressed.connect(func(): discard_popup.hide())
+	box.add_child(close)
+	discard_popup.show()
 
 
 func _show_card_preview(tex: Texture2D) -> void:
@@ -1384,6 +1593,8 @@ func _refresh() -> void:
 	turn_label.text = "  Turno %d/%d  " % [mini(state.turn, state.max_turns), state.max_turns]
 	_update_enemy_card()
 	_refresh_roster()
+	if phase != Phase.CARD:
+		_update_played_card_bar()
 	for line in state.drain_log():
 		log_history.append(line)
 		if log_show_detail or not line.begins_with("·"):

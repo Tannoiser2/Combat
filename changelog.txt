@@ -1,3 +1,13 @@
+v0.28 — 2026-06-13
+- Scelta della carta (Rule 5.0): la mano torna a 5 carte ogni turno
+  (era: nessuna pesca se la mano non era vuota)
+- UI carta: iniziative A/B/C, tipo ferita (MC/LW/BW/KIA) e badge
+  ORDER/DISCARD/EVENT visibili sotto ogni carta senza hover
+- Banner carta giocata: dal primo ORDER phase in poi appare in basso
+  il titolo e l'effetto della carta in gioco durante tutto il turno
+- Pulsante "Carte (N)": visibile durante ORDER/ACTION/END_TURN,
+  apre il popup con le DISCARD cards rimaste in mano e il loro testo
+
 v0.27 — 2026-06-13
 - Granate a mano: frammentazione fedele alla Rule 14.2
   - chi e' nell'hex riceve un esito Near/Far (controllo sul WS del
