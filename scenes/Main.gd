@@ -181,7 +181,8 @@ func _load_sfx() -> void:
 	for s in ["rifle", "mg", "pistol", "grenade", "artillery", "melee", "scream",
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
 			"thompson", "springfield", "stg44",
-			"kill", "wound", "suppress", "miss", "throw"]:
+			"kill", "wound", "suppress", "miss", "throw",
+			"footstep", "run", "vehicle", "click"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -204,6 +205,9 @@ func _consume_audio_events() -> void:
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
 			"throw": _play_sfx("throw")
+			"footstep": _play_sfx("footstep")
+			"run":      _play_sfx("run")
+			"vehicle":  _play_sfx("vehicle")
 	state.audio_events.clear()
 
 
@@ -519,10 +523,16 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
 		next_button.text = "Passa"
 	elif action_kind == TurnSequence.Act.THROW:
-		map_view.cue_hexes = TurnSequence.valid_throw_hexes(state, c)
+		var throw_hexes := TurnSequence.valid_throw_hexes(state, c)
+		map_view.cue_hexes = throw_hexes
 		map_view.cue_color = Color(0.95, 0.6, 0.15, 0.9)
-		hint_label.text = "%s: clicca l'hex bersaglio della granata (arancio) o premi Passa" % \
-			c.display_name
+		var r := TurnSequence.throw_range(c)
+		if throw_hexes.is_empty():
+			hint_label.text = "%s: nessun hex valido (gittata %d-%d hex, LOS necessaria)" % [
+				c.display_name, r[0], r[1]]
+		else:
+			hint_label.text = "%s: clicca l'hex bersaglio arancio (%d-%d hex, LOS necessaria) o premi Passa" % [
+				c.display_name, r[0], r[1]]
 		next_button.text = "Passa"
 	else:
 		map_view.cue_hexes = _passable_neighbors(c)
@@ -868,6 +878,7 @@ func _on_map_clicked() -> void:
 	var hex := map_view.pick_hex(map_view.get_local_mouse_position())
 	if hex.x <= -99:
 		return
+	_play_sfx("click")
 	if los_mode:
 		_handle_los_click(hex)
 		return
@@ -989,6 +1000,9 @@ func _handle_action_click(hex: Vector2i) -> void:
 		var from := acting.position
 		if not Move.step_to(state, acting, hex):
 			return
+		_play_sfx("vehicle" if acting.is_vehicle else \
+			("run" if acting.order in [Domain.Order.SPRINT, Domain.Order.RUN_AND_GUN,
+				Domain.Order.CHARGE] else "footstep"))
 		moves_left -= 1
 		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
 		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:
@@ -1420,19 +1434,14 @@ func _update_los_lines(c: Character) -> void:
 	if c == null or c.is_dead():
 		map_view.queue_redraw()
 		return
-	for other in state.characters:
-		if other.side == c.side or other.is_dead():
-			continue
-		# verso i nemici noti (o, per un nemico selezionato, i tuoi uomini)
-		if other.side == Domain.Side.ENEMY and not other.known:
-			continue
-		# solo le LOS LIBERE (le rosse affollavano la mappa); per un
-		# controllo puntuale c'e' lo strumento LOS.
-		if LOS.clear(state, c, other):
-			map_view.los_lines.append({
-				"to": map_view.hex_center(other.position.x, other.position.y),
-				"clear": true,
-			})
+	# Mostra solo i bersagli effettivamente colpibili, non tutti i visibili:
+	# evita di evidenziare nemici fuori gittata, in abbazia, incompatibili
+	# con l'arma corrente, ecc.
+	for target in TurnSequence.valid_fire_targets(state, c):
+		map_view.los_lines.append({
+			"to": map_view.hex_center(target.position.x, target.position.y),
+			"clear": true,
+		})
 	map_view.queue_redraw()
 
 

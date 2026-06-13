@@ -212,5 +212,37 @@ REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/25-
 LICENSE: CC0 1.0 Universal (Public Domain)
 NOTES:  Transient kept (long tail trimmed), sequenced into a 6-round burst
 
-NOTE on vehicles: vehicle/engine and main-gun sounds will be added together
-with the vehicle rules (Rule 31-32), not yet implemented.
+======================================================================
+MOVIMENTO E UI (aggiunti 2026-06-13)
+======================================================================
+
+----------------------------------------------------------------------
+FILE: footstep.ogg  (passi calmi — ordini Sneak/Hide/Evade)
+SOURCES: kenney_rpgaudio/Audio/footstep00.ogg + footstep02.ogg
+         2 passi leggeri a ~0.6s, fade-out finale
+ORIGIN: Kenney RPG Audio v1.0 (www.kenney.nl)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/kenney_rpgaudio/Audio
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: run.ogg  (passi veloci — ordini Sprint/Run&Gun/Charge)
+SOURCES: Warfork CC0 Pack: cc0/sounds/world/ft_step1-3.ogg
+         3 passi pesanti sequenziati a ~320ms (circa 185 bpm)
+ORIGIN: Warfork Free Soundpacks — CC0 Pack by Caine & MaxCarnage
+REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/cc0/sounds/world
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: vehicle.ogg  (cingoli/motore veicolo corazzato)
+SOURCES: 100-CC0-SFX/machine_01-03.ogg
+         3 transient metallici sequenziati a 400ms, lowpass 800Hz
+ORIGIN: "100 CC0 SFX" pack
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/100-CC0-SFX
+LICENSE: CC0 1.0 Universal (Public Domain)
+
+----------------------------------------------------------------------
+FILE: click.ogg  (click UI sul mouse)
+SOURCE: kenney_uiaudio/Audio/mouseclick1.ogg
+ORIGIN: Kenney UI Audio v1.0 (www.kenney.nl)
+REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/kenney_uiaudio/Audio
+LICENSE: CC0 1.0 Universal (Public Domain)

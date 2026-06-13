@@ -623,14 +623,19 @@ static func _melee_attack_tq(state: GameState, attacker: Character) -> int:
 static func _do_melee(state: GameState, attacker: Character) -> void:
 	# Bersaglio nello stesso hex (non adiacente).
 	var target: Character = null
+	var rivals_in_hex := 0
 	for d in state.characters:
 		if d.side == attacker.side or d.is_dead():
 			continue
 		if d.position == attacker.position:
-			target = d
-			break
+			rivals_in_hex += 1
+			if target == null:
+				target = d
 	if target == null:
 		return
+	if rivals_in_hex > 1:
+		state.log_event("Mischia: %d avversari nell'hex — %s attacca %s" % [
+			rivals_in_hex, attacker.display_name, target.display_name])
 	target.known = true
 	if target.is_dummy:
 		target.removed = true
@@ -745,6 +750,10 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 	var from := c.position
 	var n := Move.move_character(state, c, hexes)
 	if n > 0:
+		var sfx := "vehicle" if c.is_vehicle else \
+			("run" if c.order in [Domain.Order.SPRINT, Domain.Order.RUN_AND_GUN,
+				Domain.Order.CHARGE] else "footstep")
+		Replay.sfx(state, sfx)
 		var how := "verso il nemico" if Move.advances(c.order) else "via dal nemico"
 		if c.side == Domain.Side.ENEMY and not Move.parse_dirs(c.order_move).is_empty() \
 				and c.order != Domain.Order.CHARGE:
