@@ -1,3 +1,18 @@
+v0.31 — 2026-06-14
+- Scenari Vol.1 allineati allo Scenario Book v1.36b:
+  - s4 Sniper Village: aggiunto cup_spec completo con rinforzi turno 4
+    (wave ai hex 35.03-35.07/35.15-35.19)
+  - s5 Village Defense: corretto enemy_setup (04.11/04.16/04.18),
+    aggiunto bombardamento iniziale 105mm (6 colpi) e wave al turno 5
+  - s6 Scout the Hill: corretto deploy (bordo SINISTRO col 1-4, non destro),
+    aggiunto hex 29.08 mancante dal setup
+  - s7 Hold the Hill: corretti turni delle ondate (3 e 5, non 5 e 9)
+    e hex delle ondate (col 8-9, lato nemico della collina)
+  - s9 Destroy Those Guns: aggiunti hex 19.15 e 19.18 al setup,
+    aggiunto cannone 23.08, aggiunte wave ai turni 3/5/7
+  - s10 Hold until Relieved!: scenario aggiunto (farmhouse, 15 turni,
+    nemici da entrambi i lati, bombardamento iniziale, 2 ondate)
+
 v0.30 — 2026-06-13
 - Scia di fumo post-esplosione (Rule 18):
   - granate lasciano Fading Smoke (1 turno) nell'hex dell'esplosione
