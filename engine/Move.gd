@@ -112,6 +112,9 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 		return _stack_ok(mover, occ)
 	if not mover.has_order or mover.order not in [D.Order.CHARGE, D.Order.MELEE]:
 		return false
+	# Rule 15: non si può caricare un hex con 2+ difensori (uno contro due).
+	if _enemy_count_at(state, mover, hex) >= 2:
+		return false
 	# Edificio fortificato (Rule 27.2): non si carica un occupante al suo
 	# interno (vale per entrambi i lati - il giocatore non entra, il nemico
 	# non ci prova).
@@ -126,6 +129,15 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 # l'hex con i mezzi).
 static func _stack_ok(mover: Character, occ: Character) -> bool:
 	return not occ.is_vehicle and not mover.is_vehicle
+
+
+# Conta i nemici vivi nell'hex (per il blocco Charge con 2+ difensori).
+static func _enemy_count_at(state: GameState, mover: Character, hex: Vector2i) -> int:
+	var count := 0
+	for c in state.characters:
+		if c.side != mover.side and not c.is_dead() and c.position == hex:
+			count += 1
+	return count
 
 
 # L'ordine fa avanzare (true) o ritirare (false)?
