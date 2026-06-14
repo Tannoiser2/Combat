@@ -109,6 +109,9 @@ var los_lines: Array = []
 # Overlay di verifica del terreno (tasto T): tinte + hexside sopra la
 # scansione, per confrontare la classificazione con la mappa vera.
 var debug_terrain := false
+# Editor di mappa: modalita' pittura terreno (tasto E).
+var editor_mode := false
+var map_opacity: float = 1.0
 # Strumento LOS: {from: Vector2, to: Vector2, clear: bool} oppure {}.
 var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
@@ -373,7 +376,7 @@ func _draw() -> void:
 	var font := ThemeDB.fallback_font
 	var radius := cell.x / 1.5  # raggio centro-vertice
 	if board != null:
-		draw_texture(board, Vector2.ZERO)
+		draw_texture(board, Vector2.ZERO, Color(1.0, 1.0, 1.0, map_opacity))
 		if debug_terrain:
 			_draw_terrain_overlay(radius)
 	else:
@@ -524,6 +527,15 @@ func _draw() -> void:
 			if c.side == D.Side.FRIENDLY and c.spotted:
 				draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
 					radius * 0.12, Color(0.9, 0.15, 0.15))
+	# Editor di mappa: etichette col,row su ogni hex + tinta terreno.
+	if editor_mode:
+		for key in state.map:
+			var ec := _key_to_cell(key)
+			var ecenter := hex_center(ec.x, ec.y)
+			draw_circle(ecenter, radius * 0.28, Color(0.0, 0.0, 0.0, 0.55))
+			draw_string(font, ecenter + Vector2(-radius * 0.45, radius * 0.12),
+				"%02d.%02d" % [ec.x, ec.y],
+				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.28), Color.WHITE)
 
 
 # Un segnalino completo: pedina (o cerchietto di ripiego), pallino del
