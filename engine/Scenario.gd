@@ -515,7 +515,7 @@ const SCENARIOS := {
 
 	"s1": {
 		"name": "1. Attack the Farmhouse",
-		"map": "farmhouse", "turns": 12, "hand_limit": 3,
+		"map": "farmhouse", "turns": 12, "hand_limit": 3, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Forze nemiche presidiano la fattoria.\nTocca alla tua squadra ripulirla.",
@@ -540,7 +540,7 @@ const SCENARIOS := {
 
 	"s2": {
 		"name": "2. Defend the Farmhouse",
-		"map": "farmhouse", "turns": 12, "hand_limit": 2,
+		"map": "farmhouse", "turns": 12, "hand_limit": 2, "event_table": "defending",
 		"deploy": {"cols": [18, 30], "rows": [0, 19]},
 		"desc": "Prenderla e' stato facile, tenerla no:\nil nemico torna a riprendersi la 'sua' fattoria.",
 		"squad_full": true,
@@ -578,7 +578,7 @@ const SCENARIOS := {
 
 	"s3": {
 		"name": "3. Let's Get Out of Here!",
-		"map": "farmhouse", "turns": 12, "hand_limit": 3,
+		"map": "farmhouse", "turns": 12, "hand_limit": 3, "event_table": "s3",
 		"deploy": {"cols": [18, 26], "rows": [0, 19]},
 		"desc": "Prigioniero catturato, Taylor ferito grave,\ne il nemico lancia l'attacco. Si torna a casa.",
 		"squad_full": true,
@@ -609,7 +609,7 @@ const SCENARIOS := {
 
 	"s4": {
 		"name": "4. Sniper Village",
-		"map": "village", "turns": 14, "hand_limit": 3,
+		"map": "village", "turns": 14, "hand_limit": 3, "event_table": "attacking",
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Il paese sembra vuoto, ma il QG teme i cecchini.\nE il nemico ha scelto proprio ora per pattugliare.",
 		"squad_full": true,
@@ -638,7 +638,7 @@ const SCENARIOS := {
 
 	"s5": {
 		"name": "5. Village Defense",
-		"map": "village", "turns": 12, "hand_limit": 3,
+		"map": "village", "turns": 12, "hand_limit": 3, "event_table": "defending",
 		"deploy": {"cols": [14, 30], "rows": [0, 19]},
 		"desc": "Vengono dritti su di noi: o teniamo il paese\no il plotone a sud resta tagliato fuori.",
 		"squad_full": true,
@@ -677,7 +677,7 @@ const SCENARIOS := {
 
 	"s6": {
 		"name": "6. Scout the Hill",
-		"map": "hill", "turns": 15, "hand_limit": 3,
+		"map": "hill", "turns": 15, "hand_limit": 3, "event_table": "s6",
 		# SR8 libro: "within 4 hexes of the left hand board edge" = colonne 1-4.
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Pattuglia notturna: ricognizione sui 4 punti\nsegnati in mappa. E riportate un prigioniero vivo.",
@@ -702,7 +702,7 @@ const SCENARIOS := {
 
 	"s7": {
 		"name": "7. Hold the Hill",
-		"map": "hill", "turns": 15, "hand_limit": 3,
+		"map": "hill", "turns": 15, "hand_limit": 3, "event_table": "defending",
 		"deploy": {"cols": [20, 30], "rows": [0, 19]},
 		"desc": "La collina va tenuta a ogni costo.\nLoro arriveranno a ondate. Noi terremo.",
 		"squad_full": true,
@@ -730,7 +730,7 @@ const SCENARIOS := {
 
 	"s8": {
 		"name": "8. Rescue Mission",
-		"map": "hedgerows", "turns": 12, "hand_limit": 3,
+		"map": "hedgerows", "turns": 12, "hand_limit": 3, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "Un partigiano con documenti vitali e' nascosto in\nun casolare oltre le linee. Riportatelo a casa.",
@@ -761,7 +761,7 @@ const SCENARIOS := {
 
 	"s9": {
 		"name": "9. Destroy Those Guns!",
-		"map": "hedgerows", "turns": 12, "hand_limit": 4,
+		"map": "hedgerows", "turns": 12, "hand_limit": 4, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "L'artiglieria nemica martella le nostre posizioni\ndai campi. Entrate e fate saltare i pezzi.",
@@ -791,7 +791,7 @@ const SCENARIOS := {
 
 	"s10": {
 		"name": "10. Hold until Relieved!",
-		"map": "farmhouse", "turns": 15, "hand_limit": 3,
+		"map": "farmhouse", "turns": 15, "hand_limit": 3, "event_table": "s10",
 		"compass": ["2,3", "2,4"],
 		# Libro: "within 3 hexes of a building hex" (centro fattoria).
 		"deploy": {"cols": [11, 25], "rows": [0, 19]},

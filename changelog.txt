@@ -1,3 +1,22 @@
+v0.32 — 2026-06-14
+- Tabelle Evento per-scenario (Rule 19) implementate in Events.gd:
+  - tabella "attacking" (s1/s4/s8/s9): mortai 60mm/81mm e artiglieria 105mm
+    sui hex del lato nemico; rinforzi dal bordo est (35.16-35.18/35.06-35.10)
+  - tabella "defending" (s2/s5/s7): fuoco amico/nemico specchiato, rinforzi
+    dal bordo ovest (01.01-01.05, 01.13-01.17) per il nemico
+  - tabella "s3": fuochi amici su sub-tabella A (col 4-11) ai turni 1-4,
+    B (col 20-30) ai turni 5-12; rinforzi nemici da sub-tabella e bordo est
+  - tabella "s6": infiltrazione silenziosa (sposta 1 amico non avvistato),
+    illuminazione, rumore (TQC nemici entro 5 hex), campo minato, rinforzi
+  - tabella "s10": mortai/artiglieria sui hex del farmhouse, rinforzi da
+    lato ovest e est, sub-tabelle A/B/E per i hex
+  - chiave "event_table" aggiunta a tutti gli scenari Vol.1 (s1-s10)
+  - effetti comuni a tutte le tabelle: Lucky Strike (carta extra), rimozione
+    Low Ammo, boost morale vicino al leader, rivela un nemico nascosto,
+    Second Thoughts (cambia ordine nemico), Knife Attack silenzioso (s6)
+  - fuoco incrociato: friendly roll 9 → tiro su tabella nemica (e viceversa),
+    con guardia anti-loop a profondità 2
+
 v0.31 — 2026-06-14
 - UI: rimossi suoni dei passi e della corsa (footstep/run); i veicoli
   mantengono il proprio suono motore
