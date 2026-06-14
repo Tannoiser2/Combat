@@ -1,3 +1,54 @@
+v0.32 — 2026-06-14
+- Tabelle Evento per-scenario (Rule 19) implementate in Events.gd:
+  - tabella "attacking" (s1/s4/s8/s9): mortai 60mm/81mm e artiglieria 105mm
+    sui hex del lato nemico; rinforzi dal bordo est (35.16-35.18/35.06-35.10)
+  - tabella "defending" (s2/s5/s7): fuoco amico/nemico specchiato, rinforzi
+    dal bordo ovest (01.01-01.05, 01.13-01.17) per il nemico
+  - tabella "s3": fuochi amici su sub-tabella A (col 4-11) ai turni 1-4,
+    B (col 20-30) ai turni 5-12; rinforzi nemici da sub-tabella e bordo est
+  - tabella "s6": infiltrazione silenziosa (sposta 1 amico non avvistato),
+    illuminazione, rumore (TQC nemici entro 5 hex), campo minato, rinforzi
+  - tabella "s10": mortai/artiglieria sui hex del farmhouse, rinforzi da
+    lato ovest e est, sub-tabelle A/B/E per i hex
+  - chiave "event_table" aggiunta a tutti gli scenari Vol.1 (s1-s10)
+  - effetti comuni a tutte le tabelle: Lucky Strike (carta extra), rimozione
+    Low Ammo, boost morale vicino al leader, rivela un nemico nascosto,
+    Second Thoughts (cambia ordine nemico), Knife Attack silenzioso (s6)
+  - fuoco incrociato: friendly roll 9 → tiro su tabella nemica (e viceversa),
+    con guardia anti-loop a profondità 2
+
+v0.31 — 2026-06-14
+- UI: rimossi suoni dei passi e della corsa (footstep/run); i veicoli
+  mantengono il proprio suono motore
+- UI: roster amici (sinistra) ora collassabile con header "SQUADRA ▼/▶"
+- UI: indicatori visivi colorati nel roster: cuori rossi per ferite,
+  arancione/giallo per munizioni, pallino colorato per morale
+- UI: pannello "NEMICI NOTI" nella sidebar destra (collassabile, default
+  chiuso): mostra i nemici avvistati con ferite e pallino morale
+- Scenari Vol.1 allineati allo Scenario Book v1.36b (2a tornata):
+  - intro1 Meeting of Patrols: aggiunti VP e 4 hex obiettivo (20.06,
+    27.03, 29.14, 33.05; +4 VP ciascuno)
+  - s2 Defend the Farmhouse: aggiunta ondata al turno 5 (stessi hex
+    del setup iniziale, come da libro)
+  - s3 Let's Get Out: aggiunto hex 24.19 al setup (mancante) e ondata
+    al turno 3 ai hex 35.05-35.10
+  - s8 Rescue Mission: corretta posizione di Alex/Maquis (29.14, non
+    17.14); aggiunto 17.14 al setup nemico; aggiunte 3 ondate (turno 3
+    col 35, turni 5 e 7 col 34)
+- Scenari Vol.1 allineati (1a tornata — recap):
+  - s4 Sniper Village: aggiunto cup_spec completo con rinforzi turno 4
+    (wave ai hex 35.03-35.07/35.15-35.19)
+  - s5 Village Defense: corretto enemy_setup (04.11/04.16/04.18),
+    aggiunto bombardamento iniziale 105mm (6 colpi) e wave al turno 5
+  - s6 Scout the Hill: corretto deploy (bordo SINISTRO col 1-4, non destro),
+    aggiunto hex 29.08 mancante dal setup
+  - s7 Hold the Hill: corretti turni delle ondate (3 e 5, non 5 e 9)
+    e hex delle ondate (col 8-9, lato nemico della collina)
+  - s9 Destroy Those Guns: aggiunti hex 19.15 e 19.18 al setup,
+    aggiunto cannone 23.08, aggiunte wave ai turni 3/5/7
+  - s10 Hold until Relieved!: scenario aggiunto (farmhouse, 15 turni,
+    nemici da entrambi i lati, bombardamento iniziale, 2 ondate)
+
 v0.30 — 2026-06-13
 - Scia di fumo post-esplosione (Rule 18):
   - granate lasciano Fading Smoke (1 turno) nell'hex dell'esplosione

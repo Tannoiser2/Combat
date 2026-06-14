@@ -352,6 +352,10 @@ const SCENARIOS := {
 		"waves": [{"turn": 4, "hexes": ["35,8", "35,7", "35,6", "35,5"]}],
 		# SR13: i nemici possono uscire dalla mappa da qualsiasi bordo.
 		"enemy_may_exit": true,
+		# Punti di ricognizione da raggiungere (+4 VP l'uno).
+		"objective_hexes": ["20,6", "27,3", "29,14", "33,5"],
+		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
+			"objective_each": 4},
 	},
 
 	"intro2": {
@@ -511,7 +515,7 @@ const SCENARIOS := {
 
 	"s1": {
 		"name": "1. Attack the Farmhouse",
-		"map": "farmhouse", "turns": 12, "hand_limit": 3,
+		"map": "farmhouse", "turns": 12, "hand_limit": 3, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Forze nemiche presidiano la fattoria.\nTocca alla tua squadra ripulirla.",
@@ -536,7 +540,7 @@ const SCENARIOS := {
 
 	"s2": {
 		"name": "2. Defend the Farmhouse",
-		"map": "farmhouse", "turns": 12, "hand_limit": 2,
+		"map": "farmhouse", "turns": 12, "hand_limit": 2, "event_table": "defending",
 		"deploy": {"cols": [18, 30], "rows": [0, 19]},
 		"desc": "Prenderla e' stato facile, tenerla no:\nil nemico torna a riprendersi la 'sua' fattoria.",
 		"squad_full": true,
@@ -561,6 +565,12 @@ const SCENARIOS := {
 		"enemy_setup": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14", "3,15",
 			"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,10", "4,11",
 			"4,12", "4,13", "4,14", "4,15", "4,17"],
+		# SR libro: al turno 5 nuovi nemici ai medesimi hex d'entrata.
+		"waves": [
+			{"turn": 5, "hexes": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14", "3,15",
+				"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,10", "4,11",
+				"4,12", "4,13", "4,14", "4,15", "4,17"]},
+		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -2, "friendly_wounded": -1,
 			"no_enemy_in_building": 8},
@@ -568,7 +578,7 @@ const SCENARIOS := {
 
 	"s3": {
 		"name": "3. Let's Get Out of Here!",
-		"map": "farmhouse", "turns": 12, "hand_limit": 3,
+		"map": "farmhouse", "turns": 12, "hand_limit": 3, "event_table": "s3",
 		"deploy": {"cols": [18, 26], "rows": [0, 19]},
 		"desc": "Prigioniero catturato, Taylor ferito grave,\ne il nemico lancia l'attacco. Si torna a casa.",
 		"squad_full": true,
@@ -581,11 +591,16 @@ const SCENARIOS := {
 			"White": {"Recruit": 5, "Rifleman": 5, "Officer": 1},
 		},
 		"dummies": 20,
+		# Hex corretti dal libro (aggiunto 24.19 mancante al gruppo 2).
 		"enemy_setup": ["33,4", "33,5", "33,6", "33,7", "33,8", "33,9",
 			"35,5", "35,6", "35,7", "35,8", "35,9", "35,10", "33,10",
-			"18,19", "19,19", "20,19", "21,19", "22,19", "23,19"],
+			"18,19", "19,19", "20,19", "21,19", "22,19", "23,19", "24,19"],
 		"first_order_d6": ["EVADE 5/6", "EVADE 6/5", "SPRINT 6",
 			"SPRINT 5", "SNEAK 5", "SNEAK 6"],
+		# SR libro: rinforzi al turno 3 dal bordo est.
+		"waves": [
+			{"turn": 3, "hexes": ["35,5", "35,6", "35,7", "35,8", "35,9", "35,10"]},
+		],
 		# Fuga: VP per ogni uomo che esce dal bordo sinistro (col <= 2).
 		"exit_col": 2,
 		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
@@ -594,20 +609,28 @@ const SCENARIOS := {
 
 	"s4": {
 		"name": "4. Sniper Village",
-		"map": "village", "turns": 14, "hand_limit": 3,
+		"map": "village", "turns": 14, "hand_limit": 3, "event_table": "attacking",
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Il paese sembra vuoto, ma il QG teme i cecchini.\nE il nemico ha scelto proprio ora per pattugliare.",
 		"squad_full": true,
+		# Coppa iniziale: solo i tipi iniziali (reclute/cecchini).
+		# Al turno 4 il libro aggiunge reparti completi alla pool: li
+		# pre-carichiamo qui cosi' la wave del turno 4 li pesca dalla riserva.
 		"cup_spec": {
-			"Blue": {"Recruit": 3, "Sniper": 1},
-			"Red": {"Sniper": 1, "Recruit": 5},
-			"Yellow": {"Sniper": 1},
-			"White": {"Recruit": 4, "Sniper": 1},
+			"Blue": {"Recruit": 3, "Sniper": 1, "Rifleman": 5, "NCO": 1, "Officer": 1},
+			"Red": {"Sniper": 1, "Recruit": 5, "Veteran": 2, "Rifleman": 5},
+			"Yellow": {"Sniper": 1, "Officer": 1, "Rifleman": 5, "NCO": 2, "Elite": 1},
+			"White": {"Recruit": 4, "Sniper": 1, "Rifleman": 5, "NCO": 2, "Officer": 1},
 		},
 		"dummies": 24,
 		"enemy_setup": ["14,7", "16,11", "16,17", "17,4", "19,5", "20,3",
 			"21,3", "21,15", "21,18", "23,6", "24,6", "24,7", "25,9",
 			"25,11", "25,13", "25,19", "27,8", "28,4", "28,10", "29,7", "29,17"],
+		# SR11 (libro): al turno 4 i reparti completi entrano dai bordi est.
+		"waves": [
+			{"turn": 4, "hexes": ["35,3", "35,4", "35,5", "35,6", "35,7",
+				"35,15", "35,16", "35,17", "35,18", "35,19"]},
+		],
 		"building_tqc_aimed": true,
 		"vp": {"enemy_killed": 2, "friendly_killed": -2, "friendly_wounded": -1,
 			"no_enemy_in_building": 5},
@@ -615,7 +638,7 @@ const SCENARIOS := {
 
 	"s5": {
 		"name": "5. Village Defense",
-		"map": "village", "turns": 12, "hand_limit": 3,
+		"map": "village", "turns": 12, "hand_limit": 3, "event_table": "defending",
 		"deploy": {"cols": [14, 30], "rows": [0, 19]},
 		"desc": "Vengono dritti su di noi: o teniamo il paese\no il plotone a sud resta tagliato fuori.",
 		"squad_full": true,
@@ -627,9 +650,26 @@ const SCENARIOS := {
 			"White": {"Recruit": 3, "Rifleman": 5, "NCO": 2, "Officer": 1},
 		},
 		"dummies": 20,
+		# SR10: bombardamento iniziale (105mm, 6 colpi) prima dell'inizio.
+		"opening_barrage": {
+			"type": "ARTILLERY_105",
+			"rolls": 6,
+			"scatter": true,
+			"hex_table": [
+				"20,7", "27,11", "20,14", "27,18", "30,12",
+				"28,7", "19,14", "24,13", "23,6", "12,10",
+			],
+		},
+		# Hex corretti dal libro (04.11 non 04.10; 04.16/04.18 non 04.15/04.17).
 		"enemy_setup": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14", "3,15",
-			"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,10", "4,11",
-			"4,12", "4,13", "4,14", "4,15", "4,17"],
+			"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,11",
+			"4,12", "4,13", "4,14", "4,15", "4,16", "4,18"],
+		# SR13 (libro): al turno 5 altri nemici dalla riserva agli stessi hex.
+		"waves": [
+			{"turn": 5, "hexes": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14",
+				"3,15", "3,17", "4,2", "4,3", "4,4", "4,5", "4,6", "4,11",
+				"4,12", "4,13", "4,14", "4,15", "4,16", "4,18"]},
+		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -2, "friendly_wounded": -1,
 			"no_enemy_in_building": 8},
@@ -637,8 +677,9 @@ const SCENARIOS := {
 
 	"s6": {
 		"name": "6. Scout the Hill",
-		"map": "hill", "turns": 15, "hand_limit": 3,
-		"deploy": {"cols": [31, 35], "rows": [0, 19]},
+		"map": "hill", "turns": 15, "hand_limit": 3, "event_table": "s6",
+		# SR8 libro: "within 4 hexes of the left hand board edge" = colonne 1-4.
+		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Pattuglia notturna: ricognizione sui 4 punti\nsegnati in mappa. E riportate un prigioniero vivo.",
 		"night": true,
 		"squad_full": true,
@@ -649,8 +690,9 @@ const SCENARIOS := {
 			"White": {"Officer": 1, "Recruit": 5, "Sniper": 1},
 		},
 		"dummies": 24,
+		# 14 hex dal libro (aggiunto 29.08 mancante).
 		"enemy_setup": ["17,5", "18,6", "18,10", "18,15", "20,5", "22,4",
-			"22,10", "22,15", "23,14", "24,13", "25,17", "26,6", "27,9"],
+			"22,10", "22,15", "23,14", "24,13", "25,17", "26,6", "27,9", "29,8"],
 		# I 4 punti da ricognire (+VP quando un friendly ci arriva accanto).
 		# APPROSSIMATI: il libro li segna sulla mappa, non in chiaro.
 		"objective_hexes": ["20,5", "18,10", "23,14", "26,6"],
@@ -660,7 +702,7 @@ const SCENARIOS := {
 
 	"s7": {
 		"name": "7. Hold the Hill",
-		"map": "hill", "turns": 15, "hand_limit": 3,
+		"map": "hill", "turns": 15, "hand_limit": 3, "event_table": "defending",
 		"deploy": {"cols": [20, 30], "rows": [0, 19]},
 		"desc": "La collina va tenuta a ogni costo.\nLoro arriveranno a ondate. Noi terremo.",
 		"squad_full": true,
@@ -674,9 +716,13 @@ const SCENARIOS := {
 		"dummies": 12,
 		"enemy_setup": ["10,7", "10,9", "10,10", "10,11", "10,13", "9,8",
 			"9,11", "9,12", "9,15", "9,17", "8,6", "8,9", "8,12", "8,15", "8,16"],
+		# SR14 libro: rinforzi ai turni 3 e 5 (non 5 e 9) negli stessi hex
+		# del setup (colonne 8-9, lato sinistro della collina).
 		"waves": [
-			{"turn": 5, "hexes": ["1,5", "1,7", "1,9", "1,11", "1,13"]},
-			{"turn": 9, "hexes": ["1,5", "1,7", "1,9", "1,11", "1,13"]},
+			{"turn": 3, "hexes": ["9,8", "9,11", "9,12", "9,15", "9,17",
+				"8,6", "8,9", "8,12", "8,15", "8,16"]},
+			{"turn": 5, "hexes": ["9,8", "9,11", "9,12", "9,15", "9,17",
+				"8,6", "8,9", "8,12", "8,15", "8,16"]},
 		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -2, "friendly_wounded": -1},
@@ -684,7 +730,7 @@ const SCENARIOS := {
 
 	"s8": {
 		"name": "8. Rescue Mission",
-		"map": "hedgerows", "turns": 12, "hand_limit": 3,
+		"map": "hedgerows", "turns": 12, "hand_limit": 3, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "Un partigiano con documenti vitali e' nascosto in\nun casolare oltre le linee. Riportatelo a casa.",
@@ -696,19 +742,26 @@ const SCENARIOS := {
 			"White": {"Officer": 1, "Recruit": 5, "Rifleman": 4},
 		},
 		"dummies": 12,
-		"enemy_setup": ["18,4", "21,9", "17,10", "19,7", "17,17", "15,16",
+		# Hex corretti dal libro (17.14 era maquis, ma e' posizione nemica;
+		# il maquis "Alex" e' a 29.14 oltre le linee).
+		"enemy_setup": ["18,4", "21,9", "17,10", "17,14", "19,7", "17,17", "15,16",
 			"16,13", "12,16", "16,18"],
-		# Il Maquis e' nel casolare in 17.14: va scortato fuori dal bordo
-		# sinistro (col <= 2) vivo.
-		"maquis_hex": "17,14",
+		# Alex e' nel casolare in 29.14: va scortato fuori dal bordo sinistro.
+		"maquis_hex": "29,14",
 		"exit_col": 2,
+		# SR libro: rinforzi al turno 3 (col 35) e turni 5 e 7 (col 34).
+		"waves": [
+			{"turn": 3, "hexes": ["35,6", "35,7", "35,8", "35,9", "35,10", "35,11"]},
+			{"turn": 5, "hexes": ["34,6", "34,7", "34,8", "34,9", "34,10", "34,11"]},
+			{"turn": 7, "hexes": ["34,6", "34,7", "34,8", "34,9", "34,10", "34,11"]},
+		],
 		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
 			"maquis_rescued": 10, "friendly_exited": 1},
 	},
 
 	"s9": {
 		"name": "9. Destroy Those Guns!",
-		"map": "hedgerows", "turns": 12, "hand_limit": 4,
+		"map": "hedgerows", "turns": 12, "hand_limit": 4, "event_table": "attacking",
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "L'artiglieria nemica martella le nostre posizioni\ndai campi. Entrate e fate saltare i pezzi.",
@@ -720,12 +773,68 @@ const SCENARIOS := {
 			"White": {"Officer": 1, "Recruit": 5, "Rifleman": 4},
 		},
 		"dummies": 12,
-		"enemy_setup": ["16,16", "17,11", "18,18", "19,5", "19,10", "23,7",
-			"24,4", "24,10", "28,11", "29,13"],
-		"gun_hexes": ["19,11", "20,19", "21,3"],
+		# Hex corretti dal libro (aggiunto 19.15 e 19.18 mancanti).
+		"enemy_setup": ["16,16", "17,11", "18,18", "19,5", "19,10", "19,15",
+			"19,18", "23,7", "24,4", "24,10", "28,11", "29,13"],
+		# 4 cannoni (aggiunto 23.08 mancante).
+		"gun_hexes": ["19,11", "20,19", "21,3", "23,8"],
 		"c4": true,
+		# SR15/16/17 libro: rinforzi ai turni 3, 5 e 7 dal bordo est (col 35).
+		"waves": [
+			{"turn": 3, "hexes": ["35,6", "35,7", "35,8", "35,9", "35,10", "35,11"]},
+			{"turn": 5, "hexes": ["35,6", "35,7", "35,8", "35,9", "35,10", "35,11"]},
+			{"turn": 7, "hexes": ["35,6", "35,7", "35,8", "35,9", "35,10", "35,11"]},
+		],
 		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
 			"guns_required": true},
+	},
+
+	"s10": {
+		"name": "10. Hold until Relieved!",
+		"map": "farmhouse", "turns": 15, "hand_limit": 3, "event_table": "s10",
+		"compass": ["2,3", "2,4"],
+		# Libro: "within 3 hexes of a building hex" (centro fattoria).
+		"deploy": {"cols": [11, 25], "rows": [0, 19]},
+		"desc": "Circondati e tagliati fuori, il nemico preme da est e da ovest.\nTenete la fattoria finche' i rinforzi arrivano.",
+		"squad_full": true,
+		"enemy_morale": 2,  # Bold (+1 to TQ, libro SR3)
+		# SR9: bombardamento iniziale 105mm, 6 colpi (stessa mappa farmhouse).
+		"opening_barrage": {
+			"type": "ARTILLERY_105",
+			"rolls": 6,
+			"scatter": true,
+			"hex_table": [
+				"20,7", "27,11", "20,14", "27,18", "30,12",
+				"28,7", "31,4", "24,13", "23,6", "26,4",
+			],
+		},
+		# Il libro usa 4 team su DUE mappe (Farmhouse + Hedgerows).
+		# Semplificazione: un'unica mappa (farmhouse), nemici da sinistra
+		# (Blue/Red, lato libro) e da destra (Yellow/White, lato hedgerows).
+		"cup_spec": {
+			"Blue": {"Officer": 1, "NCO": 2, "Veteran": 3, "Rifleman": 5, "Recruit": 5},
+			"Red": {"Officer": 1, "NCO": 2, "Rifleman": 5, "Recruit": 5},
+			"Yellow": {"Officer": 1, "NCO": 2, "Veteran": 3, "Rifleman": 5, "Recruit": 5},
+			"White": {"Officer": 1, "NCO": 2, "Rifleman": 5, "Recruit": 5},
+		},
+		"dummies": 20,
+		# Hex libro (Farmhouse Cup A) + simmetria sul lato destro per Cup B.
+		"enemy_setup": [
+			"3,6", "4,2", "4,3", "4,4", "4,5", "4,12", "4,13", "4,14", "4,15",
+			"7,12", "7,13", "7,14", "7,15", "7,16",
+			"31,5", "31,9", "31,13", "32,7", "32,11", "33,9",
+		],
+		# SR12/13 libro: al turno 5 rinforzi da entrambi i lati.
+		"waves": [
+			{"turn": 5, "hexes": ["7,12", "7,13", "7,14", "7,15", "7,16",
+				"31,7", "31,11", "32,6", "32,10", "33,8"]},
+			{"turn": 9, "hexes": ["4,2", "4,3", "4,12", "4,13",
+				"31,6", "31,10", "32,8"]},
+		],
+		"building_tqc_aimed": true,
+		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
+			"friendly_killed": -2, "friendly_wounded": -1,
+			"no_enemy_in_building": 5},
 	},
 
 	# ------------------------------------------------ Vol. 2 — Mappe 5-10
