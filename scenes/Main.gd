@@ -1719,6 +1719,13 @@ const MORALE_MARKERS: Dictionary = {
 	5: "res://assets/counters/Morale_Low-f.png",             # SHAKEN
 	6: "res://assets/counters/GEN-Rout-Marker-10-f.png",     # ROUT
 }
+# Segnalini arma speciali nel roster (solo le armi con counter dedicato).
+const WEAPON_COUNTER_ID: Dictionary = {
+	"M1919":        "US-M1919-Marker-1",
+	"M2 .50cal":    "US-M2-Marker-1",
+	"Panzerfaust 60":  "GEN-Panzerfaust-60-Marker",
+	"Panzerfaust 100": "GEN-Panzerfaust-100-Marker",
+}
 const KIND_LABELS := {
 	FriendlyCards.Kind.ORDER: "ORDER",
 	FriendlyCards.Kind.DISCARD: "DISCARD",
@@ -2028,6 +2035,25 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 	info_text.text = "\n".join(lines)
 
 
+# Counter ID del segnalino arma da mostrare nel roster, o "" se nessuno.
+# Per il Bazooka restituisce il counter dello stato ammo corrente.
+func _weapon_counter_id(c: Character) -> String:
+	if c.weapon_skills.is_empty():
+		return ""
+	var wname: String = c.weapon_skills.keys()[0]
+	if wname == "Bazooka M9":
+		if c.no_ammo:
+			return "US-Baz-UnLoaded-Marker"
+		elif c.low_ammo:
+			return "US-Baz-Ammo-1-Marker"
+		else:
+			return "US-Baz-Loaded-Marker"
+	if wname == "Panzerfaust 60" or wname == "Panzerfaust 100":
+		if c.no_ammo:
+			return ""  # sparato: scompare
+	return WEAPON_COUNTER_ID.get(wname, "")
+
+
 # Roster: una riga per uomo con indicatori visivi colorati (ferite, ammo, morale).
 func _refresh_roster() -> void:
 	for child in roster_body.get_children():
@@ -2114,6 +2140,19 @@ func _refresh_roster() -> void:
 				markers_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				markers_row.add_theme_constant_override("separation", 2)
 				col.add_child(markers_row)
+				# Segnalino arma (M1919, M2, Bazooka, Panzerfaust…)
+				var wcid := _weapon_counter_id(c)
+				if not wcid.is_empty():
+					var wcp := "res://assets/counters/%s-f.png" % wcid
+					var wct := TextureRect.new()
+					wct.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					wct.custom_minimum_size = Vector2(24, 24)
+					wct.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					wct.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					if ResourceLoader.exists(wcp):
+						wct.texture = load(wcp)
+					markers_row.add_child(wct)
+				# Ferite
 				for wound_type in c.wounds:
 					var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
 						if wound_type == Domain.Wound.BAD \
@@ -2126,20 +2165,24 @@ func _refresh_roster() -> void:
 					if ResourceLoader.exists(wpath):
 						wt.texture = load(wpath)
 					markers_row.add_child(wt)
-				var ammo_path := ""
-				if c.no_ammo:
-					ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-r.png"
-				elif c.low_ammo:
-					ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-f.png"
-				if not ammo_path.is_empty():
-					var at := TextureRect.new()
-					at.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					at.custom_minimum_size = Vector2(24, 24)
-					at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-					at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-					if ResourceLoader.exists(ammo_path):
-						at.texture = load(ammo_path)
-					markers_row.add_child(at)
+				# Ammo generico solo se non gia' coperto dal segnalino arma
+				var has_weapon_ammo := wcid.begins_with("US-Baz-")
+				if not has_weapon_ammo:
+					var ammo_path := ""
+					if c.no_ammo:
+						ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-r.png"
+					elif c.low_ammo:
+						ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-f.png"
+					if not ammo_path.is_empty():
+						var at := TextureRect.new()
+						at.mouse_filter = Control.MOUSE_FILTER_IGNORE
+						at.custom_minimum_size = Vector2(24, 24)
+						at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+						at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+						if ResourceLoader.exists(ammo_path):
+							at.texture = load(ammo_path)
+						markers_row.add_child(at)
+				# Morale
 				var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
 				if not morale_path.is_empty():
 					var mt := TextureRect.new()
@@ -2219,7 +2262,18 @@ func _refresh_enemy_roster() -> void:
 			dead_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 			hbox.add_child(dead_lbl)
 		else:
-			# Ferite: marker segnalino (Light / Bad Wound)
+			# Segnalino arma
+			var ewcid := _weapon_counter_id(c)
+			if not ewcid.is_empty():
+				var ewcp := "res://assets/counters/%s-f.png" % ewcid
+				var ewct := TextureRect.new()
+				ewct.custom_minimum_size = Vector2(20, 20)
+				ewct.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				ewct.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(ewcp):
+					ewct.texture = load(ewcp)
+				hbox.add_child(ewct)
+			# Ferite
 			for wound_type in c.wounds:
 				var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
 					if wound_type == Domain.Wound.BAD \
@@ -2231,7 +2285,7 @@ func _refresh_enemy_roster() -> void:
 				if ResourceLoader.exists(wpath):
 					wt.texture = load(wpath)
 				hbox.add_child(wt)
-			# Morale: segnalino del livello
+			# Morale
 			var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
 			if not morale_path.is_empty():
 				var mt := TextureRect.new()

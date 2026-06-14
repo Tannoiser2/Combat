@@ -1,3 +1,10 @@
+v0.42 — 2026-06-14
+- Roster: segnalino arma nel pannello uomini e nemici per le armi speciali:
+  M1919 (US-M1919-Marker), M2 .50cal (US-M2-Marker), Bazooka M9 (US-Baz-
+  Loaded/UnLoaded/Ammo-1 a seconda dello stato ammo), Panzerfaust 60/100
+  (GEN-Panzerfaust-60/100-Marker, scompare dopo l'uso). Il marker ammo
+  generico resta solo per le armi senza counter dedicato.
+
 v0.41 — 2026-06-14
 - Roster squadra: righe 84 px, soldati divisi per team (header Able/Baker/Charlie),
   thumbnail segnalino 48x48, segnalini ferite/ammo/morale in colonna destra
