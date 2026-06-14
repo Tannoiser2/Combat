@@ -2036,7 +2036,7 @@ func _refresh_roster() -> void:
 			continue
 		var b := Button.new()
 		b.text = ""
-		b.custom_minimum_size = Vector2(200, 34)
+		b.custom_minimum_size = Vector2(200, 42)
 		b.disabled = c.is_dead()
 		var sb := StyleBoxFlat.new()
 		if c.is_dead():
@@ -2164,6 +2164,7 @@ func _refresh_enemy_roster() -> void:
 		return
 	for c in spotted:
 		var pc := PanelContainer.new()
+		pc.custom_minimum_size = Vector2(200, 42)
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.22, 0.12, 0.12) if not c.is_dead() else Color(0.13, 0.13, 0.13)
 		sb.border_color = MapView.MORALE_COLORS[c.morale] if not c.is_dead() else Color(0.3, 0.3, 0.3)
@@ -2175,8 +2176,18 @@ func _refresh_enemy_roster() -> void:
 		sb.set_content_margin_all(3)
 		pc.add_theme_stylebox_override("panel", sb)
 		var hbox := HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 4)
+		hbox.add_theme_constant_override("separation", 3)
 		pc.add_child(hbox)
+		# Thumbnail segnalino nemico
+		var thumb := TextureRect.new()
+		thumb.custom_minimum_size = Vector2(28, 28)
+		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var tex_path := "res://assets/counters/%s-f.png" % c.counter
+		if ResourceLoader.exists(tex_path):
+			thumb.texture = load(tex_path)
+		hbox.add_child(thumb)
+		# Nome
 		var name_lbl := Label.new()
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_lbl.add_theme_font_size_override("font_size", 12)
@@ -2187,21 +2198,32 @@ func _refresh_enemy_roster() -> void:
 		if c.is_dead():
 			var dead_lbl := Label.new()
 			dead_lbl.text = "KIA" if c.is_killed() else "INCAP"
-			dead_lbl.add_theme_font_size_override("font_size", 11)
+			dead_lbl.add_theme_font_size_override("font_size", 10)
 			dead_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 			hbox.add_child(dead_lbl)
 		else:
-			for _w in c.wounds:
-				var w := Label.new()
-				w.text = "♥"
-				w.add_theme_font_size_override("font_size", 12)
-				w.add_theme_color_override("font_color", Color(0.95, 0.2, 0.2))
-				hbox.add_child(w)
-			var m := Label.new()
-			m.text = "●"
-			m.add_theme_font_size_override("font_size", 12)
-			m.add_theme_color_override("font_color", MapView.MORALE_COLORS[c.morale])
-			hbox.add_child(m)
+			# Ferite: marker segnalino (Light / Bad Wound)
+			for wound_type in c.wounds:
+				var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
+					if wound_type == Domain.Wound.BAD \
+					else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
+				var wt := TextureRect.new()
+				wt.custom_minimum_size = Vector2(20, 20)
+				wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(wpath):
+					wt.texture = load(wpath)
+				hbox.add_child(wt)
+			# Morale: segnalino del livello
+			var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
+			if not morale_path.is_empty():
+				var mt := TextureRect.new()
+				mt.custom_minimum_size = Vector2(20, 20)
+				mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(morale_path):
+					mt.texture = load(morale_path)
+				hbox.add_child(mt)
 		enemy_roster_body.add_child(pc)
 
 
