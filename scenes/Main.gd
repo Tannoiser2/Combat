@@ -1404,7 +1404,7 @@ func _build_hud() -> void:
 	roster_title.add_theme_constant_override("margin_left", 6)
 	roster_hdr_row.add_child(roster_title)
 	var roster_collapse_btn := Button.new()
-	roster_collapse_btn.text = "◄"
+	roster_collapse_btn.text = "▼"
 	roster_collapse_btn.flat = true
 	roster_collapse_btn.add_theme_font_size_override("font_size", 14)
 	roster_hdr_row.add_child(roster_collapse_btn)
@@ -1440,7 +1440,13 @@ func _build_hud() -> void:
 		roster_collapsed = not roster_collapsed
 		roster_tabs.visible = not roster_collapsed
 		roster_title.visible = not roster_collapsed
-		roster_collapse_btn.text = "►" if roster_collapsed else "◄")
+		roster_collapse_btn.text = "▲" if roster_collapsed else "▼"
+		if roster_collapsed:
+			roster_panel.anchor_bottom = 0.0
+			roster_panel.offset_bottom = 80
+		else:
+			roster_panel.anchor_bottom = 1.0
+			roster_panel.offset_bottom = -8)
 
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
@@ -2101,10 +2107,9 @@ func _refresh_roster() -> void:
 		for c in state.characters:
 			if c.side != Domain.Side.FRIENDLY or c.team != team_name:
 				continue
-			var b := Button.new()
-			b.text = ""
-			b.custom_minimum_size = Vector2(210, 0)
-			b.disabled = c.is_dead()
+			var row := PanelContainer.new()
+			row.custom_minimum_size = Vector2(210, 0)
+			row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var sb := StyleBoxFlat.new()
 			if c.is_dead():
 				sb.bg_color = Color(0.12, 0.12, 0.12)
@@ -2118,20 +2123,12 @@ func _refresh_roster() -> void:
 			sb.border_width_bottom = 1
 			sb.set_corner_radius_all(4)
 			sb.set_content_margin_all(3)
-			b.add_theme_stylebox_override("normal", sb)
-			b.add_theme_stylebox_override("hover", sb)
-			b.add_theme_stylebox_override("pressed", sb)
-			b.add_theme_stylebox_override("disabled", sb)
+			sb.content_margin_left = 8
+			row.add_theme_stylebox_override("panel", sb)
 			var hbox := HBoxContainer.new()
 			hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			hbox.anchor_right = 1.0
-			hbox.anchor_bottom = 1.0
-			hbox.offset_left = 6
-			hbox.offset_right = -3
-			hbox.offset_top = 2
-			hbox.offset_bottom = -2
 			hbox.add_theme_constant_override("separation", 3)
-			b.add_child(hbox)
+			row.add_child(hbox)
 			# Thumbnail counter PNG (48x48)
 			var thumb := TextureRect.new()
 			thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2222,15 +2219,16 @@ func _refresh_roster() -> void:
 						mt.texture = load(morale_path)
 					markers_row.add_child(mt)
 			var ch := c
-			b.pressed.connect(func():
-				map_view.selected = ch
-				map_view.highlight_hex = ch.position
-				camera.position = map_view.hex_center(ch.position.x, ch.position.y)
-				map_view.queue_redraw()
-				_show_info(ch.position, ch)
-				if phase == Phase.ORDERS and not ch.is_dead():
-					_open_order_panel(ch))
-			roster_body.add_child(b)
+			row.gui_input.connect(func(event: InputEvent):
+				if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+					map_view.selected = ch
+					map_view.highlight_hex = ch.position
+					camera.position = map_view.hex_center(ch.position.x, ch.position.y)
+					map_view.queue_redraw()
+					_show_info(ch.position, ch)
+					if phase == Phase.ORDERS and not ch.is_dead():
+						_open_order_panel(ch))
+			roster_body.add_child(row)
 
 
 # Nemici avvistati nella sidebar destra (collassabile).
