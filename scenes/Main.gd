@@ -494,6 +494,7 @@ func _on_next_pressed() -> void:
 			state.shots.clear()
 			state.move_paths.clear()
 			state.booms.clear()
+			state.melee_events.clear()
 			state.audio_events.clear()
 			state.log_event("--- Impulse 1 ---")
 			action_queue = TurnSequence.impulse_order(state)
@@ -542,8 +543,9 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 	if action_kind == TurnSequence.Act.FIRE:
 		var targets := TurnSequence.valid_fire_targets(state, c)
 		map_view.cue_hexes = _hexes_of(targets)
-		map_view.cue_color = Color(0.95, 0.2, 0.2, 0.9)
-		hint_label.text = "%s: clicca un bersaglio (rosso) o premi Passa" % c.display_name
+		map_view.cue_color = Color(0.95, 0.55, 0.05, 0.95)
+		map_view.fire_lines_source = c.position
+		hint_label.text = "%s: clicca un bersaglio (arancio) o premi Passa" % c.display_name
 		next_button.text = "Passa"
 	elif action_kind == TurnSequence.Act.THROW:
 		var throw_hexes := TurnSequence.valid_throw_hexes(state, c)
@@ -569,6 +571,7 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 func _finish_friendly_action() -> void:
 	acting = null
 	map_view.cue_hexes = []
+	map_view.fire_lines_source = Vector2i(-99, -99)
 	_advance_action()
 
 
@@ -1049,8 +1052,15 @@ func _describe_order(o: int) -> void:
 
 func _handle_action_click(hex: Vector2i) -> void:
 	if action_kind == TurnSequence.Act.FIRE:
-		var target := map_view.character_at_hex(hex)
-		if target == null or not target in TurnSequence.valid_fire_targets(state, acting):
+		# Cerca il primo bersaglio valido nella hex cliccata (evita che
+		# character_at restituisca un nemico non avvistato davanti a uno noto).
+		var valid_targets := TurnSequence.valid_fire_targets(state, acting)
+		var target: Character = null
+		for t in valid_targets:
+			if t.position == hex:
+				target = t
+				break
+		if target == null:
 			return  # click non valido: si ignora
 		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
 		_consume_audio_events()

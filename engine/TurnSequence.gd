@@ -651,6 +651,8 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 				target = d
 	if target == null:
 		return
+	# Segnalino mischia: flash rosso sull'hex (visibile in MapView).
+	state.melee_events.append({"hex": attacker.position})
 	if rivals_in_hex > 1:
 		state.log_event("Mischia: %d avversari nell'hex — %s attacca %s" % [
 			rivals_in_hex, attacker.display_name, target.display_name])

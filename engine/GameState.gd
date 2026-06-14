@@ -129,6 +129,9 @@ var move_paths: Array = []
 # Esplosioni avvenute (per il lampo in mappa): {hex, type}.
 var booms: Array = []
 
+# Mischie avvenute nell'impulse (per il flash rosso in mappa): {hex: Vector2i}.
+var melee_events: Array = []
+
 # Coda eventi audio dell'impulse corrente: {type, weapon?, area_type?, hex}.
 # La UI la consuma e la azzera dopo ogni azione, come shots/booms.
 var audio_events: Array = []

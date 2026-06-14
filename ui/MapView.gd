@@ -104,6 +104,8 @@ var selected: Character = null      # personaggio evidenziato
 var highlight_hex := Vector2i(-99, -99)  # hex evidenziato (selezione a vuoto)
 var cue_hexes: Array[Vector2i] = []  # hex suggeriti (bersagli/mosse)
 var cue_color := Color(0.95, 0.85, 0.2, 0.9)
+# Quando impostato, disegna linee tratteggiate dal tiratore a ogni bersaglio.
+var fire_lines_source := Vector2i(-99, -99)
 # Linee di vista dall'unita' selezionata: [{to: Vector2, clear: bool}]
 var los_lines: Array = []
 # Overlay di verifica del terreno (tasto T): tinte + hexside sopra la
@@ -136,6 +138,9 @@ var _seen_moves := 0                # quanti state.move_paths gia' convertiti
 # Esplosioni: lampo che si espande e svanisce.
 var _blasts: Array = []             # {pos: Vector2, age: float}
 var _seen_booms := 0
+# Mischie: flash rosso pulsante sull'hex.
+var _melees: Array = []             # {pos: Vector2, age: float}
+var _seen_melees := 0
 
 # --- Replay: la UI carica un frame "fantasma" e fa avanzare il progresso;
 # il disegno usa queste unita' al posto di state.characters.
@@ -212,6 +217,18 @@ func _process(delta: float) -> void:
 		for b in _blasts:
 			b["age"] += delta
 		_blasts = _blasts.filter(func(b): return b["age"] < 1.0)
+	# Mischie -> flash rosso.
+	if state.melee_events.size() < _seen_melees:
+		_seen_melees = 0
+	while _seen_melees < state.melee_events.size():
+		var me: Dictionary = state.melee_events[_seen_melees]
+		_melees.append({"pos": hex_center(me["hex"].x, me["hex"].y), "age": 0.0})
+		_seen_melees += 1
+	if not _melees.is_empty():
+		dirty = true
+		for m2 in _melees:
+			m2["age"] += delta
+		_melees = _melees.filter(func(m2): return m2["age"] < 1.2)
 	# Nuovi colpi -> traccianti.
 	if state.shots.size() < _seen_shots:
 		_seen_shots = 0  # azzerati a inizio impulse
@@ -476,12 +493,23 @@ func _draw() -> void:
 			draw_circle(bullet, radius * 0.14, Color(1.0, 0.9, 0.4, 0.95))
 		elif not String(t["outcome"]).is_empty():
 			_draw_balloon(font, t["to"], t["outcome"], age, radius)
-	# Hex suggeriti (bersagli di fuoco in rosso, mosse in verde)
+	# Hex suggeriti (bersagli di fuoco in arancio, mosse in verde)
 	for h in cue_hexes:
 		var cc := hex_center(h.x, h.y)
 		var pts := _hex_points(cc, radius * 0.9)
 		draw_colored_polygon(pts, Color(cue_color.r, cue_color.g, cue_color.b, 0.22))
 		draw_polyline(_closed(pts), cue_color, radius * 0.07)
+	# Linee tratteggiate dal tiratore a ogni bersaglio (solo in Fire mode).
+	if fire_lines_source.x > -99 and not cue_hexes.is_empty():
+		var src := hex_center(fire_lines_source.x, fire_lines_source.y)
+		for h in cue_hexes:
+			var dst := hex_center(h.x, h.y)
+			var seg: float = (dst - src).length() / (radius * 0.35)
+			for i in int(seg):
+				var t0: float = float(i) / seg
+				var t1: float = minf((float(i) + 0.55) / seg, 1.0)
+				draw_line(src.lerp(dst, t0), src.lerp(dst, t1),
+					cue_color, radius * 0.05)
 	# Evidenziazione dell'hex selezionato; marker Target se e' un bersaglio.
 	if highlight_hex.x > -99:
 		var hc := hex_center(highlight_hex.x, highlight_hex.y)
@@ -497,6 +525,16 @@ func _draw() -> void:
 		if bt < 0.4:
 			draw_circle(b["pos"], radius * 0.5 * (1.0 - bt),
 				Color(1.0, 0.85, 0.3, 0.9 - bt * 2.0))
+	# Flash mischia: croce rossa che pulsa e svanisce.
+	for mel in _melees:
+		var mt := float(mel["age"]) / 1.2
+		var mr := radius * (0.55 + mt * 0.25)
+		var mc := Color(0.95, 0.1, 0.1, 1.0 - mt)
+		draw_arc(Vector2(mel["pos"]), mr, 0, TAU, 32, mc, radius * 0.12 * (1.0 - mt * 0.5))
+		var arm := mr * 0.55
+		var mpos := Vector2(mel["pos"])
+		draw_line(mpos + Vector2(-arm, 0), mpos + Vector2(arm, 0), mc, radius * 0.09)
+		draw_line(mpos + Vector2(0, -arm), mpos + Vector2(0, arm), mc, radius * 0.09)
 	# Segnalini. In replay si disegnano le unita' fantasma del frame; in
 	# gioco quelle vive. Un Enemy non Known mostra il retro generico
 	# (dummy): il giocatore sa che c'e' qualcosa, non chi sia ne' cosa fara'.
