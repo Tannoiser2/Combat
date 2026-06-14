@@ -81,6 +81,7 @@ var deploy_zone: Array[Vector2i] = []
 # Ogni frame = un impulse, con tutte le azioni animate in simultanea.
 var replay_button: Button
 var replay_frames: Array = []
+var _large_battle_override: Dictionary = {}  # sid -> bool (override toggle UI)
 var replay_idx := -1            # -1 = nessun replay in corso
 var replay_t := 0.0
 var replay_events: Array = []   # colpi/boom/suoni del frame, ordinati per "at"
@@ -154,6 +155,9 @@ func _start_scenario(scenario_id: String) -> void:
 	else:
 		state.rng.seed = hash("combat-test")
 	Scenario.build(state, scenario_id)
+	# Override Grande Battaglia dal toggle UI (se il giocatore l'ha cambiato).
+	if _large_battle_override.has(scenario_id):
+		state.large_battle = _large_battle_override[scenario_id]
 
 	map_view = MapView.new()
 	# Con la scansione in assets/maps si gioca sull'artwork vero; senza
@@ -406,6 +410,16 @@ func _mission_card(menu: CanvasLayer, sid: String) -> Button:
 	desc.modulate = Color(0.85, 0.85, 0.78)
 	desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	txt.add_child(desc)
+	# Toggle Grande Battaglia (Rule 9.2) per scenari con piu' di un team.
+	if sc.get("cup_spec", {}).size() > 1:
+		var gb := CheckButton.new()
+		gb.text = "Grande Battaglia (Rule 9.2)"
+		gb.button_pressed = _large_battle_override.get(sid, sc.get("large_battle", false))
+		gb.add_theme_font_size_override("font_size", 11)
+		gb.modulate = Color(0.85, 0.78, 0.55)
+		gb.mouse_filter = Control.MOUSE_FILTER_STOP
+		gb.toggled.connect(func(v: bool) -> void: _large_battle_override[sid] = v)
+		txt.add_child(gb)
 	return card
 
 

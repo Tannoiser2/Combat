@@ -111,7 +111,7 @@ static func friendly_order_phase(state: GameState) -> void:
 	pass
 
 
-# Step 3 - Enemy Card and Order Phase (Rule 9.0)
+# Step 3 - Enemy Card and Order Phase (Rule 9.0 / 9.2)
 static func enemy_order_phase(state: GameState) -> void:
 	# Carte DISCARD "proattive" dalla mano (uso automatico razionale).
 	_use_proactive_discards(state)
@@ -121,19 +121,37 @@ static func enemy_order_phase(state: GameState) -> void:
 	# Filo spinato (Rule 27.7): in un hex con 2+ nemici, il TQ piu' basso passa
 	# automaticamente in Hide prima di assegnare gli altri ordini.
 	_wire_auto_hide(state)
-	# SOP step 3a: una carta per ogni Enemy Team con almeno un Alerted.
 	state.enemy_cards_in_play.clear()
-	for team in state.enemy_teams_with_alerted():
-		var serial := state.draw_enemy_card()
-		state.enemy_cards_in_play[team] = serial
-		state.log_event("Team %s pesca la Enemy Card %d (iniziativa %d)" % [
-			team, serial, EnemyCards.initiative_of(serial)])
-		# SOP step 3b: ordini a tutti gli Alerted del team, ciascuno
-		# secondo il proprio morale e la propria copertura. Salta chi ha gia'
-		# un ordine (es. Hide automatico del filo spinato).
-		for c in state.characters_of_team(team):
-			if c.alerted and not c.is_dead() and not c.has_order:
+	if state.large_battle:
+		# Rule 9.2 Grande Battaglia: una carta per Gruppo; tutti i membri usano
+		# la stessa carta (ordine determinato da morale e copertura individuali).
+		for team in state.enemy_teams_with_alerted():
+			var serial := state.draw_enemy_card()
+			state.enemy_cards_in_play[team] = serial
+			state.log_event("Team %s pesca Enemy Card %d (init %d) [Grande Battaglia]" % [
+				team, serial, EnemyCards.initiative_of(serial)])
+			for c in state.characters_of_team(team):
+				if c.alerted and not c.is_dead() and not c.has_order:
+					_assign_enemy_order(state, c, serial)
+	else:
+		# Rule 9 standard: una carta per ogni personaggio nemico Alerted.
+		# Per l'Initiative Track si usa la carta con iniziativa minore del team.
+		for team in state.enemy_teams_with_alerted():
+			var team_serial := -1
+			var team_init := 999
+			for c in state.characters_of_team(team):
+				if not c.alerted or c.is_dead() or c.has_order:
+					continue
+				var serial := state.draw_enemy_card()
+				state.log_event("  %s pesca Enemy Card %d (init %d)" % [
+					c.display_name, serial, EnemyCards.initiative_of(serial)])
 				_assign_enemy_order(state, c, serial)
+				var iv := EnemyCards.initiative_of(serial)
+				if iv < team_init:
+					team_init = iv
+					team_serial = serial
+			if team_serial >= 0:
+				state.enemy_cards_in_play[team] = team_serial
 	# SOP step 3c: completare l'Initiative Order Track.
 	_update_initiative_order(state)
 
