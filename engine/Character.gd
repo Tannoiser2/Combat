@@ -78,6 +78,11 @@ var is_vehicle: bool = false
 var vehicle_type: String = ""   # "Jeep", "M3A1 Halftrack", "M4A3 Sherman", "PzIVH"
 var hull_damage: int = 0        # 0=OK, 1=immobilizzato, 2=distrutto
 var is_buttoned_up: bool = false
+# Torretta (Rule 31.6): solo gli AFV (carri) hanno una torretta che ruota
+# indipendentemente dallo scafo. turret_facing 1..6 e' assoluto (come facing);
+# 0 = non applicabile (Jeep/Halftrack senza torretta). Lo scafo (facing) gira
+# col movimento, la torretta gira 1 hex-side per impulso verso il bersaglio.
+var turret_facing: int = 0
 # fire_mode per cannoni principali: "HE" (antipersonnel) o "AP" (anticarro)
 var fire_mode: String = "HE"
 # Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello

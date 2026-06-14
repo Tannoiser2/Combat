@@ -1,3 +1,18 @@
+v0.45 — 2026-06-14
+- Veicoli (Rule 31.4-31.6): facing dello scafo e torretta ora corretti.
+  Lo scafo si orienta nella direzione di marcia a ogni passo (hit_face
+  realistico dopo il movimento). Gli AFV (Sherman, PzIVH) hanno una
+  torretta separata (turret_facing) che ruota 1 hex-side per impulso verso
+  il bersaglio: il cannone principale spara solo quando la torretta e'
+  puntata, altrimenti la rotazione consuma l'impulso. Freccia del facing
+  scafo + segnalino torretta orientato sul turret_facing in MapView.
+- Fix: _crew_morale_checks usava una chiave inesistente e applicava due
+  volte il calo di morale (bug latente sul colpo di striscio).
+
+v0.44 — 2026-06-14
+- Roster: righe ricostruite con PanelContainer (auto-size corretto, niente
+  righe sovrapposte) e collasso del pannello verso l'alto (▼/▲).
+
 v0.43 — 2026-06-14
 - Roster: segnalini status (ferite/ammo/morale/arma) ora grandi come la
   pedina del soldato (48x48); altezza riga auto-calcolata senza spazio vuoto

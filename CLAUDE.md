@@ -183,6 +183,27 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    ESTENSIBILE al modello completo: i crew sono gia' Character, basta aggiungere
    spotting/LOS/Target Marker per ruolo e boccaporto aperto/chiuso. Test:
    Main._test_vehicles (sezione equipaggio).
+   FACING + TORRETTA (Rule 31.4-31.6, FATTO v0.45): lo scafo (Character.facing
+   1..6) si orienta nella direzione di marcia a ogni passo (Move._commit_step,
+   per il veicolo imposta facing = Move.dir_of_step(from,to)); hit_face usa
+   questo facing aggiornato. Gli AFV con torretta (VehicleCombat.TURRETED =
+   Sherman, PzIVH; has_turret) hanno Character.turret_facing 1..6 ASSOLUTO,
+   indipendente dallo scafo (0 = Jeep/Halftrack senza torretta). La torretta
+   ruota 1 hex-side per impulso verso il bersaglio: VehicleCombat.turret_aim
+   ritorna true (allineata = front arc, puo' sparare) o false (ha ruotato, niente
+   fuoco questo impulso). Gate in Fire.fire_action per le armi "main_gun" (vale
+   sia per AI sia per il giocatore: passano entrambi da fire_action). Helper di
+   direzione in Move: dir_of_step (1..6 fra adiacenti), dir_toward (1..6 piu'
+   vicina a distanza), rotate_toward (1 hex-side via piu' corta sull'anello 1..6).
+   MapView._draw_vehicle_overlay: freccia del facing scafo (tutti i veicoli) +
+   segnalino GE-Turret-Marker ruotato sul turret_facing (solo AFV). Test in
+   Main._test_vehicles (sezione facing/torretta).
+   SEMPLIFICAZIONI vs regolamento: il facing scafo segue il movimento procedurale
+   (niente "1 free hex-side + 1 hex per rotazione" della Rule 31.5, ne' Reverse
+   esplicito); il front arc della torretta e' la singola direzione esagonale piu'
+   vicina al bersaglio (dir_toward), non un settore a 4 archi; coassiale/bow MG
+   non gestiti col vincolo "torretta che ruota non spara". Riferimento completo
+   regole 31.4-31.6 piu' sotto.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).
@@ -222,6 +243,28 @@ ferita via Fire._resolve_wound). Gli adiacenti fanno solo un MC
 (Area._grenade_mc). Il WS del lanciatore (Area.GRENADE_WS = 4) e' timbrato
 sul marcatore in TurnSequence.throw_grenade. Mortai/artiglieria/C4 restano
 sul modello blast (Area._blast_check con POWER). Test: Main._test_grenade.
+
+## Riferimento regole veicoli — facing e torrette (Rule 31.4-31.6)
+
+Sintesi dal Combat!2 Rules of Play (il PDF NON e' nel repo pubblico: vive solo
+nel repo privato combat-riferimenti / negli upload dell'utente. Questo riassunto
+serve a non doverlo ricaricare ogni sessione).
+
+- 31.4 Facing scafo: il veicolo ha 1 di 6 direzioni e 4 archi (Front, Right
+  Side, Left Side, Rear). L'armatura colpita dipende dall'arco da cui arriva il
+  colpo (Side se la linea passa fra Front e Side o fra Side e Rear).
+- 31.5 Movimento/rotazione: il veicolo entra solo nell'hex davanti (o dietro in
+  Reverse). 1 cambio di hex-side GRATIS a inizio impulso (se c'e' Driver o
+  Co-driver); ogni rotazione ulteriore costa 1 hex di movimento. Prende la via
+  piu' corta. Terreno Impassable -> Emergency Stop (friendly) / tabella di
+  ridirezione (enemy). In Reverse lo scafo finisce di spalle alla marcia.
+- 31.6 Torretta (solo AFV): marker torretta SEPARATO. Se torretta = scafo,
+  niente marker. La torretta gira 1 hex-side per impulso. Per girarla il Gunner
+  deve avere Fire Main/Aimed/Rapid/Suppressive. NELL'impulso in cui gira NON
+  spara (cannone ne' coassiale). Il cannone ingaggia solo un Observed Target nel
+  FRONT ARC della torretta. Gunner nemico: la torretta gira automaticamente
+  verso il bersaglio fuori arco (via piu' corta, random se equidistante).
+- Stato implementazione e semplificazioni: vedi punto 8 della roadmap sopra.
 
 ## Bug noti / attenzioni
 

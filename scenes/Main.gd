@@ -3495,6 +3495,92 @@ func _test_vehicles() -> int:
 	if not all_dead:
 		print("TEST equipaggio: distruzione non uccide tutto l'equipaggio")
 		fails += 1
+
+	# --- Facing scafo e torretta (Rule 31.4-31.6) ---
+	# rotate_toward: 1 hex-side per la via piu' corta, con wrap dell'anello 1..6.
+	if Move.rotate_toward(1, 1) != 1 or Move.rotate_toward(1, 2) != 2 \
+			or Move.rotate_toward(1, 6) != 6 or Move.rotate_toward(6, 1) != 1:
+		print("TEST veicoli: rotate_toward errato")
+		fails += 1
+
+	# dir_of_step: la direzione di un passo e' coerente con CUBE_DIRS.
+	var fs := GameState.new()
+	Boards.fill(fs, "farmhouse")
+	var p0 := Vector2i(5, 5)
+	var nb := Move.neighbors(fs, p0)
+	if not nb.is_empty():
+		var d := Move.dir_of_step(p0, nb[0])
+		if d < 1 or d > 6 \
+				or Move.from_cube(Move.to_cube(p0) + Move.CUBE_DIRS[d - 1]) != nb[0]:
+			print("TEST veicoli: dir_of_step incoerente")
+			fails += 1
+
+	# Lo scafo si orienta nella direzione di marcia (Rule 31.5).
+	var ms := GameState.new()
+	Boards.fill(ms, "farmhouse")
+	var jp := VehicleCombat.make_vehicle(
+		"Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 3)
+	ms.characters = [jp]
+	var jdest: Vector2i = Move.neighbors(ms, jp.position)[0]
+	var want_dir := Move.dir_of_step(jp.position, jdest)
+	Move.step_to(ms, jp, jdest)
+	if jp.facing != want_dir:
+		print("TEST veicoli: il facing scafo non segue il movimento (%d != %d)" % [
+			jp.facing, want_dir])
+		fails += 1
+
+	# has_turret: AFV si, Jeep no.
+	var shT := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 3)
+	if not VehicleCombat.has_turret(shT) or VehicleCombat.has_turret(jp):
+		print("TEST veicoli: has_turret errato")
+		fails += 1
+
+	# turret_aim: torretta disallineata ruota (no fire), poi si allinea.
+	var ts2 := GameState.new()
+	Boards.fill(ts2, "farmhouse")
+	var tgt := Vector2i(5, 9)
+	var want := Move.dir_toward(shT.position, tgt)
+	shT.turret_facing = ((want + 2) % 6) + 1   # ~3 hex-side di distanza
+	var aligned := false
+	var first_false := false
+	for i in range(6):
+		var r := VehicleCombat.turret_aim(ts2, shT, tgt)
+		if i == 0 and not r:
+			first_false = true
+		if r:
+			aligned = true
+			break
+	if not first_false:
+		print("TEST veicoli: torretta disallineata dovrebbe ruotare senza sparare")
+		fails += 1
+	if not aligned or shT.turret_facing != want:
+		print("TEST veicoli: la torretta non si allinea al bersaglio")
+		fails += 1
+
+	# fire_action: col cannone, torretta disallineata ruota e NON spara;
+	# allineata, spara (registra il colpo).
+	var fa := GameState.new()
+	fa.rng.seed = 0
+	Boards.fill(fa, "farmhouse")
+	var shF := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 3)
+	var pzF := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(5, 7), 4)
+	pzF.known = true
+	fa.characters = [shF, pzF]
+	var wantF := Move.dir_toward(shF.position, pzF.position)
+	shF.turret_facing = ((wantF + 2) % 6) + 1
+	Fire.fire_action(fa, shF, pzF, "75mm L40 AP")
+	if not fa.shots.is_empty():
+		print("TEST veicoli: il cannone non deve sparare con torretta disallineata")
+		fails += 1
+	shF.turret_facing = wantF
+	fa.rng.seed = 0
+	Fire.fire_action(fa, shF, pzF, "75mm L40 AP")
+	if fa.shots.is_empty():
+		print("TEST veicoli: il cannone deve sparare con torretta allineata")
+		fails += 1
 	return fails
 
 
