@@ -812,6 +812,11 @@ func _end_replay() -> void:
 # ---------------------------------------------------------------- input
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Tasto F: adatta la vista all'intera mappa.
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F \
+			and map_view != null:
+		_fit_map()
+		return
 	# Tasto T: overlay di verifica del terreno (confronto con la scansione).
 	if event is InputEventKey and event.pressed and event.keycode == KEY_T \
 			and map_view != null:
@@ -850,6 +855,26 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _zoom(factor: float) -> void:
 	var z: float = clamp(camera.zoom.x * factor, 0.15, 2.5)
+	camera.zoom = Vector2(z, z)
+
+
+func _fit_map() -> void:
+	if map_view == null or state == null or state.map.is_empty():
+		return
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for key in state.map:
+		var p: PackedStringArray = String(key).split(",")
+		var c: Vector2 = map_view.hex_center(int(p[0]), int(p[1]))
+		mn = mn.min(c)
+		mx = mx.max(c)
+	var pad: float = map_view.cell.x * 1.2
+	mn -= Vector2(pad, pad)
+	mx += Vector2(pad, pad)
+	var bounds: Vector2 = mx - mn
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var z: float = clampf(minf(vp.x / bounds.x, vp.y / bounds.y), 0.15, 2.5)
+	camera.position = (mn + mx) * 0.5
 	camera.zoom = Vector2(z, z)
 
 
