@@ -617,13 +617,7 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 	var tex := _counter_tex(counter_id)
 	if tex != null:
 		var s := radius * 1.5
-		if facing > 0:
-			var rot := atan2(FACE_DIRS[facing - 1].y, FACE_DIRS[facing - 1].x) + PI / 2.0
-			draw_set_transform(center, rot, Vector2.ONE)
-			draw_texture_rect(tex, Rect2(Vector2(-s, -s) * 0.5, Vector2(s, s)), false)
-			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		else:
-			draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+		draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
 	else:
 		draw_circle(center, radius * 0.45,
 			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[side])
@@ -653,19 +647,17 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 				Color(0.95, 0.95, 0.2))
 
 
-# Overlay per veicoli: bordo rettangolare (ruotato col facing) e badge hull_damage.
+# Overlay per veicoli: segnalino torretta ruotato col facing + badge hull_damage.
 func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
-	var hw := radius * 0.44
-	var hh := radius * 0.34
 	if c.facing > 0:
-		var rot := atan2(FACE_DIRS[c.facing - 1].y, FACE_DIRS[c.facing - 1].x) + PI / 2.0
-		draw_set_transform(center, rot, Vector2.ONE)
-		draw_rect(Rect2(Vector2(-hw, -hh), Vector2(hw * 2, hh * 2)),
-			Color(0, 0, 0, 0.75), false, radius * 0.05)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	else:
-		draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
-			Color(0, 0, 0, 0.75), false, radius * 0.05)
+		var turret_tex := _counter_tex("GE-Turret-Marker")
+		if turret_tex != null:
+			var ts := radius * 1.3
+			var rot := atan2(FACE_DIRS[c.facing - 1].y, FACE_DIRS[c.facing - 1].x) + PI / 2.0
+			draw_set_transform(center, rot, Vector2.ONE)
+			draw_texture_rect(turret_tex,
+				Rect2(Vector2(-ts, -ts) * 0.5, Vector2(ts, ts)), false)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if c.hull_damage == 1:
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))
