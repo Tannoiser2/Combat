@@ -57,7 +57,9 @@ var los_first := Vector2i(-99, -99)
 
 # Editor di mappa: pannello pittura terreno (tasto E).
 var editor_panel: PanelContainer
-var editor_brush: int = -1  # Domain.Terrain selezionato, -1 = nessuno
+var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
+var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
+var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -841,9 +843,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		if event.button_mask & MOUSE_BUTTON_MASK_LEFT \
 				and map_view != null and map_view.editor_mode:
-			var drag_hex := map_view.pick_hex(map_view.get_local_mouse_position())
-			if drag_hex.x > -99:
-				_editor_paint(drag_hex)
+			_editor_act(map_view.get_local_mouse_position())
 		elif event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
 			camera.position -= event.relative / camera.zoom.x
 
@@ -900,7 +900,7 @@ func _on_map_clicked() -> void:
 		return
 	_play_sfx("click")
 	if map_view.editor_mode:
-		_editor_paint(hex)
+		_editor_act(map_view.get_local_mouse_position())
 		return
 	if los_mode:
 		_handle_los_click(hex)
@@ -1101,15 +1101,43 @@ func _make_theme() -> Theme:
 
 # --------------------------------------------------------- editor mappa
 
-func _editor_paint(hex: Vector2i) -> void:
-	if editor_brush < 0:
-		hint_label.text = "Editor: scegli un terreno dal pannello a sinistra"
-		return
-	var key := GameState.hex_key(hex.x, hex.y)
-	if not state.map.has(key):
-		return
-	state.map[key].terrain = editor_brush
-	map_view.queue_redraw()
+func _editor_act(local_pos: Vector2) -> void:
+	if editor_is_hexside:
+		var hs := _pick_hexside(local_pos)
+		if hs.is_empty():
+			return
+		if editor_hexside_brush < 0:
+			state.hexsides.erase(hs)
+		else:
+			state.hexsides[hs] = editor_hexside_brush
+		map_view.queue_redraw()
+	elif editor_brush >= 0:
+		var hex := map_view.pick_hex(local_pos)
+		if hex.x <= -99:
+			return
+		var key := GameState.hex_key(hex.x, hex.y)
+		if not state.map.has(key):
+			return
+		state.map[key].terrain = editor_brush
+		map_view.queue_redraw()
+	else:
+		hint_label.text = "Editor: scegli un terreno o un lato dal pannello a sinistra"
+
+
+func _pick_hexside(local_pos: Vector2) -> String:
+	var h1 := map_view.pick_hex(local_pos)
+	if h1.x <= -99:
+		return ""
+	var best_n := Vector2i(-99, -99)
+	var best_d := INF
+	for n in Move.neighbors(state, h1):
+		var d := map_view.hex_center(n.x, n.y).distance_to(local_pos)
+		if d < best_d:
+			best_d = d
+			best_n = n
+	if best_n.x <= -99:
+		return ""
+	return GameState.hexside_key(h1, best_n)
 
 
 func _export_map_data() -> void:
@@ -1136,13 +1164,33 @@ func _export_map_data() -> void:
 			quoted.append('"%s"' % e)
 		lines.append('\tD.Terrain.%s: [%s],' % [tname, ", ".join(quoted)])
 	lines.append("},")
+	# Hexside (siepi/bocage/muri).
+	var hs_abbrev := {
+		Domain.Terrain.HEDGEROW: "H",
+		Domain.Terrain.BOCAGE: "B",
+		Domain.Terrain.WALL: "W",
+	}
+	if not state.hexsides.is_empty():
+		lines.append("")
+		lines.append("# Hexside per \"%s\" — incolla in HEXSIDES[\"%s\"]:" % [map_name, map_name])
+		lines.append('"%s": [' % map_name)
+		var hs_entries: Array[String] = []
+		for key in state.hexsides:
+			var t_hs: int = state.hexsides[key]
+			var ab: String = hs_abbrev.get(t_hs, "?")
+			hs_entries.append('\t"%s|%s"' % [key, ab])
+		hs_entries.sort()
+		for e in hs_entries:
+			lines.append(e + ",")
+		lines.append("],")
 	var text := "\n".join(lines)
 	var path := "/tmp/map_export_%s.txt" % map_name
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f != null:
 		f.store_string(text)
 		f.close()
-		hint_label.text = "Esportato in %s (%d terreni modificati)" % [path, by_terrain.size()]
+		hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [
+			path, by_terrain.size(), state.hexsides.size()]
 	else:
 		hint_label.text = "Errore scrittura %s" % path
 
@@ -1432,20 +1480,25 @@ func _build_hud() -> void:
 	var ep_list := VBoxContainer.new()
 	ep_list.add_theme_constant_override("separation", 2)
 	ep_scroll.add_child(ep_list)
-	# Pulsante "Nessuno" per deselezionare il pennello.
+	# Lista unificata di tutti i pulsanti (hex + hexside) per la deselezione.
+	var all_brush_buttons: Array = []
+	# -- sezione HEX --
+	ep_list.add_child(_section_label("HEX (terreno interno)"))
 	var none_btn := Button.new()
 	none_btn.text = "— Nessuno —"
 	none_btn.toggle_mode = true
-	none_btn.custom_minimum_size = Vector2(200, 28)
-	none_btn.pressed.connect(func(): editor_brush = -1)
+	none_btn.custom_minimum_size = Vector2(200, 26)
+	none_btn.pressed.connect(func():
+		editor_brush = -1
+		editor_is_hexside = false)
 	ep_list.add_child(none_btn)
-	var brush_buttons: Array = [none_btn]
+	all_brush_buttons.append(none_btn)
 	for t in Domain.TERRAIN_NAMES:
 		var tname: String = Domain.TERRAIN_NAMES[t]
 		var tb := Button.new()
 		tb.text = tname
 		tb.toggle_mode = true
-		tb.custom_minimum_size = Vector2(200, 28)
+		tb.custom_minimum_size = Vector2(200, 26)
 		var tint: Color = MapView.OVERLAY_TINTS.get(t,
 			Color(MapView.BASE_COLORS.get(t, Color.MAGENTA)))
 		tb.add_theme_color_override("font_color",
@@ -1457,11 +1510,55 @@ func _build_hud() -> void:
 		var t_val: int = t
 		tb.pressed.connect(func():
 			editor_brush = t_val
-			for b in brush_buttons:
+			editor_is_hexside = false
+			for b in all_brush_buttons:
 				if b != tb:
 					b.button_pressed = false)
-		brush_buttons.append(tb)
+		all_brush_buttons.append(tb)
 		ep_list.add_child(tb)
+	# -- sezione HEXSIDE --
+	ep_list.add_child(HSeparator.new())
+	ep_list.add_child(_section_label("LATO (hexside)"))
+	var hexside_entries: Array = [
+		[Domain.Terrain.HEDGEROW, "Hedgerow",  MapView.HEXSIDE_COLORS[Domain.Terrain.HEDGEROW]],
+		[Domain.Terrain.BOCAGE,   "Bocage",    MapView.HEXSIDE_COLORS[Domain.Terrain.BOCAGE]],
+		[Domain.Terrain.WALL,     "Wall",      MapView.HEXSIDE_COLORS[Domain.Terrain.WALL]],
+	]
+	for entry in hexside_entries:
+		var ht: int = entry[0]
+		var hn: String = entry[1]
+		var hc: Color = entry[2]
+		var hb := Button.new()
+		hb.text = hn
+		hb.toggle_mode = true
+		hb.custom_minimum_size = Vector2(200, 26)
+		hb.add_theme_color_override("font_color", Color.WHITE)
+		hb.add_theme_stylebox_override("normal",  _colored_stylebox(Color(hc.r, hc.g, hc.b, 0.8)))
+		hb.add_theme_stylebox_override("pressed", _colored_stylebox(Color(hc.r, hc.g, hc.b, 1.0)))
+		var ht_val: int = ht
+		hb.pressed.connect(func():
+			editor_is_hexside = true
+			editor_hexside_brush = ht_val
+			editor_brush = -1
+			for b in all_brush_buttons:
+				if b != hb:
+					b.button_pressed = false)
+		all_brush_buttons.append(hb)
+		ep_list.add_child(hb)
+	var rem_btn := Button.new()
+	rem_btn.text = "Rimuovi lato"
+	rem_btn.toggle_mode = true
+	rem_btn.custom_minimum_size = Vector2(200, 26)
+	rem_btn.modulate = Color(1.0, 0.7, 0.7)
+	rem_btn.pressed.connect(func():
+		editor_is_hexside = true
+		editor_hexside_brush = -1
+		editor_brush = -1
+		for b in all_brush_buttons:
+			if b != rem_btn:
+				b.button_pressed = false)
+	all_brush_buttons.append(rem_btn)
+	ep_list.add_child(rem_btn)
 	ep_box.add_child(HSeparator.new())
 	var export_btn := Button.new()
 	export_btn.text = "Esporta dati mappa"
