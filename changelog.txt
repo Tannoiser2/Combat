@@ -1,5 +1,22 @@
 v0.31 — 2026-06-14
-- Scenari Vol.1 allineati allo Scenario Book v1.36b:
+- UI: rimossi suoni dei passi e della corsa (footstep/run); i veicoli
+  mantengono il proprio suono motore
+- UI: roster amici (sinistra) ora collassabile con header "SQUADRA ▼/▶"
+- UI: indicatori visivi colorati nel roster: cuori rossi per ferite,
+  arancione/giallo per munizioni, pallino colorato per morale
+- UI: pannello "NEMICI NOTI" nella sidebar destra (collassabile, default
+  chiuso): mostra i nemici avvistati con ferite e pallino morale
+- Scenari Vol.1 allineati allo Scenario Book v1.36b (2a tornata):
+  - intro1 Meeting of Patrols: aggiunti VP e 4 hex obiettivo (20.06,
+    27.03, 29.14, 33.05; +4 VP ciascuno)
+  - s2 Defend the Farmhouse: aggiunta ondata al turno 5 (stessi hex
+    del setup iniziale, come da libro)
+  - s3 Let's Get Out: aggiunto hex 24.19 al setup (mancante) e ondata
+    al turno 3 ai hex 35.05-35.10
+  - s8 Rescue Mission: corretta posizione di Alex/Maquis (29.14, non
+    17.14); aggiunto 17.14 al setup nemico; aggiunte 3 ondate (turno 3
+    col 35, turni 5 e 7 col 34)
+- Scenari Vol.1 allineati (1a tornata — recap):
   - s4 Sniper Village: aggiunto cup_spec completo con rinforzi turno 4
     (wave ai hex 35.03-35.07/35.15-35.19)
   - s5 Village Defense: corretto enemy_setup (04.11/04.16/04.18),

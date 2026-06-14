@@ -352,6 +352,10 @@ const SCENARIOS := {
 		"waves": [{"turn": 4, "hexes": ["35,8", "35,7", "35,6", "35,5"]}],
 		# SR13: i nemici possono uscire dalla mappa da qualsiasi bordo.
 		"enemy_may_exit": true,
+		# Punti di ricognizione da raggiungere (+4 VP l'uno).
+		"objective_hexes": ["20,6", "27,3", "29,14", "33,5"],
+		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
+			"objective_each": 4},
 	},
 
 	"intro2": {
@@ -561,6 +565,12 @@ const SCENARIOS := {
 		"enemy_setup": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14", "3,15",
 			"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,10", "4,11",
 			"4,12", "4,13", "4,14", "4,15", "4,17"],
+		# SR libro: al turno 5 nuovi nemici ai medesimi hex d'entrata.
+		"waves": [
+			{"turn": 5, "hexes": ["3,2", "3,3", "3,5", "3,12", "3,13", "3,14", "3,15",
+				"3,17", "4,1", "4,2", "4,3", "4,4", "4,5", "4,10", "4,11",
+				"4,12", "4,13", "4,14", "4,15", "4,17"]},
+		],
 		"vp": {"enemy_killed": 1, "enemy_nco_killed": 2, "enemy_officer_killed": 3,
 			"friendly_killed": -2, "friendly_wounded": -1,
 			"no_enemy_in_building": 8},
@@ -581,11 +591,16 @@ const SCENARIOS := {
 			"White": {"Recruit": 5, "Rifleman": 5, "Officer": 1},
 		},
 		"dummies": 20,
+		# Hex corretti dal libro (aggiunto 24.19 mancante al gruppo 2).
 		"enemy_setup": ["33,4", "33,5", "33,6", "33,7", "33,8", "33,9",
 			"35,5", "35,6", "35,7", "35,8", "35,9", "35,10", "33,10",
-			"18,19", "19,19", "20,19", "21,19", "22,19", "23,19"],
+			"18,19", "19,19", "20,19", "21,19", "22,19", "23,19", "24,19"],
 		"first_order_d6": ["EVADE 5/6", "EVADE 6/5", "SPRINT 6",
 			"SPRINT 5", "SNEAK 5", "SNEAK 6"],
+		# SR libro: rinforzi al turno 3 dal bordo est.
+		"waves": [
+			{"turn": 3, "hexes": ["35,5", "35,6", "35,7", "35,8", "35,9", "35,10"]},
+		],
 		# Fuga: VP per ogni uomo che esce dal bordo sinistro (col <= 2).
 		"exit_col": 2,
 		"vp": {"enemy_killed": 1, "friendly_killed": -3, "friendly_wounded": -1,
@@ -727,12 +742,19 @@ const SCENARIOS := {
 			"White": {"Officer": 1, "Recruit": 5, "Rifleman": 4},
 		},
 		"dummies": 12,
-		"enemy_setup": ["18,4", "21,9", "17,10", "19,7", "17,17", "15,16",
+		# Hex corretti dal libro (17.14 era maquis, ma e' posizione nemica;
+		# il maquis "Alex" e' a 29.14 oltre le linee).
+		"enemy_setup": ["18,4", "21,9", "17,10", "17,14", "19,7", "17,17", "15,16",
 			"16,13", "12,16", "16,18"],
-		# Il Maquis e' nel casolare in 17.14: va scortato fuori dal bordo
-		# sinistro (col <= 2) vivo.
-		"maquis_hex": "17,14",
+		# Alex e' nel casolare in 29.14: va scortato fuori dal bordo sinistro.
+		"maquis_hex": "29,14",
 		"exit_col": 2,
+		# SR libro: rinforzi al turno 3 (col 35) e turni 5 e 7 (col 34).
+		"waves": [
+			{"turn": 3, "hexes": ["35,6", "35,7", "35,8", "35,9", "35,10", "35,11"]},
+			{"turn": 5, "hexes": ["34,6", "34,7", "34,8", "34,9", "34,10", "34,11"]},
+			{"turn": 7, "hexes": ["34,6", "34,7", "34,8", "34,9", "34,10", "34,11"]},
+		],
 		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
 			"maquis_rescued": 10, "friendly_exited": 1},
 	},

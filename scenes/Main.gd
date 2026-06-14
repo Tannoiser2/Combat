@@ -40,7 +40,12 @@ var order_desc: RichTextLabel
 var order_target: Character
 var enemy_card_rect: TextureRect
 var card_preview: TextureRect   # anteprima ingrandita della carta sotto il mouse
-var roster_box: VBoxContainer   # elenco della squadra a sinistra
+var roster_box: VBoxContainer   # elenco della squadra a sinistra (= roster_body)
+var roster_body: VBoxContainer  # contenuto collassabile del roster
+var roster_collapsed := false
+var enemy_roster_box: VBoxContainer    # nemici noti (pannello destra)
+var enemy_roster_body: VBoxContainer
+var enemy_roster_collapsed := true
 var overlay_legend: PanelContainer  # legenda dell'overlay terreno (tasto T)
 var played_card_bar: PanelContainer  # banner carta giocata (ORDER phase in poi)
 var played_card_text: RichTextLabel
@@ -188,7 +193,7 @@ func _load_sfx() -> void:
 			"garand", "kar98", "mg42", "m1919", "bar", "smg",
 			"thompson", "springfield", "stg44",
 			"kill", "wound", "suppress", "miss", "throw",
-			"footstep", "run", "vehicle", "click"]:
+			"vehicle", "click"]:
 		var path := "res://assets/audio/%s.ogg" % s
 		if ResourceLoader.exists(path):
 			var p := AudioStreamPlayer.new()
@@ -211,8 +216,6 @@ func _consume_audio_events() -> void:
 			"melee": _play_sfx("melee")
 			"scream": _play_sfx("scream")
 			"throw": _play_sfx("throw")
-			"footstep": _play_sfx("footstep")
-			"run":      _play_sfx("run")
 			"vehicle":  _play_sfx("vehicle")
 	state.audio_events.clear()
 
@@ -1048,9 +1051,8 @@ func _handle_action_click(hex: Vector2i) -> void:
 		var from := acting.position
 		if not Move.step_to(state, acting, hex):
 			return
-		_play_sfx("vehicle" if acting.is_vehicle else \
-			("run" if acting.order in [Domain.Order.SPRINT, Domain.Order.RUN_AND_GUN,
-				Domain.Order.CHARGE] else "footstep"))
+		if acting.is_vehicle:
+			_play_sfx("vehicle")
 		moves_left -= 1
 		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
 		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:
@@ -1284,6 +1286,30 @@ func _build_hud() -> void:
 	info_text.add_theme_font_size_override("normal_font_size", 15)
 	side_box.add_child(info_text)
 	side_box.add_child(HSeparator.new())
+	# Sezione nemici noti (collassabile, default chiusa).
+	var enemy_hdr_btn := Button.new()
+	enemy_hdr_btn.text = "NEMICI NOTI ▶"
+	enemy_hdr_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	enemy_hdr_btn.flat = true
+	enemy_hdr_btn.add_theme_font_size_override("font_size", 13)
+	enemy_hdr_btn.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	side_box.add_child(enemy_hdr_btn)
+	var enemy_scroll := ScrollContainer.new()
+	enemy_scroll.custom_minimum_size = Vector2(0, 120)
+	enemy_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	enemy_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	enemy_scroll.hide()
+	side_box.add_child(enemy_scroll)
+	enemy_roster_body = VBoxContainer.new()
+	enemy_roster_body.add_theme_constant_override("separation", 2)
+	enemy_roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	enemy_scroll.add_child(enemy_roster_body)
+	enemy_roster_box = enemy_roster_body
+	enemy_hdr_btn.pressed.connect(func():
+		enemy_roster_collapsed = not enemy_roster_collapsed
+		enemy_scroll.visible = not enemy_roster_collapsed
+		enemy_hdr_btn.text = "NEMICI NOTI ▶" if enemy_roster_collapsed else "NEMICI NOTI ▼")
+	side_box.add_child(HSeparator.new())
 	var log_head := HBoxContainer.new()
 	var log_title := _section_label("DIARIO DI BATTAGLIA")
 	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1317,15 +1343,30 @@ func _build_hud() -> void:
 	legend.text = "Morale:  " + "  ".join(parts)
 	side_box.add_child(legend)
 
-	# Roster della squadra, a sinistra (clic = seleziona e centra).
+	# Roster della squadra, a sinistra (collassabile).
 	var roster_panel := PanelContainer.new()
 	roster_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	roster_panel.offset_left = 8
 	roster_panel.offset_top = 224
 	root.add_child(roster_panel)
-	roster_box = VBoxContainer.new()
-	roster_box.add_theme_constant_override("separation", 2)
-	roster_panel.add_child(roster_box)
+	var roster_outer := VBoxContainer.new()
+	roster_outer.add_theme_constant_override("separation", 0)
+	roster_panel.add_child(roster_outer)
+	var roster_hdr := Button.new()
+	roster_hdr.text = "SQUADRA ▼"
+	roster_hdr.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	roster_hdr.flat = true
+	roster_hdr.add_theme_font_size_override("font_size", 13)
+	roster_hdr.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	roster_outer.add_child(roster_hdr)
+	roster_body = VBoxContainer.new()
+	roster_body.add_theme_constant_override("separation", 2)
+	roster_outer.add_child(roster_body)
+	roster_box = roster_body
+	roster_hdr.pressed.connect(func():
+		roster_collapsed = not roster_collapsed
+		roster_body.visible = not roster_collapsed
+		roster_hdr.text = "SQUADRA ▶" if roster_collapsed else "SQUADRA ▼")
 
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
@@ -1931,43 +1972,89 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 	info_text.text = "\n".join(lines)
 
 
-# Roster: una riga per uomo con stato sintetico (morale, ferite, ammo).
+# Roster: una riga per uomo con indicatori visivi colorati (ferite, ammo, morale).
 func _refresh_roster() -> void:
-	for child in roster_box.get_children():
+	for child in roster_body.get_children():
 		child.queue_free()
 	for c in state.characters:
 		if c.side != Domain.Side.FRIENDLY:
 			continue
 		var b := Button.new()
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(190, 0)
-		var flags := ""
-		if c.is_dead():
-			flags = "  [KIA]" if c.is_killed() else "  [INCAP]"
-		else:
-			if not c.wounds.is_empty():
-				flags += " " + "♥".repeat(c.wounds.size())
-			if c.no_ammo:
-				flags += " ⊘AMM"
-			elif c.low_ammo:
-				flags += " ↓amm"
-			if c.spotted:
-				flags += " 👁"
-		b.text = "%s\n   %s%s" % [c.display_name, Domain.MORALE_NAMES[c.morale], flags]
+		b.text = ""
+		b.custom_minimum_size = Vector2(200, 32)
 		b.disabled = c.is_dead()
-		b.modulate = Color(0.6, 0.6, 0.6) if c.is_dead() else Color.WHITE
-		if not c.is_dead():
-			b.add_theme_color_override("font_color", Color.WHITE)
-			var sb := StyleBoxFlat.new()
+		b.modulate = Color(0.55, 0.55, 0.55) if c.is_dead() else Color.WHITE
+		var sb := StyleBoxFlat.new()
+		if c.is_dead():
+			sb.bg_color = Color(0.12, 0.12, 0.12)
+			sb.border_color = Color(0.3, 0.3, 0.3)
+		else:
 			sb.bg_color = Color(0.18, 0.22, 0.13)
 			sb.border_color = MapView.MORALE_COLORS[c.morale]
-			sb.border_width_left = 6
-			sb.border_width_right = 1
-			sb.border_width_top = 1
-			sb.border_width_bottom = 1
-			sb.set_corner_radius_all(4)
-			sb.set_content_margin_all(6)
-			b.add_theme_stylebox_override("normal", sb)
+		sb.border_width_left = 6
+		sb.border_width_right = 1
+		sb.border_width_top = 1
+		sb.border_width_bottom = 1
+		sb.set_corner_radius_all(4)
+		sb.set_content_margin_all(4)
+		b.add_theme_stylebox_override("normal", sb)
+		b.add_theme_stylebox_override("hover", sb)
+		b.add_theme_stylebox_override("pressed", sb)
+		b.add_theme_stylebox_override("disabled", sb)
+		# HBoxContainer con indicatori colorati
+		var hbox := HBoxContainer.new()
+		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hbox.anchor_right = 1.0
+		hbox.anchor_bottom = 1.0
+		hbox.offset_left = 8
+		hbox.offset_right = -4
+		hbox.offset_top = 2
+		hbox.offset_bottom = -2
+		hbox.add_theme_constant_override("separation", 4)
+		b.add_child(hbox)
+		var name_lbl := Label.new()
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.add_theme_font_size_override("font_size", 13)
+		name_lbl.add_theme_color_override("font_color",
+			Color(0.55, 0.55, 0.55) if c.is_dead() else Color.WHITE)
+		name_lbl.text = c.display_name
+		hbox.add_child(name_lbl)
+		if c.is_dead():
+			var dead_lbl := Label.new()
+			dead_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			dead_lbl.text = "KIA" if c.is_killed() else "INCAP"
+			dead_lbl.add_theme_font_size_override("font_size", 11)
+			dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+			hbox.add_child(dead_lbl)
+		else:
+			for _w in c.wounds:
+				var w := Label.new()
+				w.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				w.text = "♥"
+				w.add_theme_font_size_override("font_size", 13)
+				w.add_theme_color_override("font_color", Color(0.95, 0.2, 0.2))
+				hbox.add_child(w)
+			if c.no_ammo:
+				var a := Label.new()
+				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				a.text = "⊘"
+				a.add_theme_font_size_override("font_size", 13)
+				a.add_theme_color_override("font_color", Color(1.0, 0.4, 0.1))
+				hbox.add_child(a)
+			elif c.low_ammo:
+				var a := Label.new()
+				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				a.text = "↓"
+				a.add_theme_font_size_override("font_size", 13)
+				a.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
+				hbox.add_child(a)
+			var m := Label.new()
+			m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			m.text = "●"
+			m.add_theme_font_size_override("font_size", 13)
+			m.add_theme_color_override("font_color", MapView.MORALE_COLORS[c.morale])
+			hbox.add_child(m)
 		var ch := c
 		b.pressed.connect(func():
 			map_view.selected = ch
@@ -1975,13 +2062,74 @@ func _refresh_roster() -> void:
 			camera.position = map_view.hex_center(ch.position.x, ch.position.y)
 			map_view.queue_redraw()
 			_show_info(ch.position, ch))
-		roster_box.add_child(b)
+		roster_body.add_child(b)
+
+
+# Nemici avvistati nella sidebar destra (collassabile).
+func _refresh_enemy_roster() -> void:
+	if enemy_roster_body == null:
+		return
+	for child in enemy_roster_body.get_children():
+		child.queue_free()
+	var spotted: Array = []
+	for c in state.characters:
+		if c.side == Domain.Side.ENEMY and c.spotted and not c.embarked:
+			spotted.append(c)
+	if spotted.is_empty():
+		var lbl := Label.new()
+		lbl.text = "Nessun nemico avvistato"
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
+		enemy_roster_body.add_child(lbl)
+		return
+	for c in spotted:
+		var pc := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.22, 0.12, 0.12) if not c.is_dead() else Color(0.13, 0.13, 0.13)
+		sb.border_color = MapView.MORALE_COLORS[c.morale] if not c.is_dead() else Color(0.3, 0.3, 0.3)
+		sb.border_width_left = 5
+		sb.border_width_right = 1
+		sb.border_width_top = 1
+		sb.border_width_bottom = 1
+		sb.set_corner_radius_all(3)
+		sb.set_content_margin_all(3)
+		pc.add_theme_stylebox_override("panel", sb)
+		var hbox := HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 4)
+		pc.add_child(hbox)
+		var name_lbl := Label.new()
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.add_theme_color_override("font_color",
+			Color(0.95, 0.7, 0.7) if not c.is_dead() else Color(0.45, 0.45, 0.45))
+		name_lbl.text = c.display_name
+		hbox.add_child(name_lbl)
+		if c.is_dead():
+			var dead_lbl := Label.new()
+			dead_lbl.text = "KIA" if c.is_killed() else "INCAP"
+			dead_lbl.add_theme_font_size_override("font_size", 11)
+			dead_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
+			hbox.add_child(dead_lbl)
+		else:
+			for _w in c.wounds:
+				var w := Label.new()
+				w.text = "♥"
+				w.add_theme_font_size_override("font_size", 12)
+				w.add_theme_color_override("font_color", Color(0.95, 0.2, 0.2))
+				hbox.add_child(w)
+			var m := Label.new()
+			m.text = "●"
+			m.add_theme_font_size_override("font_size", 12)
+			m.add_theme_color_override("font_color", MapView.MORALE_COLORS[c.morale])
+			hbox.add_child(m)
+		enemy_roster_body.add_child(pc)
 
 
 func _refresh() -> void:
 	turn_label.text = "  Turno %d/%d  " % [mini(state.turn, state.max_turns), state.max_turns]
 	_update_enemy_card()
 	_refresh_roster()
+	_refresh_enemy_roster()
 	if phase != Phase.CARD:
 		_update_played_card_bar()
 	for line in state.drain_log():
