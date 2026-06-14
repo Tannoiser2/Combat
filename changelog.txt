@@ -1,3 +1,11 @@
+v0.41 — 2026-06-14
+- Roster squadra: righe 84 px, soldati divisi per team (header Able/Baker/Charlie),
+  thumbnail segnalino 48x48, segnalini ferite/ammo/morale in colonna destra
+- Tab "Nemici" unificato nel pannello roster a sinistra (accanto a "Squadra");
+  rimosso il tab "Nemici noti" dal pannello informazioni a destra
+- Veicoli su mappa: il corpo del mezzo non ruota più; la direzione è indicata
+  dal segnalino torretta (GE-Turret-Marker) ruotato sul facing corrente
+
 v0.40 — 2026-06-14
 - Mischia (Rule 15): CHARGE bloccata se l'hex bersaglio contiene 2+ nemici
   vivi. Move.can_enter conta tutti i difensori (non solo il primo via

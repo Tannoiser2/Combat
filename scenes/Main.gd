@@ -1334,23 +1334,11 @@ func _build_hud() -> void:
 	info_text.add_theme_font_size_override("normal_font_size", 15)
 	side_box.add_child(info_text)
 	side_box.add_child(HSeparator.new())
-	# Tab NEMICI NOTI / DIARIO DI BATTAGLIA
+	# Diario di battaglia (il roster nemici e' nel pannello squadra a sinistra)
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_theme_font_size_override("font_size", 13)
 	side_box.add_child(tabs)
-	# Tab 1: Nemici noti
-	var enemy_tab := ScrollContainer.new()
-	enemy_tab.name = "Nemici noti"
-	enemy_tab.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	enemy_tab.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tabs.add_child(enemy_tab)
-	enemy_roster_body = VBoxContainer.new()
-	enemy_roster_body.add_theme_constant_override("separation", 2)
-	enemy_roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	enemy_tab.add_child(enemy_roster_body)
-	enemy_roster_box = enemy_roster_body
-	# Tab 2: Diario di battaglia
 	var log_tab := VBoxContainer.new()
 	log_tab.name = "Diario"
 	log_tab.add_theme_constant_override("separation", 2)
@@ -1388,30 +1376,43 @@ func _build_hud() -> void:
 	legend.text = "Morale:  " + "  ".join(parts)
 	side_box.add_child(legend)
 
-	# Roster della squadra, a sinistra (collassabile).
+	# Roster della squadra, a sinistra: tab Squadra | Nemici.
 	var roster_panel := PanelContainer.new()
 	roster_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	roster_panel.offset_left = 8
 	roster_panel.offset_top = 224
 	root.add_child(roster_panel)
 	var roster_outer := VBoxContainer.new()
+	roster_outer.custom_minimum_size = Vector2(230, 0)
 	roster_outer.add_theme_constant_override("separation", 0)
 	roster_panel.add_child(roster_outer)
-	var roster_hdr := Button.new()
-	roster_hdr.text = "SQUADRA ▼"
-	roster_hdr.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	roster_hdr.flat = true
-	roster_hdr.add_theme_font_size_override("font_size", 13)
-	roster_hdr.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
-	roster_outer.add_child(roster_hdr)
+	var roster_tabs := TabContainer.new()
+	roster_tabs.add_theme_font_size_override("font_size", 13)
+	roster_outer.add_child(roster_tabs)
+	# Tab Squadra
+	var squad_scroll := ScrollContainer.new()
+	squad_scroll.name = "Squadra"
+	squad_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	squad_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	squad_scroll.custom_minimum_size = Vector2(0, 480)
+	roster_tabs.add_child(squad_scroll)
 	roster_body = VBoxContainer.new()
 	roster_body.add_theme_constant_override("separation", 2)
-	roster_outer.add_child(roster_body)
+	roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	squad_scroll.add_child(roster_body)
 	roster_box = roster_body
-	roster_hdr.pressed.connect(func():
-		roster_collapsed = not roster_collapsed
-		roster_body.visible = not roster_collapsed
-		roster_hdr.text = "SQUADRA ▶" if roster_collapsed else "SQUADRA ▼")
+	# Tab Nemici
+	var enemy_scroll := ScrollContainer.new()
+	enemy_scroll.name = "Nemici"
+	enemy_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	enemy_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	enemy_scroll.custom_minimum_size = Vector2(0, 480)
+	roster_tabs.add_child(enemy_scroll)
+	enemy_roster_body = VBoxContainer.new()
+	enemy_roster_body.add_theme_constant_override("separation", 2)
+	enemy_roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	enemy_scroll.add_child(enemy_roster_body)
+	enemy_roster_box = enemy_roster_body
 
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
@@ -2031,118 +2032,134 @@ func _show_info(hex: Vector2i, c: Character) -> void:
 func _refresh_roster() -> void:
 	for child in roster_body.get_children():
 		child.queue_free()
+	# Raggruppa per team nell'ordine di apparizione in state.characters
+	var team_order: Array[String] = []
 	for c in state.characters:
-		if c.side != Domain.Side.FRIENDLY:
-			continue
-		var b := Button.new()
-		b.text = ""
-		b.custom_minimum_size = Vector2(200, 42)
-		b.disabled = c.is_dead()
-		var sb := StyleBoxFlat.new()
-		if c.is_dead():
-			sb.bg_color = Color(0.12, 0.12, 0.12)
-			sb.border_color = Color(0.3, 0.3, 0.3)
-		else:
-			sb.bg_color = Color(0.18, 0.22, 0.13)
-			sb.border_color = MapView.MORALE_COLORS[c.morale]
-		sb.border_width_left = 5
-		sb.border_width_right = 1
-		sb.border_width_top = 1
-		sb.border_width_bottom = 1
-		sb.set_corner_radius_all(4)
-		sb.set_content_margin_all(3)
-		b.add_theme_stylebox_override("normal", sb)
-		b.add_theme_stylebox_override("hover", sb)
-		b.add_theme_stylebox_override("pressed", sb)
-		b.add_theme_stylebox_override("disabled", sb)
-		var hbox := HBoxContainer.new()
-		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hbox.anchor_right = 1.0
-		hbox.anchor_bottom = 1.0
-		hbox.offset_left = 6
-		hbox.offset_right = -3
-		hbox.offset_top = 2
-		hbox.offset_bottom = -2
-		hbox.add_theme_constant_override("separation", 3)
-		b.add_child(hbox)
-		# Thumbnail counter PNG (28x28)
-		var thumb := TextureRect.new()
-		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		thumb.custom_minimum_size = Vector2(28, 28)
-		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		var tex_path := "res://assets/counters/%s-f.png" % c.counter
-		if ResourceLoader.exists(tex_path):
-			thumb.texture = load(tex_path)
-		hbox.add_child(thumb)
-		# Nome
-		var name_lbl := Label.new()
-		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.add_theme_font_size_override("font_size", 12)
-		name_lbl.add_theme_color_override("font_color",
-			Color(0.5, 0.5, 0.5) if c.is_dead() else Color.WHITE)
-		name_lbl.text = c.display_name
-		hbox.add_child(name_lbl)
-		if c.is_dead():
-			var dead_lbl := Label.new()
-			dead_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			dead_lbl.text = "KIA" if c.is_killed() else "INC"
-			dead_lbl.add_theme_font_size_override("font_size", 10)
-			dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-			hbox.add_child(dead_lbl)
-		else:
-			# Ferite: segnalino per ciascuna ferita (Light / Bad Wound marker)
-			for wound_type in c.wounds:
-				var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
-					if wound_type == Domain.Wound.BAD \
-					else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
-				var wt := TextureRect.new()
-				wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				wt.custom_minimum_size = Vector2(20, 20)
-				wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				if ResourceLoader.exists(wpath):
-					wt.texture = load(wpath)
-				hbox.add_child(wt)
-			# Ammo: Low Ammo (fronte) o Out of Ammo (retro)
-			var ammo_path := ""
-			if c.no_ammo:
-				ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-r.png"
-			elif c.low_ammo:
-				ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-f.png"
-			if not ammo_path.is_empty():
-				var at := TextureRect.new()
-				at.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				at.custom_minimum_size = Vector2(20, 20)
-				at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				if ResourceLoader.exists(ammo_path):
-					at.texture = load(ammo_path)
-				hbox.add_child(at)
-			# Morale: segnalino del livello
-			var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
-			if not morale_path.is_empty():
-				var mt := TextureRect.new()
-				mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				mt.custom_minimum_size = Vector2(20, 20)
-				mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				if ResourceLoader.exists(morale_path):
-					mt.texture = load(morale_path)
-				hbox.add_child(mt)
-		var ch := c
-		b.pressed.connect(func():
-			map_view.selected = ch
-			map_view.highlight_hex = ch.position
-			camera.position = map_view.hex_center(ch.position.x, ch.position.y)
-			map_view.queue_redraw()
-			_show_info(ch.position, ch)
-			# In fase ordini il roster apre direttamente il pannello ordini,
-			# cosi' anche un uomo impilato e' ordinabile per nome.
-			if phase == Phase.ORDERS and not ch.is_dead():
-				_open_order_panel(ch))
-		roster_body.add_child(b)
+		if c.side == Domain.Side.FRIENDLY and not c.team in team_order:
+			team_order.append(c.team)
+	for team_name in team_order:
+		var team_hdr := Label.new()
+		team_hdr.text = "— %s —" % team_name.to_upper()
+		team_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		team_hdr.add_theme_font_size_override("font_size", 11)
+		team_hdr.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+		roster_body.add_child(team_hdr)
+		for c in state.characters:
+			if c.side != Domain.Side.FRIENDLY or c.team != team_name:
+				continue
+			var b := Button.new()
+			b.text = ""
+			b.custom_minimum_size = Vector2(210, 84)
+			b.disabled = c.is_dead()
+			var sb := StyleBoxFlat.new()
+			if c.is_dead():
+				sb.bg_color = Color(0.12, 0.12, 0.12)
+				sb.border_color = Color(0.3, 0.3, 0.3)
+			else:
+				sb.bg_color = Color(0.18, 0.22, 0.13)
+				sb.border_color = MapView.MORALE_COLORS[c.morale]
+			sb.border_width_left = 5
+			sb.border_width_right = 1
+			sb.border_width_top = 1
+			sb.border_width_bottom = 1
+			sb.set_corner_radius_all(4)
+			sb.set_content_margin_all(3)
+			b.add_theme_stylebox_override("normal", sb)
+			b.add_theme_stylebox_override("hover", sb)
+			b.add_theme_stylebox_override("pressed", sb)
+			b.add_theme_stylebox_override("disabled", sb)
+			var hbox := HBoxContainer.new()
+			hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			hbox.anchor_right = 1.0
+			hbox.anchor_bottom = 1.0
+			hbox.offset_left = 6
+			hbox.offset_right = -3
+			hbox.offset_top = 2
+			hbox.offset_bottom = -2
+			hbox.add_theme_constant_override("separation", 3)
+			b.add_child(hbox)
+			# Thumbnail counter PNG (48x48)
+			var thumb := TextureRect.new()
+			thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			thumb.custom_minimum_size = Vector2(48, 48)
+			thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			var tex_path := "res://assets/counters/%s-f.png" % c.counter
+			if ResourceLoader.exists(tex_path):
+				thumb.texture = load(tex_path)
+			hbox.add_child(thumb)
+			# Colonna destra: nome sopra, segnalini sotto
+			var col := VBoxContainer.new()
+			col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			col.add_theme_constant_override("separation", 3)
+			hbox.add_child(col)
+			var name_lbl := Label.new()
+			name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			name_lbl.add_theme_font_size_override("font_size", 13)
+			name_lbl.add_theme_color_override("font_color",
+				Color(0.5, 0.5, 0.5) if c.is_dead() else Color.WHITE)
+			name_lbl.text = c.display_name
+			col.add_child(name_lbl)
+			if c.is_dead():
+				var dead_lbl := Label.new()
+				dead_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				dead_lbl.text = "KIA" if c.is_killed() else "INC"
+				dead_lbl.add_theme_font_size_override("font_size", 10)
+				dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+				col.add_child(dead_lbl)
+			else:
+				var markers_row := HBoxContainer.new()
+				markers_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				markers_row.add_theme_constant_override("separation", 2)
+				col.add_child(markers_row)
+				for wound_type in c.wounds:
+					var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
+						if wound_type == Domain.Wound.BAD \
+						else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
+					var wt := TextureRect.new()
+					wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					wt.custom_minimum_size = Vector2(24, 24)
+					wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					if ResourceLoader.exists(wpath):
+						wt.texture = load(wpath)
+					markers_row.add_child(wt)
+				var ammo_path := ""
+				if c.no_ammo:
+					ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-r.png"
+				elif c.low_ammo:
+					ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-f.png"
+				if not ammo_path.is_empty():
+					var at := TextureRect.new()
+					at.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					at.custom_minimum_size = Vector2(24, 24)
+					at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					if ResourceLoader.exists(ammo_path):
+						at.texture = load(ammo_path)
+					markers_row.add_child(at)
+				var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
+				if not morale_path.is_empty():
+					var mt := TextureRect.new()
+					mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					mt.custom_minimum_size = Vector2(24, 24)
+					mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					if ResourceLoader.exists(morale_path):
+						mt.texture = load(morale_path)
+					markers_row.add_child(mt)
+			var ch := c
+			b.pressed.connect(func():
+				map_view.selected = ch
+				map_view.highlight_hex = ch.position
+				camera.position = map_view.hex_center(ch.position.x, ch.position.y)
+				map_view.queue_redraw()
+				_show_info(ch.position, ch)
+				if phase == Phase.ORDERS and not ch.is_dead():
+					_open_order_panel(ch))
+			roster_body.add_child(b)
 
 
 # Nemici avvistati nella sidebar destra (collassabile).
