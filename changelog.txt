@@ -1,3 +1,10 @@
+v0.43 — 2026-06-14
+- Roster: segnalini status (ferite/ammo/morale/arma) ora grandi come la
+  pedina del soldato (48x48); altezza riga auto-calcolata senza spazio vuoto
+- Pannello roster alto tutta la finestra (ancora top-bottom), collassabile
+  con pulsante ◄/► in alto a destra (nasconde tab e titolo, rimane solo
+  il bottone ► per riaprire)
+
 v0.42 — 2026-06-14
 - Roster: segnalino arma nel pannello uomini e nemici per le armi speciali:
   M1919 (US-M1919-Marker), M2 .50cal (US-M2-Marker), Bazooka M9 (US-Baz-

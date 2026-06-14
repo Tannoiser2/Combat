@@ -1376,25 +1376,48 @@ func _build_hud() -> void:
 	legend.text = "Morale:  " + "  ".join(parts)
 	side_box.add_child(legend)
 
-	# Roster della squadra, a sinistra: tab Squadra | Nemici.
+	# Roster della squadra: pannello sinistro alto tutta la finestra, collassabile.
 	var roster_panel := PanelContainer.new()
-	roster_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	roster_panel.anchor_left = 0.0
+	roster_panel.anchor_right = 0.0
+	roster_panel.anchor_top = 0.0
+	roster_panel.anchor_bottom = 1.0
 	roster_panel.offset_left = 8
-	roster_panel.offset_top = 224
+	roster_panel.offset_top = 46
+	roster_panel.offset_bottom = -8
+	roster_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	root.add_child(roster_panel)
 	var roster_outer := VBoxContainer.new()
 	roster_outer.custom_minimum_size = Vector2(230, 0)
+	roster_outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	roster_outer.add_theme_constant_override("separation", 0)
 	roster_panel.add_child(roster_outer)
+	# Header con pulsante collassa ◄
+	var roster_hdr_row := HBoxContainer.new()
+	roster_hdr_row.add_theme_constant_override("separation", 0)
+	roster_outer.add_child(roster_hdr_row)
+	var roster_title := Label.new()
+	roster_title.text = "SQUADRA"
+	roster_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	roster_title.add_theme_font_size_override("font_size", 13)
+	roster_title.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
+	roster_title.add_theme_constant_override("margin_left", 6)
+	roster_hdr_row.add_child(roster_title)
+	var roster_collapse_btn := Button.new()
+	roster_collapse_btn.text = "◄"
+	roster_collapse_btn.flat = true
+	roster_collapse_btn.add_theme_font_size_override("font_size", 14)
+	roster_hdr_row.add_child(roster_collapse_btn)
 	var roster_tabs := TabContainer.new()
 	roster_tabs.add_theme_font_size_override("font_size", 13)
+	roster_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	roster_outer.add_child(roster_tabs)
 	# Tab Squadra
 	var squad_scroll := ScrollContainer.new()
 	squad_scroll.name = "Squadra"
 	squad_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	squad_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	squad_scroll.custom_minimum_size = Vector2(0, 480)
+	squad_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	roster_tabs.add_child(squad_scroll)
 	roster_body = VBoxContainer.new()
 	roster_body.add_theme_constant_override("separation", 2)
@@ -1406,13 +1429,18 @@ func _build_hud() -> void:
 	enemy_scroll.name = "Nemici"
 	enemy_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	enemy_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	enemy_scroll.custom_minimum_size = Vector2(0, 480)
+	enemy_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	roster_tabs.add_child(enemy_scroll)
 	enemy_roster_body = VBoxContainer.new()
 	enemy_roster_body.add_theme_constant_override("separation", 2)
 	enemy_roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	enemy_scroll.add_child(enemy_roster_body)
 	enemy_roster_box = enemy_roster_body
+	roster_collapse_btn.pressed.connect(func():
+		roster_collapsed = not roster_collapsed
+		roster_tabs.visible = not roster_collapsed
+		roster_title.visible = not roster_collapsed
+		roster_collapse_btn.text = "►" if roster_collapsed else "◄")
 
 	# La mano di carte, in basso al centro
 	hand_panel = PanelContainer.new()
@@ -2075,7 +2103,7 @@ func _refresh_roster() -> void:
 				continue
 			var b := Button.new()
 			b.text = ""
-			b.custom_minimum_size = Vector2(210, 84)
+			b.custom_minimum_size = Vector2(210, 0)
 			b.disabled = c.is_dead()
 			var sb := StyleBoxFlat.new()
 			if c.is_dead():
@@ -2146,7 +2174,7 @@ func _refresh_roster() -> void:
 					var wcp := "res://assets/counters/%s-f.png" % wcid
 					var wct := TextureRect.new()
 					wct.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					wct.custom_minimum_size = Vector2(24, 24)
+					wct.custom_minimum_size = Vector2(48, 48)
 					wct.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					wct.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(wcp):
@@ -2159,7 +2187,7 @@ func _refresh_roster() -> void:
 						else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
 					var wt := TextureRect.new()
 					wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					wt.custom_minimum_size = Vector2(24, 24)
+					wt.custom_minimum_size = Vector2(48, 48)
 					wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(wpath):
@@ -2176,7 +2204,7 @@ func _refresh_roster() -> void:
 					if not ammo_path.is_empty():
 						var at := TextureRect.new()
 						at.mouse_filter = Control.MOUSE_FILTER_IGNORE
-						at.custom_minimum_size = Vector2(24, 24)
+						at.custom_minimum_size = Vector2(48, 48)
 						at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 						at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 						if ResourceLoader.exists(ammo_path):
@@ -2187,7 +2215,7 @@ func _refresh_roster() -> void:
 				if not morale_path.is_empty():
 					var mt := TextureRect.new()
 					mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					mt.custom_minimum_size = Vector2(24, 24)
+					mt.custom_minimum_size = Vector2(48, 48)
 					mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(morale_path):
