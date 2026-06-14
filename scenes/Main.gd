@@ -73,6 +73,11 @@ var acting: Character = null
 var action_kind: int = 0   # TurnSequence.Act
 var moves_left: int = 0
 
+# Selezione ciclica delle pedine impilate (stacking, Rule 8): riclicca lo
+# stesso hex per passare all'uomo successivo nella pila.
+var _stack_cycle_hex := Vector2i(-99, -99)
+var _stack_cycle_i := 0
+
 # Fase di schieramento: uomini ancora da piazzare e zona valida.
 var deploy_queue: Array = []
 var deploy_zone: Array[Vector2i] = []
@@ -957,11 +962,30 @@ func _on_map_clicked() -> void:
 	if acting != null:
 		_handle_action_click(hex)
 		return
-	var c := map_view.character_at_hex(hex)
+	# Selezione: con piu' pedine vive nell'hex (stacking, Rule 8) ogni clic
+	# successivo sullo stesso hex passa all'uomo seguente nella pila.
+	var here: Array = []
+	for cc in state.characters:
+		if not cc.is_dead() and cc.position == hex:
+			here.append(cc)
+	var c: Character = null
+	if not here.is_empty():
+		if hex == _stack_cycle_hex:
+			_stack_cycle_i = (_stack_cycle_i + 1) % here.size()
+		else:
+			_stack_cycle_hex = hex
+			_stack_cycle_i = 0
+		c = here[_stack_cycle_i]
+	else:
+		_stack_cycle_hex = Vector2i(-99, -99)
+		_stack_cycle_i = 0
 	map_view.selected = c
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	if here.size() > 1:
+		hint_label.text = "Pila di %d uomini: riclicca l'hex per il prossimo (%s)" % [
+			here.size(), c.display_name]
 	# Carta Initiative (DISCARD): click su un friendly per cambiarne l'ordine.
 	if _initiative_card_pending:
 		_initiative_card_pending = false
@@ -2096,7 +2120,11 @@ func _refresh_roster() -> void:
 			map_view.highlight_hex = ch.position
 			camera.position = map_view.hex_center(ch.position.x, ch.position.y)
 			map_view.queue_redraw()
-			_show_info(ch.position, ch))
+			_show_info(ch.position, ch)
+			# In fase ordini il roster apre direttamente il pannello ordini,
+			# cosi' anche un uomo impilato e' ordinabile per nome.
+			if phase == Phase.ORDERS and not ch.is_dead():
+				_open_order_panel(ch))
 		roster_body.add_child(b)
 
 

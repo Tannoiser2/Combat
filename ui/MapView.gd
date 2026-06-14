@@ -348,6 +348,19 @@ func character_at_hex(hex: Vector2i) -> Character:
 	return null if c == null or c.is_dead() else c
 
 
+# Scostamento a cascata per una pedina in una pila (stacking visivo, Rule 8):
+# le unita' nello stesso hex si spostano in diagonale attorno al centro.
+func _stack_offset(c: Character, stack_idx: Dictionary, stack_count: Dictionary,
+		radius: float) -> Vector2:
+	var k := GameState.hex_key(c.position.x, c.position.y)
+	var total: int = stack_count.get(k, 1)
+	if total <= 1:
+		return Vector2.ZERO
+	var i: int = stack_idx.get(c, 0)
+	var step := radius * 0.32 * (i - (total - 1) * 0.5)
+	return Vector2(step, step)
+
+
 # Texture del segnalino "<id>-f.png" da assets/counters/, o null se manca
 # (caricata una volta sola). Cosi' la build web senza i PNG ripiega sui
 # cerchietti, mentre in locale compaiono le pedine vere.
@@ -551,20 +564,34 @@ func _draw() -> void:
 				continue
 			var kia_name := "kia-ENEMY" if c.side == D.Side.ENEMY else "kia-FRIENDLY"
 			_draw_marker(_named_tex(kia_name), _pos_of(c), radius)
+		# Stacking (Rule 8): conta i vivi per hex e assegna a ciascuno un
+		# indice nella pila, cosi' le pedine sovrapposte vengono sfalsate.
+		var stack_idx := {}      # Character -> indice
+		var stack_count := {}    # chiave hex -> totale vivi
 		for c in state.characters:
 			if c.is_dead():
 				continue
-			var hidden := c.side == D.Side.ENEMY and not c.known
-			var center := _pos_of(c)
-			var facing_arg := c.facing if c.is_vehicle and not hidden else 0
-			_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
-				c.morale, c.order if c.has_order else -1, c.display_name,
-				c == selected, c.order_move, facing_arg)
-			if c.is_vehicle and not hidden:
-				_draw_vehicle_overlay(radius, center, c)
-			if c.side == D.Side.FRIENDLY and c.spotted:
-				draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
-					radius * 0.12, Color(0.9, 0.15, 0.15))
+			var k := GameState.hex_key(c.position.x, c.position.y)
+			var n: int = stack_count.get(k, 0)
+			stack_idx[c] = n
+			stack_count[k] = n + 1
+		# Disegna prima le pedine NON selezionate, poi quella selezionata, cosi'
+		# in una pila l'unita' scelta resta leggibile in cima.
+		for pass_selected in [false, true]:
+			for c in state.characters:
+				if c.is_dead() or (c == selected) != pass_selected:
+					continue
+				var hidden := c.side == D.Side.ENEMY and not c.known
+				var center := _pos_of(c) + _stack_offset(c, stack_idx, stack_count, radius)
+				var facing_arg := c.facing if c.is_vehicle and not hidden else 0
+				_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
+					c.morale, c.order if c.has_order else -1, c.display_name,
+					c == selected, c.order_move, facing_arg)
+				if c.is_vehicle and not hidden:
+					_draw_vehicle_overlay(radius, center, c)
+				if c.side == D.Side.FRIENDLY and c.spotted:
+					draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
+						radius * 0.12, Color(0.9, 0.15, 0.15))
 	# Editor di mappa: etichette col,row su ogni hex + tinta terreno.
 	if editor_mode:
 		for key in state.map:

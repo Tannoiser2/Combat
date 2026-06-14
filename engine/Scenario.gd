@@ -228,11 +228,7 @@ const FULL_SQUAD_VOL2 := [
 	{"name": "Pvt Holland", "role": "US Rifleman", "team": "Charlie",
 		"counter": "US-Charlie-Pvt-Holland", "weapon": "M1903 Springfield", "ws": 5},
 	{"name": "Pvt Williams", "role": "MG Gunner", "team": "Charlie",
-		"counter": "US-Charlie-Pvt-Williams",
-		"mg_role": "operator", "mg_partner_id": "pvt_nolan"},
-	{"name": "Pvt Nolan", "role": "MG Assistant", "team": "Charlie",
-		"counter": "US-Charlie-N",
-		"mg_role": "assistant", "mg_partner_id": "pvt_williams"},
+		"counter": "US-Charlie-Pvt-Williams", "mg_role": "operator"},
 ]
 
 
@@ -1318,9 +1314,9 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	if bool(prof.get("medic", false)) or bool(entry.get("medic", false)):
 		c.is_medic = true
 		c.weapon_skills = {}
-	# MG Operator/Assistant (Rule 14.3): collegamento operatore <-> assistente.
+	# MG Operator (Rule 14.3): chi imbraccia la belt-fed. L'assistente
+	# (portatore di munizioni) e' un compagno qualsiasi nello stesso hex.
 	c.mg_role = entry.get("mg_role", "")
-	c.mg_partner_id = entry.get("mg_partner_id", "")
 	c.counter = entry.get("counter", "")
 	c.role = entry["role"]
 	c.is_dummy = entry["role"] == "Dummy"

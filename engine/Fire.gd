@@ -618,34 +618,37 @@ static func _smoke_modifier(state: GameState, a: Vector2i, b: Vector2i) -> int:
 	return mod
 
 
-# L'operatore MG ha un assistente vivo adiacente (Rule 14.3)?
+# L'operatore MG ha un portatore di munizioni nello stesso hex (Rule 14.3)?
+# E' un compagno vivo qualunque (stesso lato, non un veicolo) che condivide
+# l'hex dell'operatore.
 static func _has_mg_assistant(state: GameState, operator: Character) -> bool:
-	if operator.mg_partner_id.is_empty():
-		return false
 	for c in state.characters:
-		if c.id == operator.mg_partner_id and not c.is_dead():
-			return Spotting.hex_distance(c.position, operator.position) <= 1
+		if c == operator or c.is_dead() or c.is_vehicle:
+			continue
+		if c.side == operator.side and c.position == operator.position:
+			return true
 	return false
 
 
-# Al Bad Wound o KIA dell'operatore MG, l'assistente prende il controllo
-# dell'arma a nastro (Rule 14.3): il partner diventa il nuovo operatore.
+# Al Bad Wound o KIA dell'operatore MG, un compagno nello stesso hex prende il
+# controllo dell'arma a nastro (Rule 14.3) e ne diventa il nuovo operatore.
 static func _mg_transfer_if_operator(state: GameState, operator: Character) -> void:
-	if operator.mg_role != "operator" or operator.mg_partner_id.is_empty():
+	if operator.mg_role != "operator":
 		return
 	for c in state.characters:
-		if c.id != operator.mg_partner_id or c.is_dead():
+		if c == operator or c.is_dead() or c.is_vehicle:
+			continue
+		if c.side != operator.side or c.position != operator.position:
 			continue
 		for w_name in operator.weapon_skills.duplicate():
 			if "belt" in Weapons.info(w_name)["flags"]:
 				c.weapon_skills[w_name] = operator.weapon_skills[w_name]
 				operator.weapon_skills.erase(w_name)
 				c.mg_role = "operator"
-				c.mg_partner_id = ""
-				operator.mg_partner_id = ""
+				operator.mg_role = ""
 				_log(state, "%s prende il controllo della %s" % [c.display_name, w_name])
-				break
-		break
+				return
+		return
 
 
 static func _log(state: GameState, msg: String) -> void:
