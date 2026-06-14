@@ -1,3 +1,26 @@
+v0.34 — 2026-06-14
+- UI: flash mischia in mappa (cerchio rosso animato + mirino nell'hex
+  dove scatta la mischia, dura 1.2 s come le esplosioni)
+- UI: linee arancio tratteggiate dai soldato che agisce a tutti i
+  bersagli validi quando si sceglie l'ordine di fuoco (spariscono dopo
+  il colpo)
+- Fix: con due nemici nello stesso hex, il clic seleziona sempre il
+  bersaglio valido (avvistato e a gittata) invece del primo trovato
+
+v0.33 — 2026-06-14
+- Rule 9.2 Grande Battaglia: quando uno scenario e' contrassegnato come
+  Grande Battaglia si pesca una sola carta Ordine per Gruppo nemico
+  (non una per personaggio); tutti i membri del Gruppo eseguono
+  l'ordine indicato dalla carta
+- Modalita' standard (default): una carta per personaggio, il Gruppo
+  usa la carta col valore di iniziativa piu' basso per determinare
+  l'ordine di attivazione
+- s5 Village Defense: contrassegnato come Grande Battaglia (2 team,
+  molti nemici)
+- UI: nella schermata scenario appare un toggle "Grande Battaglia
+  (Rule 9.2)" per tutti gli scenari con piu' di un team nemico;
+  consente di forzare la modalita' indipendentemente dal flag dello scenario
+
 v0.32 — 2026-06-14
 - Tabelle Evento per-scenario (Rule 19) implementate in Events.gd:
   - tabella "attacking" (s1/s4/s8/s9): mortai 60mm/81mm e artiglieria 105mm
