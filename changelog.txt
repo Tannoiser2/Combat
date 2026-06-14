@@ -1,3 +1,13 @@
+v0.40 — 2026-06-14
+- Mischia (Rule 15): CHARGE bloccata se l'hex bersaglio contiene 2+ nemici
+  vivi. Move.can_enter conta tutti i difensori (non solo il primo via
+  character_at) e impedisce la carica 1-contro-2.
+
+v0.39 — 2026-06-14
+- Roster (amici e nemici): righe più alte (42 px), segnalino nemico
+  affiancato al nome nella tab Nemici noti, marker grafici reali per
+  ferite e morale anche per i nemici (identici al roster amico)
+
 v0.38 — 2026-06-14
 - Fix: pannello "Nemici noti" mostrava sempre "Nessun nemico avvistato"
   anche con nemici visibili (filtrava c.spotted invece di c.known)
