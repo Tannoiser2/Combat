@@ -647,13 +647,22 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 				Color(0.95, 0.95, 0.2))
 
 
-# Overlay per veicoli: segnalino torretta ruotato col facing + badge hull_damage.
+# Overlay per veicoli: freccia del facing dello scafo (orientamento armatura,
+# Rule 31.4) + segnalino torretta ruotato col turret_facing per gli AFV
+# (Rule 31.6) + badge hull_damage.
 func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
+	# Freccia dello scafo: indica il fronte del veicolo (faccia frontale).
 	if c.facing > 0:
+		_draw_hull_arrow(center, radius, c.facing,
+			Color(0.95, 0.85, 0.2) if c.side == D.Side.FRIENDLY else Color(0.95, 0.55, 0.2))
+	# Torretta (solo AFV): segnalino ruotato secondo il turret_facing, che gira
+	# indipendentemente dallo scafo (Rule 31.6).
+	if VehicleCombat.has_turret(c) and c.turret_facing > 0:
 		var turret_tex := _counter_tex("GE-Turret-Marker")
 		if turret_tex != null:
 			var ts := radius * 1.3
-			var rot := atan2(FACE_DIRS[c.facing - 1].y, FACE_DIRS[c.facing - 1].x) + PI / 2.0
+			var rot := atan2(FACE_DIRS[c.turret_facing - 1].y,
+				FACE_DIRS[c.turret_facing - 1].x) + PI / 2.0
 			draw_set_transform(center, rot, Vector2.ONE)
 			draw_texture_rect(turret_tex,
 				Rect2(Vector2(-ts, -ts) * 0.5, Vector2(ts, ts)), false)
@@ -662,6 +671,17 @@ func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))
 		draw_circle(bp, radius * 0.18, Color(0, 0, 0, 0.6), false, radius * 0.03)
+
+
+# Piccola freccia sul bordo del segnalino, nella direzione del facing scafo.
+func _draw_hull_arrow(center: Vector2, radius: float, facing: int, color: Color) -> void:
+	var dir: Vector2 = FACE_DIRS[facing - 1]
+	var perp := Vector2(-dir.y, dir.x)
+	var tip := center + dir * radius * 0.92
+	var b1 := center + dir * radius * 0.62 + perp * radius * 0.22
+	var b2 := center + dir * radius * 0.62 - perp * radius * 0.22
+	draw_colored_polygon([tip, b1, b2], color)
+	draw_polyline([tip, b1, b2, tip], Color(0, 0, 0, 0.7), radius * 0.03)
 
 
 func _draw_procedural_terrain(font: Font, radius: float) -> void:

@@ -57,6 +57,31 @@ const VEHICLE_DATA := {
 	},
 }
 
+# AFV con torretta rotante (Rule 31.6). Jeep e Halftrack non hanno torretta.
+const TURRETED := ["M4A3 Sherman", "PzIVH"]
+
+
+# Vero se il veicolo e' un AFV dotato di torretta (Rule 31.6).
+static func has_turret(c: Character) -> bool:
+	return c.is_vehicle and c.vehicle_type in TURRETED
+
+
+# Punta la torretta sul bersaglio (Rule 31.6). Se e' gia' allineata col
+# bersaglio (front arc = la direzione esagonale del bersaglio) ritorna true:
+# il cannone puo' sparare. Altrimenti ruota di 1 hex-side verso il bersaglio
+# e ritorna false: la rotazione consuma l'impulso, niente fuoco.
+static func turret_aim(state: GameState, vehicle: Character, target_pos: Vector2i) -> bool:
+	if vehicle.turret_facing <= 0:
+		vehicle.turret_facing = vehicle.facing
+	var want := Move.dir_toward(vehicle.position, target_pos)
+	if vehicle.turret_facing == want:
+		return true
+	vehicle.turret_facing = Move.rotate_toward(vehicle.turret_facing, want)
+	state.log_event("  la torretta del %s ruota verso direzione %d (bersaglio in %d)" % [
+		vehicle.display_name, vehicle.turret_facing, want])
+	return false
+
+
 # Terreni che i veicoli non possono attraversare.
 const VEHICLE_BLOCKED := [
 	D.Terrain.BUILDING, D.Terrain.FOXHOLE, D.Terrain.MARSH,
@@ -93,6 +118,7 @@ static func make_vehicle(v_name: String, side: int, team: String,
 	var c := Character.new(uid, v_name, side, team)
 	c.position = pos
 	c.facing = facing
+	c.turret_facing = facing if v_name in TURRETED else 0
 	c.is_vehicle = true
 	c.vehicle_type = v_name
 	c.counter = VEHICLE_COUNTER.get(v_name, "")
@@ -333,16 +359,15 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 static func _crew_morale_checks(state: GameState, vehicle: Character) -> void:
 	var alive := _embarked_alive(vehicle)
 	if alive.is_empty():
-		# Veicolo senza crew modellato: ripiego sul vecchio MC del mezzo.
-		var mc := Checks.morale_check(vehicle, state.rng)
-		if not mc["passed"]:
-			vehicle.morale = D.lower_morale(vehicle.morale, 1)
+		# Veicolo senza crew modellato: ripiego sul MC del mezzo (morale_check
+		# applica gia' l'eventuale calo).
+		Checks.morale_check(vehicle, state.rng)
 		return
 	var worst: int = vehicle.morale
 	for cm in alive:
+		# morale_check applica gia' il calo (delta < 0 = MC fallito).
 		var mc := Checks.morale_check(cm, state.rng)
-		if not mc["passed"]:
-			cm.morale = D.lower_morale(cm.morale, 1)
+		if int(mc["delta"]) < 0:
 			state.log_event("  %s: MC fallito -> %s" % [
 				cm.display_name, D.MORALE_NAMES[cm.morale]])
 		worst = maxi(worst, cm.morale)

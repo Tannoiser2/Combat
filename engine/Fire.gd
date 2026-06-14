@@ -120,6 +120,13 @@ static func _abbey_hexes_crossed(state: GameState, a: Vector2i, b: Vector2i) -> 
 # Un'azione di fuoco completa: ROF attacchi in sequenza sul bersaglio.
 # Se il bersaglio e' un veicolo instrada il fuoco AT a VehicleCombat.
 static func fire_action(state: GameState, firer: Character, target: Character, weapon: String) -> void:
+	# Rule 31.6: per sparare col cannone principale la torretta dell'AFV deve
+	# essere puntata sul bersaglio. Se non lo e', ruota di 1 hex-side verso il
+	# bersaglio e NON spara (la rotazione consuma l'impulso).
+	if firer.is_vehicle and VehicleCombat.has_turret(firer) \
+			and "main_gun" in Weapons.info(weapon)["flags"]:
+		if not VehicleCombat.turret_aim(state, firer, target.position):
+			return
 	if target.is_vehicle:
 		VehicleCombat.at_fire(state, firer, target, weapon)
 		return

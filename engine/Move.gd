@@ -65,6 +65,41 @@ static func to_cube(h: Vector2i) -> Vector3i:
 	return Vector3i(h.x, -h.x - z, z)
 
 
+# Direzione esagonale (1..6, indice di CUBE_DIRS) di un passo fra due hex
+# ADIACENTI. 0 se i due hex non sono adiacenti (Rule 31: facing dello scafo).
+static func dir_of_step(from: Vector2i, to: Vector2i) -> int:
+	var delta := to_cube(to) - to_cube(from)
+	var idx := CUBE_DIRS.find(delta)
+	return idx + 1 if idx >= 0 else 0
+
+
+# Direzione esagonale (1..6) piu' vicina dal centro `from` verso `to`, anche a
+# distanza. Usata per orientare la torretta sul bersaglio (Rule 31.6).
+static func dir_toward(from: Vector2i, to: Vector2i) -> int:
+	var delta := to_cube(to) - to_cube(from)
+	var best := 1
+	var best_dot := -0x7fffffff
+	for i in range(6):
+		var dir: Vector3i = CUBE_DIRS[i]
+		var dot: int = dir.x * delta.x + dir.y * delta.y + dir.z * delta.z
+		if dot > best_dot:
+			best_dot = dot
+			best = i + 1
+	return best
+
+
+# Ruota un facing (1..6) di UN hex-side verso target_dir, per la via piu'
+# corta (Rule 31.5/31.6: 1 hex-side per impulso). Se gia' allineato, invariato.
+static func rotate_toward(current: int, target_dir: int) -> int:
+	if current == target_dir:
+		return current
+	var cw := (target_dir - current + 6) % 6   # passi in senso orario
+	var ccw := (current - target_dir + 6) % 6   # passi in senso antiorario
+	if cw <= ccw:
+		return (current % 6) + 1                 # +1 (wrap 6->1)
+	return ((current + 4) % 6) + 1               # -1 (wrap 1->6)
+
+
 static func from_cube(c: Vector3i) -> Vector2i:
 	return Vector2i(c.x, c.z + int((c.x + (c.x & 1)) / 2.0))
 
@@ -162,6 +197,11 @@ static func nearest_enemy(state: GameState, mover: Character) -> Character:
 # Registra un passo per l'animazione (UI) e il replay, poi sposta davvero.
 static func _commit_step(state: GameState, mover: Character, dest: Vector2i) -> void:
 	var from := mover.position
+	# Rule 31.5: lo scafo del veicolo si orienta nella direzione di marcia.
+	if mover.is_vehicle:
+		var d := dir_of_step(from, dest)
+		if d > 0:
+			mover.facing = d
 	mover.position = dest
 	state.move_paths.append({"who": mover, "from": from, "to": dest})
 	Replay.step(state, mover, from, dest)
