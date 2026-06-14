@@ -231,7 +231,7 @@ const FULL_SQUAD_VOL2 := [
 		"counter": "US-Charlie-Pvt-Williams",
 		"mg_role": "operator", "mg_partner_id": "pvt_nolan"},
 	{"name": "Pvt Nolan", "role": "MG Assistant", "team": "Charlie",
-		"counter": "US-Charlie-Pvt-Nolan",
+		"counter": "US-Charlie-N",
 		"mg_role": "assistant", "mg_partner_id": "pvt_williams"},
 ]
 
