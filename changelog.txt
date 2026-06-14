@@ -1,3 +1,9 @@
+v0.37 — 2026-06-14
+- Pvt Williams (MG Operator, Charlie Team) ora parte gia' appaviato con
+  Pvt Bennett nello stesso hex di schieramento: nessun -3 WS da turno 1.
+  La chiave "mg_companion" nel roster colloca automaticamente il portatore
+  di munizioni nell'hex dell'operatore a inizio scenario.
+
 v0.36 — 2026-06-14
 - Stacking (Rule 8): piu' uomini dello stesso lato possono ora occupare
   lo stesso hex

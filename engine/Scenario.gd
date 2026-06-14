@@ -228,7 +228,8 @@ const FULL_SQUAD_VOL2 := [
 	{"name": "Pvt Holland", "role": "US Rifleman", "team": "Charlie",
 		"counter": "US-Charlie-Pvt-Holland", "weapon": "M1903 Springfield", "ws": 5},
 	{"name": "Pvt Williams", "role": "MG Gunner", "team": "Charlie",
-		"counter": "US-Charlie-Pvt-Williams", "mg_role": "operator"},
+		"counter": "US-Charlie-Pvt-Williams", "mg_role": "operator",
+		"mg_companion": "Pvt Bennett"},
 ]
 
 
@@ -1134,6 +1135,22 @@ static func build(state: GameState, scenario_id: String) -> void:
 		if sc.get("taylor_bad_wound", false) and fc.display_name == "Sgt Taylor":
 			fc.wounds.append(D.Wound.BAD)
 		state.characters.append(fc)
+	# MG Operator (Rule 14.3): il portatore di munizioni parte nello stesso hex
+	# dell'operatore (evita il -3 WS da turno 1). La chiave "mg_companion" nel
+	# roster entry indica chi deve condividere l'hex.
+	for f in roster:
+		if f.has("mg_companion"):
+			var op_name: String = f["name"]
+			var companion_name: String = f["mg_companion"]
+			var op: Character = null
+			var companion: Character = null
+			for fc in state.characters:
+				if fc.display_name == op_name:
+					op = fc
+				elif fc.display_name == companion_name:
+					companion = fc
+			if op != null and companion != null:
+				companion.position = op.position
 	# Il Maquis da salvare (s8): friendly senza ordini, nel casolare.
 	if sc.has("maquis_hex"):
 		var mq := _make({"name": "Maquis", "role": "Maquis", "team": "Charlie",
