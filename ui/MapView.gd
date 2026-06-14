@@ -626,13 +626,19 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 				Color(0.95, 0.95, 0.2))
 
 
-# Overlay per veicoli: bordo rettangolare e badge hull_damage.
-# Il counter e' gia' ruotato in base al facing da _draw_unit.
+# Overlay per veicoli: bordo rettangolare (ruotato col facing) e badge hull_damage.
 func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
 	var hw := radius * 0.44
 	var hh := radius * 0.34
-	draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
-		Color(0, 0, 0, 0.75), false, radius * 0.05)
+	if c.facing > 0:
+		var rot := atan2(FACE_DIRS[c.facing - 1].y, FACE_DIRS[c.facing - 1].x) + PI / 2.0
+		draw_set_transform(center, rot, Vector2.ONE)
+		draw_rect(Rect2(Vector2(-hw, -hh), Vector2(hw * 2, hh * 2)),
+			Color(0, 0, 0, 0.75), false, radius * 0.05)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
+			Color(0, 0, 0, 0.75), false, radius * 0.05)
 	if c.hull_damage == 1:
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))
