@@ -1708,6 +1708,16 @@ const WOUND_COLORS := {
 	FriendlyCards.WoundDraw.BAD_WOUND: Color(0.95, 0.50, 0.20),
 	FriendlyCards.WoundDraw.KIA: Color(0.95, 0.25, 0.20),
 }
+# Segnalini morale nel roster (int key = Domain.Morale enum value, 0..6).
+const MORALE_MARKERS: Dictionary = {
+	0: "res://assets/counters/Morale_Fanatic-f.png",        # BERSERK
+	1: "res://assets/counters/Morale_High--f.png",           # AGGRESSIVE
+	2: "res://assets/counters/GEN-Bold-Marker-12-f.png",     # BOLD
+	3: "res://assets/counters/GEN-Normal-Marker-10-f.png",   # NORMAL
+	4: "res://assets/counters/GEN-Cautious-Marker-10-f.png", # CAUTIOUS
+	5: "res://assets/counters/Morale_Low-f.png",             # SHAKEN
+	6: "res://assets/counters/GEN-Rout-Marker-10-f.png",     # ROUT
+}
 const KIND_LABELS := {
 	FriendlyCards.Kind.ORDER: "ORDER",
 	FriendlyCards.Kind.DISCARD: "DISCARD",
@@ -2082,38 +2092,45 @@ func _refresh_roster() -> void:
 			dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 			hbox.add_child(dead_lbl)
 		else:
-			# Ferite: tanti cuori quante ferite
-			for _w in c.wounds:
-				var w := Label.new()
-				w.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				w.text = "+"
-				w.add_theme_font_size_override("font_size", 13)
-				w.add_theme_color_override("font_color", Color(0.95, 0.2, 0.2))
-				hbox.add_child(w)
-			# Ammo
+			# Ferite: segnalino per ciascuna ferita (Light / Bad Wound marker)
+			for wound_type in c.wounds:
+				var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
+					if wound_type == Domain.Wound.BAD \
+					else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
+				var wt := TextureRect.new()
+				wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				wt.custom_minimum_size = Vector2(20, 20)
+				wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(wpath):
+					wt.texture = load(wpath)
+				hbox.add_child(wt)
+			# Ammo: Low Ammo (fronte) o Out of Ammo (retro)
+			var ammo_path := ""
 			if c.no_ammo:
-				var a := Label.new()
-				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				a.text = "NO"
-				a.add_theme_font_size_override("font_size", 10)
-				a.add_theme_color_override("font_color", Color(1.0, 0.4, 0.1))
-				hbox.add_child(a)
+				ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-r.png"
 			elif c.low_ammo:
-				var a := Label.new()
-				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				a.text = "LB"
-				a.add_theme_font_size_override("font_size", 10)
-				a.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
-				hbox.add_child(a)
-			# Pallino morale: piccolo pannello colorato (no Unicode)
-			var mp := PanelContainer.new()
-			mp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			mp.custom_minimum_size = Vector2(10, 10)
-			var msb := StyleBoxFlat.new()
-			msb.bg_color = MapView.MORALE_COLORS[c.morale]
-			msb.set_corner_radius_all(5)
-			mp.add_theme_stylebox_override("panel", msb)
-			hbox.add_child(mp)
+				ammo_path = "res://assets/counters/GEN-LowAmmo-Marker-2-f.png"
+			if not ammo_path.is_empty():
+				var at := TextureRect.new()
+				at.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				at.custom_minimum_size = Vector2(20, 20)
+				at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(ammo_path):
+					at.texture = load(ammo_path)
+				hbox.add_child(at)
+			# Morale: segnalino del livello
+			var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
+			if not morale_path.is_empty():
+				var mt := TextureRect.new()
+				mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				mt.custom_minimum_size = Vector2(20, 20)
+				mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				if ResourceLoader.exists(morale_path):
+					mt.texture = load(morale_path)
+				hbox.add_child(mt)
 		var ch := c
 		b.pressed.connect(func():
 			map_view.selected = ch
@@ -2136,7 +2153,7 @@ func _refresh_enemy_roster() -> void:
 		child.queue_free()
 	var spotted: Array = []
 	for c in state.characters:
-		if c.side == Domain.Side.ENEMY and c.spotted and not c.embarked:
+		if c.side == Domain.Side.ENEMY and c.known and not c.embarked:
 			spotted.append(c)
 	if spotted.is_empty():
 		var lbl := Label.new()
