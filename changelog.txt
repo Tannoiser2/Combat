@@ -1,3 +1,10 @@
+v0.38 — 2026-06-14
+- Fix: pannello "Nemici noti" mostrava sempre "Nessun nemico avvistato"
+  anche con nemici visibili (filtrava c.spotted invece di c.known)
+- Roster squadra: ferite, ammo e morale ora mostrano i segnalini grafici
+  reali (GEN-LightWound, GEN-BadWound, GEN-LowAmmo, GEN-Normal/Bold/
+  Cautious/Rout/Morale_Fanatic/High/Low) invece di testi e pallini
+
 v0.37 — 2026-06-14
 - Pvt Williams (MG Operator, Charlie Team) ora parte gia' appaviato con
   Pvt Bennett nello stesso hex di schieramento: nessun -3 WS da turno 1.
