@@ -94,6 +94,7 @@ var scenario_id: String = ""
 var enemy_reserve: Array = []
 var waves_done: Array = []      # turni di rinforzo gia' eseguiti
 var night: bool = false         # scenario notturno
+var large_battle: bool = false  # Rule 9.2: una carta per Gruppo invece che per personaggio
 # Meteo e condizioni del terreno (Rule 28): vedi Weather.gd. max_los = limite
 # di visibilita' del meteo (0 = illimitato), tirato a inizio scenario.
 var weather: int = Weather.Type.CLEAR

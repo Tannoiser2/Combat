@@ -639,6 +639,7 @@ const SCENARIOS := {
 	"s5": {
 		"name": "5. Village Defense",
 		"map": "village", "turns": 12, "hand_limit": 3, "event_table": "defending",
+		"large_battle": true,
 		"deploy": {"cols": [14, 30], "rows": [0, 19]},
 		"desc": "Vengono dritti su di noi: o teniamo il paese\no il plotone a sud resta tagliato fuori.",
 		"squad_full": true,
@@ -1146,6 +1147,7 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.characters.append(mq)
 	# Scenario notturno: -2 al fuoco oltre 2 hex (salvo illuminazione).
 	state.night = bool(sc.get("night", false))
+	state.large_battle = bool(sc.get("large_battle", false))
 	# Meteo e condizioni del terreno (Rule 28): chiavi "weather"/"ground"
 	# (nomi in Weather.TYPE_BY_NAME/GROUND_BY_NAME). Il limite di visibilita'
 	# si tira ora a inizio scenario.
