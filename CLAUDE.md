@@ -189,14 +189,24 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Il fumo deriva col vento e si dissolve normalmente nei turni successivi.
    Implementato in Area.end_phase (keep.append fumo dopo _explode) e in
    Scenario._run_opening_barrage (state.area_markers.append).
-10. FATTO (v0.30): MG Operator/Assistant (Rule 14.3). Character.mg_role
-   ("operator"/"assistant") e mg_partner_id. Pvt Nolan aggiunto a
-   FULL_SQUAD_VOL2 come MG Assistant di Pvt Williams (M1919). Effetti:
-   Fire._has_mg_assistant (partner vivo adiacente), Fire._compute_ws (-3 WS
-   senza assistente), Fire.fire_action (singolo 9 = ammo senza assistente,
+10. FATTO (v0.30, rivisto v0.36): MG Operator (Rule 14.3). Character.mg_role
+   ("operator"/""). Pvt Williams (M1919) e' l'operatore. Il portatore di
+   munizioni NON e' un personaggio dedicato: e' un compagno qualsiasi (stesso
+   lato, non veicolo) presente nello STESSO hex dell'operatore (stacking,
+   Rule 8). Effetti: Fire._has_mg_assistant (compagno vivo nell'hex),
+   Fire._compute_ws (-3 WS senza), Fire.fire_action (singolo 9 = ammo senza,
    doppio 9 con), Fire._mg_transfer_if_operator (al Bad Wound/KIA
-   dell'operatore l'assistente prende l'MG e diventa il nuovo operatore).
-   Scenario._make imposta c.mg_role e c.mg_partner_id da entry.
+   dell'operatore un compagno nell'hex prende l'MG e diventa il nuovo
+   operatore). Scenario._make imposta c.mg_role da entry. (Pvt Nolan,
+   personaggio inventato per fare l'assistente, rimosso.)
+
+12. FATTO (v0.36): Stacking (Rule 8). Piu' uomini dello stesso lato possono
+   condividere un hex. Move.can_enter/compass_step permettono l'ingresso in
+   un hex con un compagno vivo (Move._stack_ok: vietato solo se uno dei due
+   e' un veicolo); resta il blocco verso un hex nemico (solo carica/mischia).
+   UI: MapView._stack_offset sfalsa a cascata le pedine sovrapposte; il click
+   sull'hex cicla tra gli uomini della pila (Main._stack_cycle_*), e in fase
+   ordini il roster a sinistra apre il pannello ordini sull'uomo scelto.
 11. FATTO (v0.30): Carte Initiative (14/18) giocabili manualmente dal
    popup "Carte (N)". Il pulsante "Usa" scarta la carta e attende che il
    giocatore clicchi un uomo; apre il pannello ordini per quel personaggio.

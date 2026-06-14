@@ -1,3 +1,54 @@
+v0.37 — 2026-06-14
+- Pvt Williams (MG Operator, Charlie Team) ora parte gia' appaviato con
+  Pvt Bennett nello stesso hex di schieramento: nessun -3 WS da turno 1.
+  La chiave "mg_companion" nel roster colloca automaticamente il portatore
+  di munizioni nell'hex dell'operatore a inizio scenario.
+
+v0.36 — 2026-06-14
+- Stacking (Rule 8): piu' uomini dello stesso lato possono ora occupare
+  lo stesso hex
+  - il movimento entra negli hex gia' occupati da un compagno (i veicoli
+    restano esclusi: niente fanteria nell'hex di un mezzo)
+  - le pedine sovrapposte vengono disegnate sfalsate a cascata, cosi' si
+    vedono tutte
+  - clic sull'hex: cicla tra gli uomini della pila; in fase ordini il
+    roster a sinistra apre il pannello ordini sull'uomo scelto
+- MG Operator (Rule 14.3) rivisto: il portatore di munizioni non e' piu'
+  un personaggio dedicato (Pvt Nolan rimosso), ma un compagno qualsiasi
+  presente nello stesso hex dell'operatore della M1919 (Pvt Williams).
+  Senza un compagno nell'hex: -3 WS e singolo 9 = arma scarica
+
+v0.35 — 2026-06-14
+- UI: roster squadra con miniatura del segnalino accanto al nome;
+  ferite, munizioni e morale come indicatori grafici (pallino colorato)
+- UI: pannelli NEMICI NOTI e DIARIO DI BATTAGLIA ora in due tab
+  selezionabili nella sidebar destra
+- Fix: il bordo dei veicoli ora ruota insieme al segnalino (facing)
+- Fix: allineamento dei segnalini alla griglia sulla mappa woods
+
+v0.34 — 2026-06-14
+- UI: flash mischia in mappa (cerchio rosso animato + mirino nell'hex
+  dove scatta la mischia, dura 1.2 s come le esplosioni)
+- UI: linee arancio tratteggiate dai soldato che agisce a tutti i
+  bersagli validi quando si sceglie l'ordine di fuoco (spariscono dopo
+  il colpo)
+- Fix: con due nemici nello stesso hex, il clic seleziona sempre il
+  bersaglio valido (avvistato e a gittata) invece del primo trovato
+
+v0.33 — 2026-06-14
+- Rule 9.2 Grande Battaglia: quando uno scenario e' contrassegnato come
+  Grande Battaglia si pesca una sola carta Ordine per Gruppo nemico
+  (non una per personaggio); tutti i membri del Gruppo eseguono
+  l'ordine indicato dalla carta
+- Modalita' standard (default): una carta per personaggio, il Gruppo
+  usa la carta col valore di iniziativa piu' basso per determinare
+  l'ordine di attivazione
+- s5 Village Defense: contrassegnato come Grande Battaglia (2 team,
+  molti nemici)
+- UI: nella schermata scenario appare un toggle "Grande Battaglia
+  (Rule 9.2)" per tutti gli scenari con piu' di un team nemico;
+  consente di forzare la modalita' indipendentemente dal flag dello scenario
+
 v0.32 — 2026-06-14
 - Tabelle Evento per-scenario (Rule 19) implementate in Events.gd:
   - tabella "attacking" (s1/s4/s8/s9): mortai 60mm/81mm e artiglieria 105mm

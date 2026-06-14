@@ -26,7 +26,7 @@ const BOARDS := {
 	"village": {"file": "res://assets/maps/village.jpg", "origin": Vector2(77, 110)},
 	"hedgerows": {"file": "res://assets/maps/hedgerows.jpg", "origin": Vector2(70, 110)},
 	# Vol. 2 — mappe 5-10
-	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(67, 103)},
+	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(76, 109)},
 	"town":       {"file": "res://assets/maps/town.jpg",       "origin": Vector2(73, 104)},
 	"abbey":      {"file": "res://assets/maps/abbey.jpg",      "origin": Vector2(73, 104)},
 	"hamlet":     {"file": "res://assets/maps/hamlet.jpg",     "origin": Vector2(73, 105)},
@@ -348,6 +348,19 @@ func character_at_hex(hex: Vector2i) -> Character:
 	return null if c == null or c.is_dead() else c
 
 
+# Scostamento a cascata per una pedina in una pila (stacking visivo, Rule 8):
+# le unita' nello stesso hex si spostano in diagonale attorno al centro.
+func _stack_offset(c: Character, stack_idx: Dictionary, stack_count: Dictionary,
+		radius: float) -> Vector2:
+	var k := GameState.hex_key(c.position.x, c.position.y)
+	var total: int = stack_count.get(k, 1)
+	if total <= 1:
+		return Vector2.ZERO
+	var i: int = stack_idx.get(c, 0)
+	var step := radius * 0.32 * (i - (total - 1) * 0.5)
+	return Vector2(step, step)
+
+
 # Texture del segnalino "<id>-f.png" da assets/counters/, o null se manca
 # (caricata una volta sola). Cosi' la build web senza i PNG ripiega sui
 # cerchietti, mentre in locale compaiono le pedine vere.
@@ -551,20 +564,34 @@ func _draw() -> void:
 				continue
 			var kia_name := "kia-ENEMY" if c.side == D.Side.ENEMY else "kia-FRIENDLY"
 			_draw_marker(_named_tex(kia_name), _pos_of(c), radius)
+		# Stacking (Rule 8): conta i vivi per hex e assegna a ciascuno un
+		# indice nella pila, cosi' le pedine sovrapposte vengono sfalsate.
+		var stack_idx := {}      # Character -> indice
+		var stack_count := {}    # chiave hex -> totale vivi
 		for c in state.characters:
 			if c.is_dead():
 				continue
-			var hidden := c.side == D.Side.ENEMY and not c.known
-			var center := _pos_of(c)
-			var facing_arg := c.facing if c.is_vehicle and not hidden else 0
-			_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
-				c.morale, c.order if c.has_order else -1, c.display_name,
-				c == selected, c.order_move, facing_arg)
-			if c.is_vehicle and not hidden:
-				_draw_vehicle_overlay(radius, center, c)
-			if c.side == D.Side.FRIENDLY and c.spotted:
-				draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
-					radius * 0.12, Color(0.9, 0.15, 0.15))
+			var k := GameState.hex_key(c.position.x, c.position.y)
+			var n: int = stack_count.get(k, 0)
+			stack_idx[c] = n
+			stack_count[k] = n + 1
+		# Disegna prima le pedine NON selezionate, poi quella selezionata, cosi'
+		# in una pila l'unita' scelta resta leggibile in cima.
+		for pass_selected in [false, true]:
+			for c in state.characters:
+				if c.is_dead() or (c == selected) != pass_selected:
+					continue
+				var hidden := c.side == D.Side.ENEMY and not c.known
+				var center := _pos_of(c) + _stack_offset(c, stack_idx, stack_count, radius)
+				var facing_arg := c.facing if c.is_vehicle and not hidden else 0
+				_draw_unit(font, radius, center, c.counter, c.side, c.team, hidden,
+					c.morale, c.order if c.has_order else -1, c.display_name,
+					c == selected, c.order_move, facing_arg)
+				if c.is_vehicle and not hidden:
+					_draw_vehicle_overlay(radius, center, c)
+				if c.side == D.Side.FRIENDLY and c.spotted:
+					draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
+						radius * 0.12, Color(0.9, 0.15, 0.15))
 	# Editor di mappa: etichette col,row su ogni hex + tinta terreno.
 	if editor_mode:
 		for key in state.map:
@@ -626,13 +653,19 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 				Color(0.95, 0.95, 0.2))
 
 
-# Overlay per veicoli: bordo rettangolare e badge hull_damage.
-# Il counter e' gia' ruotato in base al facing da _draw_unit.
+# Overlay per veicoli: bordo rettangolare (ruotato col facing) e badge hull_damage.
 func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void:
 	var hw := radius * 0.44
 	var hh := radius * 0.34
-	draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
-		Color(0, 0, 0, 0.75), false, radius * 0.05)
+	if c.facing > 0:
+		var rot := atan2(FACE_DIRS[c.facing - 1].y, FACE_DIRS[c.facing - 1].x) + PI / 2.0
+		draw_set_transform(center, rot, Vector2.ONE)
+		draw_rect(Rect2(Vector2(-hw, -hh), Vector2(hw * 2, hh * 2)),
+			Color(0, 0, 0, 0.75), false, radius * 0.05)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		draw_rect(Rect2(center - Vector2(hw, hh), Vector2(hw * 2, hh * 2)),
+			Color(0, 0, 0, 0.75), false, radius * 0.05)
 	if c.hull_damage == 1:
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))

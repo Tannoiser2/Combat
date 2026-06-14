@@ -106,8 +106,11 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 	var occ := state.character_at(hex.x, hex.y)
 	if occ == null or occ.is_dead():
 		return true
-	if occ.side == mover.side or not mover.has_order \
-			or mover.order not in [D.Order.CHARGE, D.Order.MELEE]:
+	# Stacking (Rule 8): piu' uomini dello stesso lato possono condividere un
+	# hex. I veicoli non condividono l'hex con la fanteria.
+	if occ.side == mover.side:
+		return _stack_ok(mover, occ)
+	if not mover.has_order or mover.order not in [D.Order.CHARGE, D.Order.MELEE]:
 		return false
 	# Edificio fortificato (Rule 27.2): non si carica un occupante al suo
 	# interno (vale per entrambi i lati - il giocatore non entra, il nemico
@@ -116,6 +119,13 @@ static func can_enter(state: GameState, mover: Character, hex: Vector2i) -> bool
 	if h != null and h.terrain == D.Terrain.FORTIFIED_BUILDING:
 		return false
 	return true
+
+
+# Lo stacking dello stesso lato e' permesso (Rule 8): un compagno vivo nell'hex
+# non blocca, salvo che uno dei due sia un veicolo (la fanteria non condivide
+# l'hex con i mezzi).
+static func _stack_ok(mover: Character, occ: Character) -> bool:
+	return not occ.is_vehicle and not mover.is_vehicle
 
 
 # L'ordine fa avanzare (true) o ritirare (false)?
@@ -193,7 +203,12 @@ static func compass_step(state: GameState, mover: Character, dirs: Array[int]) -
 					"fugge fuori mappa in ROUT" if routing else "esce dalla mappa"])
 				return 2
 			continue
-		if is_passable(state, dest):
+		# Hex libero, oppure occupato da un compagno (stacking, Rule 8).
+		var occ := state.character_at(dest.x, dest.y)
+		var stackable: bool = occ != null and not occ.is_dead() \
+			and occ.side == mover.side and _stack_ok(mover, occ) \
+			and Area.fire_at(state, dest) < 0
+		if is_passable(state, dest) or stackable:
 			_commit_step(state, mover, dest)
 			return 1
 	return 0

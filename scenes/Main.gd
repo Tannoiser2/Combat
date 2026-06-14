@@ -73,6 +73,11 @@ var acting: Character = null
 var action_kind: int = 0   # TurnSequence.Act
 var moves_left: int = 0
 
+# Selezione ciclica delle pedine impilate (stacking, Rule 8): riclicca lo
+# stesso hex per passare all'uomo successivo nella pila.
+var _stack_cycle_hex := Vector2i(-99, -99)
+var _stack_cycle_i := 0
+
 # Fase di schieramento: uomini ancora da piazzare e zona valida.
 var deploy_queue: Array = []
 var deploy_zone: Array[Vector2i] = []
@@ -957,11 +962,30 @@ func _on_map_clicked() -> void:
 	if acting != null:
 		_handle_action_click(hex)
 		return
-	var c := map_view.character_at_hex(hex)
+	# Selezione: con piu' pedine vive nell'hex (stacking, Rule 8) ogni clic
+	# successivo sullo stesso hex passa all'uomo seguente nella pila.
+	var here: Array = []
+	for cc in state.characters:
+		if not cc.is_dead() and cc.position == hex:
+			here.append(cc)
+	var c: Character = null
+	if not here.is_empty():
+		if hex == _stack_cycle_hex:
+			_stack_cycle_i = (_stack_cycle_i + 1) % here.size()
+		else:
+			_stack_cycle_hex = hex
+			_stack_cycle_i = 0
+		c = here[_stack_cycle_i]
+	else:
+		_stack_cycle_hex = Vector2i(-99, -99)
+		_stack_cycle_i = 0
 	map_view.selected = c
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	if here.size() > 1:
+		hint_label.text = "Pila di %d uomini: riclicca l'hex per il prossimo (%s)" % [
+			here.size(), c.display_name]
 	# Carta Initiative (DISCARD): click su un friendly per cambiarne l'ordine.
 	if _initiative_card_pending:
 		_initiative_card_pending = false
@@ -1310,30 +1334,27 @@ func _build_hud() -> void:
 	info_text.add_theme_font_size_override("normal_font_size", 15)
 	side_box.add_child(info_text)
 	side_box.add_child(HSeparator.new())
-	# Sezione nemici noti (collassabile, default chiusa).
-	var enemy_hdr_btn := Button.new()
-	enemy_hdr_btn.text = "NEMICI NOTI ▶"
-	enemy_hdr_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	enemy_hdr_btn.flat = true
-	enemy_hdr_btn.add_theme_font_size_override("font_size", 13)
-	enemy_hdr_btn.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
-	side_box.add_child(enemy_hdr_btn)
-	var enemy_scroll := ScrollContainer.new()
-	enemy_scroll.custom_minimum_size = Vector2(0, 120)
-	enemy_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	enemy_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	enemy_scroll.hide()
-	side_box.add_child(enemy_scroll)
+	# Tab NEMICI NOTI / DIARIO DI BATTAGLIA
+	var tabs := TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_font_size_override("font_size", 13)
+	side_box.add_child(tabs)
+	# Tab 1: Nemici noti
+	var enemy_tab := ScrollContainer.new()
+	enemy_tab.name = "Nemici noti"
+	enemy_tab.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	enemy_tab.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(enemy_tab)
 	enemy_roster_body = VBoxContainer.new()
 	enemy_roster_body.add_theme_constant_override("separation", 2)
 	enemy_roster_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	enemy_scroll.add_child(enemy_roster_body)
+	enemy_tab.add_child(enemy_roster_body)
 	enemy_roster_box = enemy_roster_body
-	enemy_hdr_btn.pressed.connect(func():
-		enemy_roster_collapsed = not enemy_roster_collapsed
-		enemy_scroll.visible = not enemy_roster_collapsed
-		enemy_hdr_btn.text = "NEMICI NOTI ▶" if enemy_roster_collapsed else "NEMICI NOTI ▼")
-	side_box.add_child(HSeparator.new())
+	# Tab 2: Diario di battaglia
+	var log_tab := VBoxContainer.new()
+	log_tab.name = "Diario"
+	log_tab.add_theme_constant_override("separation", 2)
+	tabs.add_child(log_tab)
 	var log_head := HBoxContainer.new()
 	var log_title := _section_label("DIARIO DI BATTAGLIA")
 	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1346,14 +1367,14 @@ func _build_hud() -> void:
 		log_show_detail = on
 		_rebuild_log())
 	log_head.add_child(detail_toggle)
-	side_box.add_child(log_head)
+	log_tab.add_child(log_head)
 	log_text = RichTextLabel.new()
 	log_text.bbcode_enabled = true
 	log_text.scroll_following = true
 	log_text.fit_content = false
 	log_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_text.add_theme_font_size_override("normal_font_size", 13)
-	side_box.add_child(log_text)
+	log_tab.add_child(log_text)
 	side_box.add_child(HSeparator.new())
 	# Legenda dei pallini di morale.
 	var legend := RichTextLabel.new()
@@ -2005,9 +2026,8 @@ func _refresh_roster() -> void:
 			continue
 		var b := Button.new()
 		b.text = ""
-		b.custom_minimum_size = Vector2(200, 32)
+		b.custom_minimum_size = Vector2(200, 34)
 		b.disabled = c.is_dead()
-		b.modulate = Color(0.55, 0.55, 0.55) if c.is_dead() else Color.WHITE
 		var sb := StyleBoxFlat.new()
 		if c.is_dead():
 			sb.bg_color = Color(0.12, 0.12, 0.12)
@@ -2015,77 +2035,96 @@ func _refresh_roster() -> void:
 		else:
 			sb.bg_color = Color(0.18, 0.22, 0.13)
 			sb.border_color = MapView.MORALE_COLORS[c.morale]
-		sb.border_width_left = 6
+		sb.border_width_left = 5
 		sb.border_width_right = 1
 		sb.border_width_top = 1
 		sb.border_width_bottom = 1
 		sb.set_corner_radius_all(4)
-		sb.set_content_margin_all(4)
+		sb.set_content_margin_all(3)
 		b.add_theme_stylebox_override("normal", sb)
 		b.add_theme_stylebox_override("hover", sb)
 		b.add_theme_stylebox_override("pressed", sb)
 		b.add_theme_stylebox_override("disabled", sb)
-		# HBoxContainer con indicatori colorati
 		var hbox := HBoxContainer.new()
 		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.anchor_right = 1.0
 		hbox.anchor_bottom = 1.0
-		hbox.offset_left = 8
-		hbox.offset_right = -4
+		hbox.offset_left = 6
+		hbox.offset_right = -3
 		hbox.offset_top = 2
 		hbox.offset_bottom = -2
-		hbox.add_theme_constant_override("separation", 4)
+		hbox.add_theme_constant_override("separation", 3)
 		b.add_child(hbox)
+		# Thumbnail counter PNG (28x28)
+		var thumb := TextureRect.new()
+		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		thumb.custom_minimum_size = Vector2(28, 28)
+		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var tex_path := "res://assets/counters/%s-f.png" % c.counter
+		if ResourceLoader.exists(tex_path):
+			thumb.texture = load(tex_path)
+		hbox.add_child(thumb)
+		# Nome
 		var name_lbl := Label.new()
 		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.add_theme_font_size_override("font_size", 13)
+		name_lbl.add_theme_font_size_override("font_size", 12)
 		name_lbl.add_theme_color_override("font_color",
-			Color(0.55, 0.55, 0.55) if c.is_dead() else Color.WHITE)
+			Color(0.5, 0.5, 0.5) if c.is_dead() else Color.WHITE)
 		name_lbl.text = c.display_name
 		hbox.add_child(name_lbl)
 		if c.is_dead():
 			var dead_lbl := Label.new()
 			dead_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			dead_lbl.text = "KIA" if c.is_killed() else "INCAP"
-			dead_lbl.add_theme_font_size_override("font_size", 11)
+			dead_lbl.text = "KIA" if c.is_killed() else "INC"
+			dead_lbl.add_theme_font_size_override("font_size", 10)
 			dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 			hbox.add_child(dead_lbl)
 		else:
+			# Ferite: tanti cuori quante ferite
 			for _w in c.wounds:
 				var w := Label.new()
 				w.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				w.text = "♥"
+				w.text = "+"
 				w.add_theme_font_size_override("font_size", 13)
 				w.add_theme_color_override("font_color", Color(0.95, 0.2, 0.2))
 				hbox.add_child(w)
+			# Ammo
 			if c.no_ammo:
 				var a := Label.new()
 				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				a.text = "⊘"
-				a.add_theme_font_size_override("font_size", 13)
+				a.text = "NO"
+				a.add_theme_font_size_override("font_size", 10)
 				a.add_theme_color_override("font_color", Color(1.0, 0.4, 0.1))
 				hbox.add_child(a)
 			elif c.low_ammo:
 				var a := Label.new()
 				a.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				a.text = "↓"
-				a.add_theme_font_size_override("font_size", 13)
+				a.text = "LB"
+				a.add_theme_font_size_override("font_size", 10)
 				a.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 				hbox.add_child(a)
-			var m := Label.new()
-			m.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			m.text = "●"
-			m.add_theme_font_size_override("font_size", 13)
-			m.add_theme_color_override("font_color", MapView.MORALE_COLORS[c.morale])
-			hbox.add_child(m)
+			# Pallino morale: piccolo pannello colorato (no Unicode)
+			var mp := PanelContainer.new()
+			mp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			mp.custom_minimum_size = Vector2(10, 10)
+			var msb := StyleBoxFlat.new()
+			msb.bg_color = MapView.MORALE_COLORS[c.morale]
+			msb.set_corner_radius_all(5)
+			mp.add_theme_stylebox_override("panel", msb)
+			hbox.add_child(mp)
 		var ch := c
 		b.pressed.connect(func():
 			map_view.selected = ch
 			map_view.highlight_hex = ch.position
 			camera.position = map_view.hex_center(ch.position.x, ch.position.y)
 			map_view.queue_redraw()
-			_show_info(ch.position, ch))
+			_show_info(ch.position, ch)
+			# In fase ordini il roster apre direttamente il pannello ordini,
+			# cosi' anche un uomo impilato e' ordinabile per nome.
+			if phase == Phase.ORDERS and not ch.is_dead():
+				_open_order_panel(ch))
 		roster_body.add_child(b)
 
 
