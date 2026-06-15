@@ -36,6 +36,7 @@ var log_history: Array[String] = []
 var log_show_detail := false
 var order_panel: PanelContainer   # selettore ordini con spiegazioni
 var order_list: VBoxContainer
+var order_title_label: Label      # testo della barra-titolo (trascinabile)
 var order_desc: RichTextLabel
 var order_target: Character
 var enemy_card_rect: TextureRect
@@ -1014,10 +1015,7 @@ func _open_order_panel(c: Character) -> void:
 	order_target = c
 	for child in order_list.get_children():
 		child.queue_free()
-	var title := Label.new()
-	title.text = "Ordine per %s" % c.display_name
-	title.add_theme_color_override("font_color", Color(0.98, 0.92, 0.55))
-	order_list.add_child(title)
+	order_title_label.text = "⠿  Ordine: %s" % c.display_name
 	for o in TurnSequence.legal_orders(state, c):
 		var b := Button.new()
 		b.text = Domain.ORDER_NAMES[o]
@@ -1642,9 +1640,17 @@ func _build_hud() -> void:
 	order_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	order_panel.hide()
 	root.add_child(order_panel)
+	var order_outer := VBoxContainer.new()
+	order_outer.add_theme_constant_override("separation", 4)
+	order_panel.add_child(order_outer)
+	# Barra-titolo trascinabile.
+	var order_titlebar := _title_bar("Ordini")
+	order_title_label = order_titlebar.get_child(0) as Label
+	order_outer.add_child(order_titlebar)
+	_make_draggable(order_panel, order_titlebar)
 	var order_h := HBoxContainer.new()
 	order_h.add_theme_constant_override("separation", 10)
-	order_panel.add_child(order_h)
+	order_outer.add_child(order_h)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(210, 430)
 	order_h.add_child(scroll)
@@ -2043,13 +2049,12 @@ func _show_vehicle_display(vehicle: Character) -> void:
 		child.queue_free()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
-	box.custom_minimum_size = Vector2(400, 0)
+	box.custom_minimum_size = Vector2(252, 0)
 	vehicle_popup.add_child(box)
-	var title := Label.new()
-	title.text = vehicle.vehicle_type
-	title.add_theme_font_size_override("font_size", 17)
-	title.add_theme_color_override("font_color", Color(0.95, 0.88, 0.55))
-	box.add_child(title)
+	# Barra-titolo: afferrala per spostare la finestra col mouse.
+	var header := _title_bar(vehicle.vehicle_type)
+	box.add_child(header)
+	_make_draggable(vehicle_popup, header)
 	# Stato dello scafo.
 	var hull_str := "Intatto"
 	var hull_col := Color(0.6, 0.85, 0.6)
@@ -2141,7 +2146,7 @@ const DISPLAY_BOXES := {
 	},
 }
 
-const VEHICLE_DISPLAY_W := 392.0
+const VEHICLE_DISPLAY_W := 240.0
 
 
 # Vehicle Display: il mat reale del veicolo come sfondo, con le pedine
@@ -2292,6 +2297,44 @@ func _crew_text_list(vehicle: Character) -> Control:
 		row.text = "%s — %s%s" % [cm.crew_role, st, _crew_action_text(vehicle, cm)]
 		vb.add_child(row)
 	return vb
+
+
+# Barra-titolo di una finestra fluttuante: fa anche da maniglia di trascinamento.
+func _title_bar(text: String) -> Panel:
+	var bar := Panel.new()
+	bar.custom_minimum_size = Vector2(0, 26)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.20, 0.22, 0.28)
+	sb.set_corner_radius_all(4)
+	bar.add_theme_stylebox_override("panel", sb)
+	var lbl := Label.new()
+	lbl.text = "⠿  " + text
+	lbl.position = Vector2(6, 3)
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(lbl)
+	return bar
+
+
+# Rende 'win' trascinabile col mouse afferrando la barra 'handle'. Al primo
+# trascinamento la finestra passa a posizionamento libero (ancore top-left)
+# preservando la posizione corrente.
+func _make_draggable(win: Control, handle: Control) -> void:
+	handle.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	handle.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+			if ev.pressed:
+				var gp := win.global_position
+				win.set_anchors_preset(Control.PRESET_TOP_LEFT)
+				win.grow_horizontal = Control.GROW_DIRECTION_END
+				win.grow_vertical = Control.GROW_DIRECTION_END
+				win.global_position = gp
+				handle.set_meta("_dragging", true)
+			else:
+				handle.set_meta("_dragging", false)
+		elif ev is InputEventMouseMotion and handle.get_meta("_dragging", false):
+			win.global_position += ev.relative)
 
 
 # Cicla l'azione di fuoco di un membro (Rule 31.9). Gunner: niente -> cannone
