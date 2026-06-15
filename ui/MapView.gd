@@ -467,6 +467,17 @@ func _draw() -> void:
 			if wh.wire:
 				var wc := _key_to_cell(key)
 				_draw_marker(wire_tex, hex_center(wc.x, wc.y), radius, 0.85)
+	# Trincee (Rule 27.4) ed edifici fortificati (Rule 27.2): terreno di
+	# scenario non disegnato sull'immagine della board -> marker dedicato.
+	var trench_tex := _named_tex("GEN-Trench-Marker-f")
+	var fort_tex := _named_tex("GEN-Fortified-Marker-f")
+	for key in state.map:
+		var sh: GameState.MapHex = state.map[key]
+		var scell := _key_to_cell(key)
+		if sh.terrain == D.Terrain.TRENCH and trench_tex != null:
+			_draw_marker(trench_tex, hex_center(scell.x, scell.y), radius, 0.9)
+		elif sh.terrain == D.Terrain.FORTIFIED_BUILDING and fort_tex != null:
+			_draw_marker(fort_tex, hex_center(scell.x, scell.y), radius, 0.9)
 	# Strumento LOS: linea spessa tra i due hex scelti.
 	if not los_tool.is_empty():
 		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \

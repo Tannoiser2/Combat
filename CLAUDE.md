@@ -118,8 +118,27 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    (Fire._abbey_hexes_crossed); gli interni sono immuni al fuoco da fuori
    (Fire.can_fire); la LOS dentro l'abbazia non e' bloccata dai muri ma da fuori
    il muro esterno blocca (LOS both_abbey, HEIGHT2 2). Test Main._test_abbey.
-   RULE 27 COMPLETA. I terreni nuovi non sono ancora piazzati in nessuno
-   scenario (markers/board da scenario).
+   RULE 27 COMPLETA. PIAZZAMENTO SULLE BOARD (v0.46+): i terreni speciali che
+   il classificatore a colori non vede sono marcati a mano nel dizionario
+   MANUAL di tools/generate_boards.py (applicati sopra la classificazione auto,
+   vincono su di essa) e ricavati dai collari con tools/detect_collars.py.
+   FATTO: Abbazia sulla board "abbey" (31 ABBEY_EXTERIOR collare rosso, 16
+   ABBEY_INTERIOR collare rosso+giallo; validati sull'esempio del regolamento
+   18,10/21,11 interni, 22,10 esterno; usata da s16 e s18). FATTO (v0.47):
+   Fontana (27.1, collare giallo) sulla board "town", 9 hex della piazza
+   ornamentale (15-17 x 13-15); e' l'unica mappa con fontane. NOTA: edifici
+   fortificati (27.2) e trincee (27.4) NON sono stampati sulle mappe ("placed
+   via a scenario special rule"): vanno aggiunti per-scenario (come il filo
+   spinato, chiave "wire"), non sulle board. FATTO (v0.48): chiavi di scenario
+   "trench" (27.4) e "fortified" (27.2) in Scenario._make (impostano
+   hex.terrain), con marker MapView (GEN-Trench/Fortified-Marker) anche sopra
+   l'immagine della board. Piazzati in s21 (MG nest fortificati 13,11/17,9 +
+   trincee) e s22 (linea trincee + caposaldo 18,10). Posizioni di design: lo
+   Scenario Book copre solo il Vol.1, i .vsav VASSAL sono PARTITE GIOCATE
+   (embeddano i pool interi dei counter, identici tra scenari, e posizioni di
+   meta' partita), quindi NON esiste un setup/OOB ufficiale Vol.2 nei materiali.
+   Tutto il terreno speciale STAMPATO sulle board (abbazia, fontana) e quello
+   di scenario (trincee, fortificati) e' ora piazzato e usato in partita.
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
@@ -204,6 +223,11 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    vicina al bersaglio (dir_toward), non un settore a 4 archi; coassiale/bow MG
    non gestiti col vincolo "torretta che ruota non spara". Riferimento completo
    regole 31.4-31.6 piu' sotto.
+   MODELLO EQUIPAGGIO COMPLETO (da fare): il modello attuale e' "intermedio"
+   (un veicolo = un attore, un'arma, un'azione per impulso). La roadmap per
+   l'equipaggio fedele al regolamento (attori per-membro, armi multiple
+   bow/coax/main, LOS per ruolo+boccaporto, Target Marker/Observed Target, load
+   state del Loader, Vehicle Order Matrix per l'AI) e' in docs/veicoli_roadmap.md.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

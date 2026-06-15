@@ -187,6 +187,10 @@ OVERLAY_COLORS = {
     "ROCKS": (160, 160, 160), "BUILDING": (255, 0, 0), "STREAM": (0, 120, 255),
     "MARSH": (0, 255, 255), "HEDGEROW": (0, 90, 0), "LOGS": (140, 70, 20),
     "OPEN_L1": (230, 230, 120), "OPEN_L2": (255, 120, 0),
+    # terreni speciali Vol.2 (override manuali in generate_boards.py)
+    "FOUNTAIN": (0, 200, 255), "FORTIFIED_BUILDING": (180, 0, 0),
+    "TRENCH": (120, 80, 40), "ABBEY_EXTERIOR": (255, 0, 0),
+    "ABBEY_INTERIOR": (255, 200, 0),
 }
 
 

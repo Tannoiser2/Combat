@@ -50,7 +50,7 @@ const VEHICLE_DATA := {
 	},
 	"PzIVH": {
 		"speed": Speed.FORWARD,
-		"armor":   [8, 3, 2],
+		"armor":   [9, 3, 2],   # Lower Hull Front 9/16 dal Vehicle Display PzIVH
 		"armor_g": [16, 5, 4],
 		"weapon": "KwK 7.5cm HE", "ws": 7, "tq": 7,
 		"side": D.Side.ENEMY,
