@@ -124,9 +124,13 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    vincono su di essa) e ricavati dai collari con tools/detect_collars.py.
    FATTO: Abbazia sulla board "abbey" (31 ABBEY_EXTERIOR collare rosso, 16
    ABBEY_INTERIOR collare rosso+giallo; validati sull'esempio del regolamento
-   18,10/21,11 interni, 22,10 esterno; usata da s16 e s18). DA FARE: trincee
-   ed edifici fortificati sul "ridge" (s21/s22), fontane, e l'eventuale filo
-   spinato per-scenario sulle nuove board.
+   18,10/21,11 interni, 22,10 esterno; usata da s16 e s18). FATTO (v0.47):
+   Fontana (27.1, collare giallo) sulla board "town", 9 hex della piazza
+   ornamentale (15-17 x 13-15); e' l'unica mappa con fontane. NOTA: edifici
+   fortificati (27.2) e trincee (27.4) NON sono stampati sulle mappe ("placed
+   via a scenario special rule"): vanno aggiunti per-scenario (come il filo
+   spinato, chiave "wire"), non sulle board. Quindi il terreno speciale
+   STAMPATO sulle board e' tutto piazzato; il resto e' lavoro lato scenario.
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in

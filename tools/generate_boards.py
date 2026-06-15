@@ -45,6 +45,15 @@ TERRAIN_NAME = {
 # e validati sull'esempio del regolamento (18,10 e 21,11 interni, 22,10
 # esterno).
 MANUAL = {
+    # town: fontana ornamentale della piazza (Rule 27.1, collare giallo sul
+    # center-dot). Tutti gli hex collarati sono Fountain (Rough, ostacolo 1/2).
+    # Rilevati con tools/detect_collars.py --fountain (giallo puro 255,255,0).
+    "town": {
+        "FOUNTAIN": [
+            "15,13", "15,14", "15,15", "16,13", "16,14", "16,15",
+            "17,13", "17,14", "17,15",
+        ],
+    },
     "abbey": {
         "ABBEY_EXTERIOR": [
             "17,9", "17,10", "17,11", "17,12", "17,13", "18,8", "18,12",

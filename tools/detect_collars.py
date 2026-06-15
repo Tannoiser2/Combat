@@ -32,6 +32,33 @@ def is_yellow(r, g, b):
     return r >= 180 and g >= 150 and b <= 120 and g - b >= 55
 
 
+def is_pure_yellow(r, g, b):
+    # collare giallo della Fountain (27.1): giallo saturo sul center-dot,
+    # ben distinto dal tan dei campi (che ha blu ~125).
+    return r >= 225 and g >= 225 and b <= 70
+
+
+def detect_fountains(name):
+    x0, y0 = ORIG[name]
+    img = Image.open("assets/maps/%s.jpg" % name).convert("RGB")
+    px = img.load()
+    W, H = img.size
+    hits = []
+    for col in range(1, COLS + 1):
+        for row in range(0, last_row(col) + 1):
+            cx, cy = hex_center(x0, y0, col, row)
+            rad, y = 24, 0
+            for ix in range(int(cx - rad), int(cx + rad)):
+                for iy in range(int(cy - rad), int(cy + rad)):
+                    if 0 <= ix < W and 0 <= iy < H and \
+                            (ix - cx) ** 2 + (iy - cy) ** 2 <= rad * rad and \
+                            is_pure_yellow(*px[ix, iy]):
+                        y += 1
+            if y >= 20:
+                hits.append("%d,%d" % (col, row))
+    return hits
+
+
 def detect(name, c0, c1, r0, r1):
     x0, y0 = ORIG[name]
     img = Image.open("assets/maps/%s.jpg" % name).convert("RGB")
@@ -66,6 +93,12 @@ def detect(name, c0, c1, r0, r1):
 
 
 def main():
+    if "--fountain" in sys.argv:
+        args = [a for a in sys.argv[1:] if a != "--fountain"]
+        names = args if args else list(ORIG)
+        for name in names:
+            print("FOUNTAIN %s: %s" % (name, detect_fountains(name)))
+        return
     name = sys.argv[1]
     if len(sys.argv) >= 6:
         c0, c1, r0, r1 = map(int, sys.argv[2:6])

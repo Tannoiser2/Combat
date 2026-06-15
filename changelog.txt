@@ -1,3 +1,12 @@
+v0.47 — 2026-06-15
+- Mappa Town (Rule 27.1): la fontana ornamentale della piazza e' piazzata
+  come terreno FOUNTAIN (9 hex, 15-17 x 13-15; prima erano lastricato/campo).
+  Riconosciuta dal collare giallo sul center-dot con detect_collars.py
+  --fountain. Le fontane non compaiono su nessun'altra mappa.
+- Nota di regola: edifici fortificati (27.2) e trincee (27.4) NON sono
+  stampati sulle mappe (si piazzano via regola speciale di scenario), quindi
+  restano lavoro lato scenario, non lato board.
+
 v0.46 — 2026-06-15
 - Mappa Abbazia (Rule 27.5): i terreni d'abbazia sono finalmente piazzati
   sulla board "abbey" (prima erano classificati come rocce/edifici). 31 hex
