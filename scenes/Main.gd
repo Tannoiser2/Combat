@@ -1026,6 +1026,54 @@ func _open_order_panel(c: Character) -> void:
 		b.pressed.connect(_on_order_selected.bind(o))
 		b.mouse_entered.connect(_describe_order.bind(o))
 		order_list.add_child(b)
+	# Veicoli con equipaggio (Rule 31.9): comando per-membro. L'ordine sopra
+	# muove lo scafo (Driver); il Gunner puo' sparare il cannone in aggiunta,
+	# anche durante il movimento (move-and-shoot).
+	if c.is_vehicle:
+		var gunner: Character = TurnSequence._crew_member(c, "Gunner")
+		if gunner != null:
+			var crew_lbl := Label.new()
+			crew_lbl.text = "— Equipaggio —"
+			crew_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
+			order_list.add_child(crew_lbl)
+			var firing: bool = gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE
+			var gun_btn := Button.new()
+			gun_btn.text = "Gunner: cannone %s" % ("SPARA" if firing else "non spara")
+			gun_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			gun_btn.custom_minimum_size = Vector2(190, 0)
+			gun_btn.modulate = Color(0.6, 0.95, 0.6) if firing else Color(0.85, 0.85, 0.7)
+			gun_btn.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Gunner[/color][/b]\n\nIl cannoniere spara il cannone principale al bersaglio in linea di vista e gittata, anche mentre lo scafo si muove (move-and-shoot), col malus dell'ordine di movimento. Il cannone va ricaricato dopo ogni colpo.")
+			gun_btn.pressed.connect(func() -> void:
+				if gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE:
+					gunner.clear_order()
+				else:
+					gunner.set_order(Domain.Order.AIMED_FIRE)
+				_open_order_panel(c))
+			order_list.add_child(gun_btn)
+		# Rule 31.9.4b: bow MG del Co-Driver (arma separata, fuoco simultaneo).
+		var codriver: Character = TurnSequence._crew_member(c, "Co-Driver")
+		if codriver != null and not VehicleCombat.bow_mg_weapon(c).is_empty():
+			if gunner == null:
+				var crew_lbl2 := Label.new()
+				crew_lbl2.text = "— Equipaggio —"
+				crew_lbl2.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
+				order_list.add_child(crew_lbl2)
+			var bfiring: bool = codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE
+			var bow_btn := Button.new()
+			bow_btn.text = "Co-Driver: bow MG %s" % ("SPARA" if bfiring else "non spara")
+			bow_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			bow_btn.custom_minimum_size = Vector2(190, 0)
+			bow_btn.modulate = Color(0.6, 0.95, 0.6) if bfiring else Color(0.85, 0.85, 0.7)
+			bow_btn.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Co-Driver[/color][/b]\n\nServe la mitragliatrice di scafo (bow MG): spara al bersaglio piu' vicino in vista, anche mentre il carro muove e mentre il Gunner spara col cannone. Senza secondo servente usa la TQ-3 e va a corto di munizioni con un singolo 9.")
+			bow_btn.pressed.connect(func() -> void:
+				if codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE:
+					codriver.clear_order()
+				else:
+					codriver.set_order(Domain.Order.AIMED_FIRE)
+				_open_order_panel(c))
+			order_list.add_child(bow_btn)
 	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
 	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
 	# facile da colpire.
@@ -1996,6 +2044,13 @@ func _show_vehicle_display(vehicle: Character) -> void:
 	hull.text = "Scafo: %s" % hull_str
 	hull.add_theme_color_override("font_color", hull_col)
 	box.add_child(hull)
+	# Rule 31.1.3: stato di carica del cannone principale (AFV con torretta).
+	if VehicleCombat.has_turret(vehicle):
+		var gun := Label.new()
+		gun.text = "Cannone: %s" % ("carico" if vehicle.main_gun_loaded else "da ricaricare")
+		gun.add_theme_color_override("font_color",
+			Color(0.55, 0.8, 0.55) if vehicle.main_gun_loaded else Color(0.9, 0.75, 0.3))
+		box.add_child(gun)
 	box.add_child(HSeparator.new())
 	var crew_head := _section_label("EQUIPAGGIO")
 	box.add_child(crew_head)
@@ -3580,6 +3635,117 @@ func _test_vehicles() -> int:
 	Fire.fire_action(fa, shF, pzF, "75mm L40 AP")
 	if fa.shots.is_empty():
 		print("TEST veicoli: il cannone deve sparare con torretta allineata")
+		fails += 1
+
+	# Rule 31.1.3: stato di carica. Spara -> scarico -> ricarica (un impulso,
+	# niente fuoco) -> torna a sparare. Torretta pre-allineata.
+	var ls := GameState.new()
+	ls.rng.seed = 0
+	Boards.fill(ls, "farmhouse")
+	var shL := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 3)
+	var pzL := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(5, 7), 4)
+	pzL.known = true
+	ls.characters = [shL, pzL]
+	shL.turret_facing = Move.dir_toward(shL.position, pzL.position)  # allineata
+	if not shL.main_gun_loaded:
+		print("TEST cannone: deve partire carico")
+		fails += 1
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # spara, si svuota
+	if shL.main_gun_loaded or ls.shots.is_empty():
+		print("TEST cannone: il primo colpo deve sparare e svuotare il cannone")
+		fails += 1
+	pzL.hull_damage = 0   # ripristina il bersaglio per i tiri successivi
+	var n1: int = ls.shots.size()
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # ricarica, niente fuoco
+	if ls.shots.size() != n1 or not shL.main_gun_loaded:
+		print("TEST cannone: il cannone scarico deve ricaricarsi senza sparare")
+		fails += 1
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # spara di nuovo
+	if ls.shots.size() == n1:
+		print("TEST cannone: il cannone ricaricato deve tornare a sparare")
+		fails += 1
+
+	# Rule 31.9: ordini per-membro. _crew_member trova il ruolo; il Gunner
+	# riceve un ordine di fuoco col bersaglio in LOS (base del move-and-shoot).
+	var cs := GameState.new()
+	cs.rng.seed = 0
+	Boards.fill(cs, "farmhouse")
+	var pzC := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(10, 10), 3)
+	var jeepC := VehicleCombat.make_vehicle(
+		"Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(12, 10))
+	if TurnSequence._crew_member(pzC, "Gunner") == null:
+		print("TEST equipaggio: il PzIVH deve avere un Gunner")
+		fails += 1
+	if TurnSequence._crew_member(jeepC, "Gunner") != null:
+		print("TEST equipaggio: la Jeep non ha un Gunner")
+		fails += 1
+	var foeC := Character.new("foeC", "Foe", Domain.Side.FRIENDLY, "Able")
+	foeC.troop_quality = 6
+	foeC.weapon_skills = {"M1 Garand": 6}
+	foeC.position = Vector2i(10, 9)   # adiacente al PzIVH
+	foeC.spotted = true
+	cs.characters = [pzC, foeC]
+	TurnSequence._assign_vehicle_order(cs, pzC)
+	var gunC := TurnSequence._crew_member(pzC, "Gunner")
+	if gunC == null or not gunC.has_order or gunC.order != Domain.Order.AIMED_FIRE:
+		print("TEST equipaggio: il Gunner deve ricevere Aimed Fire col bersaglio in LOS")
+		fails += 1
+
+	# Rule 31.9: il Gunner spara anche se lo scafo non ha ordine (Driver fermo).
+	# Veicolo senza ordine + Gunner AIMED_FIRE -> resolve_action lo processa e
+	# il cannone spara (si svuota).
+	var gs := GameState.new()
+	gs.rng.seed = 0
+	Boards.fill(gs, "farmhouse")
+	var pzG := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(8, 5), 3)
+	var shG := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 6), 4)
+	shG.spotted = true
+	gs.characters = [pzG, shG]
+	pzG.facing = Move.dir_toward(pzG.position, shG.position)
+	pzG.turret_facing = Move.dir_toward(pzG.position, shG.position)
+	pzG.clear_order()   # lo scafo non ha ordine (Driver fermo)
+	TurnSequence._crew_member(pzG, "Gunner").set_order(Domain.Order.AIMED_FIRE)
+	gs.impulse = 2
+	gs.rng.seed = 0
+	TurnSequence.resolve_action(gs, pzG)
+	if pzG.main_gun_loaded:
+		print("TEST equipaggio: il Gunner deve sparare col veicolo senza ordine")
+		fails += 1
+
+	# Rule 31.9.4b: la bow MG del Co-Driver e' un'arma separata (WS = TQ-3) e
+	# spara nello stesso impulse, anche con lo scafo fermo.
+	var bs2 := GameState.new()
+	bs2.rng.seed = 0
+	Boards.fill(bs2, "farmhouse")
+	var shB := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var codB := TurnSequence._crew_member(shB, "Co-Driver")
+	if codB == null or codB.weapon_skills.get("M1919", 0) != 4:
+		print("TEST bow MG: il Co-Driver del Sherman deve avere la bow MG a TQ-3 (4)")
+		fails += 1
+	var enemyB := Character.new("enB", "Schutze", Domain.Side.ENEMY, "Red")
+	enemyB.troop_quality = 5
+	enemyB.weapon_skills = {"KAR 98K": 5}
+	enemyB.position = Vector2i(8, 6)   # adiacente al Sherman
+	enemyB.known = true
+	bs2.characters = [shB, enemyB]
+	shB.clear_order()   # scafo fermo, nessun ordine del veicolo/Gunner
+	if codB != null:
+		codB.set_order(Domain.Order.AIMED_FIRE)
+	bs2.impulse = 2
+	var shots_b: int = bs2.shots.size()
+	bs2.rng.seed = 0
+	TurnSequence.resolve_action(bs2, shB)
+	if bs2.shots.size() == shots_b:
+		print("TEST bow MG: il Co-Driver deve aver sparato la bow MG col solo suo ordine")
 		fails += 1
 	return fails
 

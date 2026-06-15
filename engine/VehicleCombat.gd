@@ -46,6 +46,7 @@ const VEHICLE_DATA := {
 		"armor":   [10, 4, 4],
 		"armor_g": [18,  6, 6],
 		"weapon": "75mm L40 HE", "ws": 7, "tq": 7,
+		"bow_mg": "M1919",   # Rule 31.9.4b: bow MG del Co-Driver
 		"side": D.Side.FRIENDLY,
 	},
 	"PzIVH": {
@@ -53,6 +54,7 @@ const VEHICLE_DATA := {
 		"armor":   [9, 3, 2],   # Lower Hull Front 9/16 dal Vehicle Display PzIVH
 		"armor_g": [16, 5, 4],
 		"weapon": "KwK 7.5cm HE", "ws": 7, "tq": 7,
+		"bow_mg": "MG34 Vehicle",
 		"side": D.Side.ENEMY,
 	},
 }
@@ -156,9 +158,18 @@ static func populate_crew(vehicle: Character) -> void:
 		cm.embarked = true
 		cm.position = vehicle.position
 		cm.weapon_skills[pistol] = maxi(2, tq - 3)
+		# Rule 31.9.4b: il Co-Driver serve la bow MG. Senza assistente il fuoco
+		# usa la TQ -3 al posto del WS (l'MG va Low/No Ammo sul singolo 9).
+		if role == "Co-Driver" and vd.has("bow_mg"):
+			cm.weapon_skills[String(vd["bow_mg"])] = maxi(2, tq - 3)
 		if role == "Commander":
 			cm.leadership = 1
 		vehicle.crew.append(cm)
+
+
+# Nome dell'arma bow MG del veicolo (Rule 31.9.4b), o "" se non ne ha.
+static func bow_mg_weapon(vehicle: Character) -> String:
+	return String(VEHICLE_DATA.get(vehicle.vehicle_type, {}).get("bow_mg", ""))
 
 
 # Sincronizza il morale dei crew imbarcati con quello del veicolo (a inizio

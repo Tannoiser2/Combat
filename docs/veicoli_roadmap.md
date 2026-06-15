@@ -32,20 +32,34 @@ In sostanza: **un equipaggio, un'azione, un'arma per impulso.**
 Il regolamento tratta ogni membro come un **attore con LOS, ordine e azione
 propri**, simultanei nello stesso impulso. Aree di lavoro:
 
-### A. Equipaggio come attori individuali (FONDAMENTO)
+### A. Equipaggio come attori individuali (FONDAMENTO) — PARZIALE (v0.51)
 Ogni crew member riceve un **proprio ordine** ogni impulso (31.9): es. su uno
 Sherman, nello stesso impulso, Gunner spara il cannone, Co-Driver spara la bow
-MG, Commander fa Spot, Loader ricarica. Serve renderli attori di prima classe
-(in `state.characters` o un ciclo d'attivazione dedicato del veicolo),
-mantenendo il legame `vehicle.crew`.
+MG, Commander fa Spot, Loader ricarica.
+FATTO (slice 1, engine, v0.51): i crew sono attori con `order` proprio; il
+veicolo risolve l'azione per-membro (`TurnSequence._resolve_vehicle_action`): lo
+scafo si muove con l'ordine del Driver (= ordine del veicolo) e il **Gunner**
+spara il cannone indipendentemente -> **move-and-shoot**. L'AI assegna gli
+ordini separati (`_assign_vehicle_order` + `_crew_member`).
+FATTO (slice 2, UI, v0.52): nel pannello ordini di un veicolo amico con
+equipaggio c'e' il toggle "Gunner: cannone SPARA/non spara"; il giocatore
+comanda separatamente movimento (Driver) e fuoco del cannone (Gunner). Il
+Gunner spara anche se lo scafo non ha ordine. Ordini per-membro azzerati a fine
+turno (`end_phase`).
+DA FARE: Loader/Commander/Co-Driver con ordini espliciti (Load/Spot) e azioni
+proprie (armi multiple bow/coax MG, vedi B); pannello con il roster completo
+dei membri (oggi solo il Gunner ha un comando dedicato).
 
-### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple
-- **Cannone principale** (Gunner): HE o AP — gia' presente, ma da legare al load
-  state (vedi D).
+### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple — PARZIALE (v0.53)
+- **Cannone principale** (Gunner): HE o AP — FATTO, con load state (vedi D).
+- **Bow MG** (Co-Driver): FATTO (v0.53). Arma e azione separate: il Co-Driver
+  spara la bow MG (Sherman M1919, PzIVH MG34) nello stesso impulse del cannone,
+  con WS = TQ-3 (no assistente) e Low/No Ammo sul singolo 9. Engine
+  (`_fire_crew_weapon`), AI e UI (toggle). DA FARE: arco frontale e malus
+  dell'ordine di movimento del Driver sul fuoco della bow MG.
 - **MG coassiale** (Gunner): Fire MG con la **TQ** (non WS); se il Gunner spara
-  la coax, il Loader puo' Load o Spot. **Mancante.**
-- **Bow MG** (Co-Driver): Fire MG, **niente assistente** -> -3 TQ e Low/No Ammo
-  sul singolo 9 (Rule 14.3 non si applica). **Mancante.**
+  la coax, il Loader puo' Load o Spot. **Mancante** (il Gunner sceglie cannone
+  O coassiale: serve un "fire mode" del Gunner).
 - **Armi leggere** (qualsiasi crew con boccaporto aperto + pistola): ordine di
   fuoco standard. **Mancante.**
 - **Halftrack**: il personaggio nella **cupola** spara in qualsiasi direzione; i
@@ -68,10 +82,12 @@ mantenendo il legame `vehicle.crew`.
   — anche il Commander di un altro AFV via radio — ha gia' un marker li');
   Spot Order +1; boccaporto aperto +0.
 
-### D. Stato di carica del cannone — il Loader (31.1.3)
-Il cannone principale deve essere **caricato** dal Loader, che riceve ordini
-**Load** o **Spot**. Oggi il cannone spara sempre. Serve un flag "main gun
-loaded" e l'azione Load.
+### D. Stato di carica del cannone — il Loader (31.1.3) — PARZIALE (v0.50)
+FATTO: flag `Character.main_gun_loaded`; il cannone va caricato per sparare,
+ogni colpo lo svuota, la ricarica consuma un impulso (gate in
+`Fire.fire_action`, dopo quello della torretta). Stato nel Vehicle Display.
+DA FARE col modello per-membro: la ricarica come ordine **esplicito** del
+Loader (Load/Spot) anziche' automatica nell'attivazione del veicolo.
 
 ### E. Morale e perdite per membro (31.10.6 / 31.10.9 / 31.10.11)
 Gia' parziale (morale check individuali sullo striscio). Da completare: esiti

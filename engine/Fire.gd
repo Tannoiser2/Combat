@@ -123,10 +123,20 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	# Rule 31.6: per sparare col cannone principale la torretta dell'AFV deve
 	# essere puntata sul bersaglio. Se non lo e', ruota di 1 hex-side verso il
 	# bersaglio e NON spara (la rotazione consuma l'impulso).
-	if firer.is_vehicle and VehicleCombat.has_turret(firer) \
-			and "main_gun" in Weapons.info(weapon)["flags"]:
-		if not VehicleCombat.turret_aim(state, firer, target.position):
+	var is_main_gun: bool = firer.is_vehicle \
+		and "main_gun" in Weapons.info(weapon)["flags"]
+	if is_main_gun:
+		if VehicleCombat.has_turret(firer) \
+				and not VehicleCombat.turret_aim(state, firer, target.position):
 			return
+		# Rule 31.1.3: il cannone deve essere carico. Se non lo e', il Loader
+		# lo ricarica e l'impulso si consuma (niente fuoco questo impulso).
+		if not firer.main_gun_loaded:
+			firer.main_gun_loaded = true
+			state.log_event("%s: il Loader ricarica il cannone" % firer.display_name)
+			return
+		# Spara: il colpo svuota il cannone (va ricaricato prima del prossimo).
+		firer.main_gun_loaded = false
 	if target.is_vehicle:
 		VehicleCombat.at_fire(state, firer, target, weapon)
 		return
