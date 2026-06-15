@@ -1,3 +1,12 @@
+v0.56 — 2026-06-15
+- Vehicle Display "mappetta del carro": la finestra fluttuante del veicolo
+  mostra ora uno schema dall'alto (scafo, torretta per gli AFV) con le caselle
+  dell'equipaggio piazzate nelle loro posizioni (Driver/Co-Driver davanti,
+  Commander/Gunner/Loader in torretta). Ogni casella ha il bordo colorato per
+  stato (a bordo/ferito/sceso/KIA) e mostra l'azione corrente; sui veicoli
+  amici le caselle di Gunner (cannone/coassiale) e Co-Driver (bow MG) sono
+  cliccabili per scegliere il fuoco direttamente sullo schema.
+
 v0.55 — 2026-06-15
 - Equipaggio veicoli (Rule 31.7/31.10), boccaporto ed equipaggio esposto -
   primo tassello della Fase 4: gli AFV hanno un boccaporto aperto/chiuso (i

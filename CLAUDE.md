@@ -266,7 +266,14 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    _fire_at_exposed_crew fa il WS check e ferisce un crew via _crew_casualty).
    UI: toggle "Boccaporto" nel pannello ordini + stato nel Vehicle Display.
    DA FARE Fase 4: archi di LOS per ruolo/boccaporto e Target Marker/Observed
-   Target.
+   Target (a basso rendimento di gioco: la torretta ruota sempre verso il
+   bersaglio e il Commander ha LOS 360, quindi il gating "Observed Target" non
+   vincola quasi mai il fuoco; resta solo un effetto fine sullo spotting).
+   FATTO (v0.56, UI): Vehicle Display "mappetta del carro" - schema dall'alto
+   (Main._build_vehicle_schematic/_crew_slot) con scafo, torretta e le caselle
+   dell'equipaggio nelle loro posizioni; bordo colorato per stato + azione; le
+   caselle Gunner (cannone/coassiale)/Co-Driver (bow MG) sono cliccabili sui
+   veicoli amici (_cycle_crew_action) per comandare il fuoco dallo schema.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).
