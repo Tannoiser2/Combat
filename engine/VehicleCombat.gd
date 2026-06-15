@@ -23,6 +23,8 @@ const VEHICLE_COUNTER := {
 	"M3A1 Halftrack":"FR-M3a1",
 	"M4A3 Sherman":  "FR-M4A3-A",
 	"PzIVH":         "EN-PZIVH-A",
+	"GMC 2.5t":      "FR-GMC-2.5t",
+	"Opel Blitz":    "EN-Opel-Blitz-A",
 }
 
 
@@ -57,6 +59,22 @@ const VEHICLE_DATA := {
 		"weapon": "KwK 7.5cm HE", "ws": 7, "tq": 7,
 		"bow_mg": "MG34 Vehicle",
 		"coax_mg": "MG34 Vehicle",
+		"side": D.Side.ENEMY,
+	},
+	# Camion da trasporto soft-skin (Rule 31): nessuna corazza, nessun'arma
+	# montata. I 12 posti passeggero del Vehicle Display non sono modellati.
+	"GMC 2.5t": {
+		"speed": Speed.FAST,
+		"armor":   [0, 0, 0],
+		"armor_g": [0, 0, 0],
+		"weapon": "", "ws": 0, "tq": 6,
+		"side": D.Side.FRIENDLY,
+	},
+	"Opel Blitz": {
+		"speed": Speed.FAST,
+		"armor":   [0, 0, 0],
+		"armor_g": [0, 0, 0],
+		"weapon": "", "ws": 0, "tq": 6,
 		"side": D.Side.ENEMY,
 	},
 }
@@ -119,6 +137,8 @@ const VEHICLE_CREW := {
 	"M3A1 Halftrack":  ["Driver", "Co-Driver", "Gunner"],
 	"M4A3 Sherman":    ["Commander", "Driver", "Gunner", "Loader", "Co-Driver"],
 	"PzIVH":           ["Commander", "Driver", "Gunner", "Loader", "Co-Driver"],
+	"GMC 2.5t":        ["Driver", "Co-Driver"],
+	"Opel Blitz":      ["Driver", "Co-Driver"],
 }
 
 # Pedine equipaggio per lato e ruolo (file in assets/counters/<id>-f.png). Il
@@ -164,7 +184,9 @@ static func make_vehicle(v_name: String, side: int, team: String,
 	c.troop_quality = int(vd["tq"])
 	c.morale = D.Morale.BOLD
 	var w: String = weapon_override if not weapon_override.is_empty() else str(vd["weapon"])
-	c.weapon_skills[w] = int(vd["ws"])
+	# I camion soft-skin non hanno arma montata (w == "").
+	if not w.is_empty():
+		c.weapon_skills[w] = int(vd["ws"])
 	# I carri hanno anche l'arma AP nella propria lista.
 	if w == "75mm L40 HE":
 		c.weapon_skills["75mm L40 AP"] = int(vd["ws"])

@@ -187,6 +187,18 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    M2 .50cal, Bazooka M9, Panzerfaust 60/100, 75mm L40 HE/AP, KwK 7.5cm HE/AP, MG34 Vehicle.
    Test in Main._test_vehicles. Veicoli assegnati: s20 Halftrack, s21 Sherman + 2 AT Grenadier,
    s22 PzIVH. Pvt Cruz (Bazooka Man) in FULL_SQUAD_VOL2.
+   CAMION (v0.58): "GMC 2.5t" (USA) e "Opel Blitz" (tedesco), trasporti
+   soft-skin (armor 0, nessun'arma montata, FAST, crew Driver/Co-Driver; i 12
+   posti passeggero del display NON sono modellati). make_vehicle salta l'arma
+   se vd["weapon"]=="". PIU' VEICOLI NEGLI SCENARI (v0.58, scelta di design -
+   vedi sotto la nota Vassal): s12 Overrun (Opel Blitz SS), s15 (Jeep),
+   s16 (GMC), s19 (Jeep), oltre a s20/s21/s22. Posizioni validate su terreno
+   non-VEHICLE_BLOCKED. NOTA VASSAL (Vol.2): i .vsav degli scenari 11-22 sono
+   ZIP+offuscati (!VCSK); la loro Main Map contiene SOLO Setup Marker (zone di
+   schieramento) e marker di gioco, NESSUNA unita'/veicolo pre-piazzati (stanno
+   nei Character Display, che sono globali del modulo). I PDF disponibili non
+   contengono gli scenari Vol.2. Quindi NON esiste un OOB veicoli ufficiale per
+   scenario: le assegnazioni sopra sono scelte di design.
    EQUIPAGGIO (Rule 31, livello intermedio, FATTO v0.29): VehicleCombat.VEHICLE_CREW
    mappa tipo->ruoli; populate_crew (chiamata da make_vehicle) crea i crew come
    Character veri dentro vehicle.crew (Character.crew/embarked/crew_role), TQ e morale
@@ -272,8 +284,8 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    FATTO (v0.56, UI): Vehicle Display "mappetta del carro" - schema dall'alto
    con scafo, torretta e le caselle dell'equipaggio nelle loro posizioni.
    FATTO (v0.57, UI): il Vehicle Display usa ora il MAT REALE del veicolo come
-   sfondo (assets/displays/display-{M4A3,PzIVH,Jeep,M3A1}.png, copiati dai
-   materiali del progetto; artwork originale stile TM, come i segnalini) con
+   sfondo (assets/displays/display-{M4A3,PzIVH,Jeep,M3A1,GMC,Opel}.png, copiati
+   dai materiali del progetto; artwork originale stile TM, come i segnalini) con
    tutte le statistiche arma/armatura stampate. Le PEDINE equipaggio
    (assets/counters/<id>-f.png, ruolo STAMPATO sul segnalino) sono piazzate
    nelle caselle del rispettivo ruolo: mappa pedina->ruolo in

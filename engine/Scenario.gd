@@ -863,6 +863,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [20, 28], "rows": [0, 19]},
 		"desc": "Ci hanno circondato nel bosco. Reggete finché la\nriserva non arriva: ogni uomo è vitale.",
 		"squad_vol2": true,
+		# Camion SS che porta l'assalto (scelta di design: nessun OOB ufficiale).
+		"vehicles": [
+			{"type": "Opel Blitz", "side": "enemy", "team": "Purple",
+				"pos": "1,9", "facing": 1},
+		],
 		"enemy_morale": 1,
 		"cup_spec": {
 			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 8},
@@ -929,6 +934,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "I tedeschi si ritirano nel paese. Non lasciateli\nriorganizzarsi: inseguiteli e sgombrate le strade.",
 		"squad_vol2": true,
+		# Jeep da ricognizione per l'inseguimento (scelta di design).
+		"vehicles": [
+			{"type": "Jeep", "side": "friendly", "team": "Baker",
+				"pos": "2,9", "facing": 4},
+		],
 		"cup_spec": {
 			"Blue": {"Officer": 1, "NCO": 2, "Rifleman": 5, "Recruit": 3},
 			"Red": {"NCO": 1, "Rifleman": 4, "Recruit": 4},
@@ -949,6 +959,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Un partigiano è intrappolato nell'abbazia occupata dai\ntedeschi. Entrate, prendetelo, uscite subito.",
 		"squad_vol2": true,
+		# Camion GMC per l'estrazione rapida (scelta di design).
+		"vehicles": [
+			{"type": "GMC 2.5t", "side": "friendly", "team": "Baker",
+				"pos": "2,10", "facing": 4},
+		],
 		"cup_spec": {
 			"Teal": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 5},
 			"Blue": {"NCO": 1, "Rifleman": 3, "Recruit": 3},
@@ -1014,6 +1029,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "Un soldato ferito è rimasto indietro tra le siepi.\nRecuperate Mitchell e riportarlo alle linee.",
 		"squad_vol2": true,
+		# Jeep per il recupero del ferito (scelta di design).
+		"vehicles": [
+			{"type": "Jeep", "side": "friendly", "team": "Baker",
+				"pos": "2,11", "facing": 4},
+		],
 		"cup_spec": {
 			"Blue": {"NCO": 1, "Rifleman": 4, "Recruit": 5},
 			"Red": {"NCO": 1, "Rifleman": 4, "Recruit": 4},

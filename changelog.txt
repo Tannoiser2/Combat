@@ -1,3 +1,14 @@
+v0.58 — 2026-06-15
+- Due camion da trasporto soft-skin (Rule 31): "GMC 2.5t" (USA) e
+  "Opel Blitz" (tedesco), senza corazza né arma montata, con i loro display
+  mat (display-GMC/display-Opel) e le pedine equipaggio (Driver/Co-Driver).
+- Più veicoli negli scenari Vol.2 (scelta di design: i .vsav VASSAL sono
+  template di setup senza OOB veicoli, e nei materiali non esiste il testo
+  degli scenari Vol.2). Ora hanno veicoli: s12 Overrun (Opel Blitz SS),
+  s15 They're Falling Back (Jeep), s16 Get Them Out of There (GMC),
+  s19 No Man Left Behind (Jeep), oltre a s20/s21/s22. Tutti e 6 i tipi di
+  veicolo sono ora usati in partita. Posizioni validate su terreno passabile.
+
 v0.57 — 2026-06-15
 - Vehicle Display con il MAT reale del veicolo: la finestra fluttuante usa ora
   il display mat ufficiale del progetto (M4A3, PzIVH, Jeep, M3A1 in
