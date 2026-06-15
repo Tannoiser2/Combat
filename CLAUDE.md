@@ -257,6 +257,16 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    consuma la carica del cannone. UI: toggle Gunner a 3 stati (non spara/
    cannone/coassiale). Sherman/PzIVH coax = M1919/MG34. FASE 3 COMPLETA (armi
    multiple: cannone + bow MG + coassiale).
+   FATTO (v0.55, Fase 4 primo tassello): boccaporto ed equipaggio esposto
+   (Rule 31.7/31.10). Gli AFV partono col boccaporto chiuso (Character.
+   is_buttoned_up; make_vehicle lo imposta per i TURRETED). Chiuso: -2 allo
+   spotting del mezzo (Spotting.attempt) e crew al sicuro dal fuoco leggero;
+   aperto / mezzi scoperti: VehicleCombat.crew_exposed true -> le armi leggere
+   possono colpire l'equipaggio (Fire.can_fire lo ammette, Fire.
+   _fire_at_exposed_crew fa il WS check e ferisce un crew via _crew_casualty).
+   UI: toggle "Boccaporto" nel pannello ordini + stato nel Vehicle Display.
+   DA FARE Fase 4: archi di LOS per ruolo/boccaporto e Target Marker/Observed
+   Target.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

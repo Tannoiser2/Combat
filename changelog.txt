@@ -1,3 +1,13 @@
+v0.55 — 2026-06-15
+- Equipaggio veicoli (Rule 31.7/31.10), boccaporto ed equipaggio esposto -
+  primo tassello della Fase 4: gli AFV hanno un boccaporto aperto/chiuso (i
+  carri partono chiusi). Chiuso: l'equipaggio e' al sicuro dal fuoco leggero ma
+  il mezzo avvista a -2. Aperto (e i mezzi scoperti come Jeep/Halftrack sempre):
+  l'equipaggio e' esposto e le armi leggere possono colpirlo (ferite ai crew,
+  non allo scafo). UI: toggle "Boccaporto" nel pannello ordini e stato nel
+  Vehicle Display. Da fare nella Fase 4: archi di LOS per ruolo e i Target
+  Marker / Observed Target.
+
 v0.54 — 2026-06-15
 - Equipaggio veicoli (Rule 31.9.4c), MG coassiale: il Gunner puo' sparare la
   mitragliatrice coassiale (antiuomo, con la TQ piena) invece del cannone,

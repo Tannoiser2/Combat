@@ -1080,6 +1080,19 @@ func _open_order_panel(c: Character) -> void:
 					codriver.set_order(Domain.Order.AIMED_FIRE)
 				_open_order_panel(c))
 			order_list.add_child(bow_btn)
+		# Rule 31.7/31.10: boccaporto aperto/chiuso (solo AFV con torretta).
+		if VehicleCombat.has_turret(c):
+			var hatch_btn := Button.new()
+			hatch_btn.text = "Boccaporto: %s" % ("CHIUSO" if c.is_buttoned_up else "APERTO")
+			hatch_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			hatch_btn.custom_minimum_size = Vector2(190, 0)
+			hatch_btn.modulate = Color(0.7, 0.85, 0.98) if c.is_buttoned_up else Color(0.95, 0.8, 0.5)
+			hatch_btn.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Boccaporto[/color][/b]\n\n[b]Chiuso[/b]: equipaggio al sicuro dal fuoco leggero, ma avvista a -2 (visibilita' ridotta).\n[b]Aperto[/b]: avvista normalmente, ma l'equipaggio e' esposto al fuoco leggero.")
+			hatch_btn.pressed.connect(func() -> void:
+				c.is_buttoned_up = not c.is_buttoned_up
+				_open_order_panel(c))
+			order_list.add_child(hatch_btn)
 	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
 	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
 	# facile da colpire.
@@ -2057,6 +2070,15 @@ func _show_vehicle_display(vehicle: Character) -> void:
 		gun.add_theme_color_override("font_color",
 			Color(0.55, 0.8, 0.55) if vehicle.main_gun_loaded else Color(0.9, 0.75, 0.3))
 		box.add_child(gun)
+	# Rule 31.7/31.10: boccaporto (AFV) o mezzo scoperto.
+	var hatch := Label.new()
+	if VehicleCombat.has_turret(vehicle):
+		hatch.text = "Boccaporto: %s" % ("chiuso" if vehicle.is_buttoned_up else "aperto (equipaggio esposto)")
+	else:
+		hatch.text = "Mezzo scoperto (equipaggio esposto)"
+	hatch.add_theme_color_override("font_color",
+		Color(0.6, 0.75, 0.95) if (VehicleCombat.has_turret(vehicle) and vehicle.is_buttoned_up) else Color(0.9, 0.75, 0.4))
+	box.add_child(hatch)
 	box.add_child(HSeparator.new())
 	var crew_head := _section_label("EQUIPAGGIO")
 	box.add_child(crew_head)
@@ -3786,6 +3808,63 @@ func _test_vehicles() -> int:
 		fails += 1
 	if not shX.main_gun_loaded:
 		print("TEST coassiale: sparando la coassiale il cannone non si deve scaricare")
+		fails += 1
+
+	# Rule 31.7/31.10: boccaporto ed equipaggio esposto.
+	var hx := GameState.new()
+	hx.rng.seed = 0
+	Boards.fill(hx, "farmhouse")
+	var shH := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	if not shH.is_buttoned_up:
+		print("TEST boccaporto: l'AFV deve partire chiuso")
+		fails += 1
+	if VehicleCombat.crew_exposed(shH):
+		print("TEST boccaporto: un AFV chiuso non e' esposto")
+		fails += 1
+	shH.is_buttoned_up = false
+	if not VehicleCombat.crew_exposed(shH):
+		print("TEST boccaporto: un AFV aperto e' esposto")
+		fails += 1
+	var jeepH := VehicleCombat.make_vehicle("Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(9, 5))
+	if not VehicleCombat.crew_exposed(jeepH):
+		print("TEST boccaporto: la Jeep (scoperta) e' sempre esposta")
+		fails += 1
+	# Armi leggere: non colpiscono un AFV chiuso, colpiscono uno aperto.
+	var rfH := Character.new("rfH", "Rifle", Domain.Side.ENEMY, "Red")
+	rfH.troop_quality = 6
+	rfH.weapon_skills = {"KAR 98K": 6}
+	rfH.position = Vector2i(8, 6)
+	var shClosed := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	shClosed.spotted = true
+	hx.characters = [shClosed, rfH]
+	if Fire.can_fire(hx, rfH, shClosed, "KAR 98K"):
+		print("TEST boccaporto: armi leggere non devono colpire un AFV chiuso")
+		fails += 1
+	shClosed.is_buttoned_up = false
+	if not Fire.can_fire(hx, rfH, shClosed, "KAR 98K"):
+		print("TEST boccaporto: armi leggere colpiscono un AFV aperto (equipaggio esposto)")
+		fails += 1
+	hx.rng.seed = 0   # nat0 colpisce
+	Fire.fire_action(hx, rfH, shClosed, "KAR 98K")
+	if hx.shots.is_empty():
+		print("TEST boccaporto: il fuoco all'equipaggio esposto deve registrare uno sparo")
+		fails += 1
+	# Spotting: il boccaporto chiuso da' -2 alla soglia.
+	var sps := GameState.new()
+	sps.rng.seed = 5
+	Boards.fill(sps, "farmhouse")
+	var spv := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var tgS := Character.new("tgS", "T", Domain.Side.ENEMY, "Red")
+	tgS.troop_quality = 6
+	tgS.position = Vector2i(8, 6)   # adiacente -> LOS garantita
+	sps.characters = [spv, tgS]
+	spv.is_buttoned_up = true
+	var th_closed: int = Spotting.attempt(sps, spv, tgS)["threshold"]
+	spv.is_buttoned_up = false
+	tgS.known = false
+	var th_open: int = Spotting.attempt(sps, spv, tgS)["threshold"]
+	if th_open - th_closed != 2:
+		print("TEST boccaporto: chiuso deve dare -2 allo spotting (%d vs %d)" % [th_closed, th_open])
 		fails += 1
 	return fails
 
