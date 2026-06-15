@@ -844,6 +844,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [31, 35], "rows": [0, 19]},
 		"desc": "I tedeschi si sono ritirati nel bosco pensando di essere al\nsicuro. Dimostriamo loro che si sbagliano.",
 		"squad_vol2": true,
+		# Sherman di supporto per la "vendetta" (scelta di design).
+		"vehicles": [
+			{"type": "M4A3 Sherman", "side": "friendly", "team": "Able",
+				"pos": "32,8", "facing": 4},
+		],
 		"cup_spec": {
 			"Teal": {"SS Officer": 1, "SS NCO": 2, "SS Schutze": 6},
 			"Blue": {"NCO": 1, "Rifleman": 4, "Recruit": 3},
@@ -863,10 +868,13 @@ const SCENARIOS := {
 		"deploy": {"cols": [20, 28], "rows": [0, 19]},
 		"desc": "Ci hanno circondato nel bosco. Reggete finché la\nriserva non arriva: ogni uomo è vitale.",
 		"squad_vol2": true,
-		# Camion SS che porta l'assalto (scelta di design: nessun OOB ufficiale).
+		# Assalto corazzato SS: Opel Blitz (fanteria) + PzIVH di punta (scelta
+		# di design: nessun OOB ufficiale). Il Bazooka Man amico fa l'anticarro.
 		"vehicles": [
 			{"type": "Opel Blitz", "side": "enemy", "team": "Purple",
 				"pos": "1,9", "facing": 1},
+			{"type": "PzIVH", "side": "enemy", "team": "Teal",
+				"pos": "1,12", "facing": 1},
 		],
 		"enemy_morale": 1,
 		"cup_spec": {
@@ -912,6 +920,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [12, 20], "rows": [0, 19]},
 		"desc": "Il posto di comando è nel casolare. I tedeschi vengono\ndalle colline. Tenete la posizione a ogni costo.",
 		"squad_vol2": true,
+		# Jeep di collegamento al CP (scelta di design).
+		"vehicles": [
+			{"type": "Jeep", "side": "friendly", "team": "Baker",
+				"pos": "13,9", "facing": 2},
+		],
 		"enemy_morale": 1,
 		"cup_spec": {
 			"Purple": {"SS Officer": 1, "SS NCO": 3, "SS Schutze": 7},
@@ -984,6 +997,11 @@ const SCENARIOS := {
 		"deploy": {"cols": [31, 35], "rows": [0, 19]},
 		"desc": "Il paese va ripreso casa per casa. Ogni edificio\nnasconde un pericolo: procedate con cautela.",
 		"squad_vol2": true,
+		# Halftrack con la .50cal per ripulire gli edifici (scelta di design).
+		"vehicles": [
+			{"type": "M3A1 Halftrack", "side": "friendly", "team": "Baker",
+				"pos": "32,10", "facing": 4},
+		],
 		"cup_spec": {
 			"Purple": {"SS Officer": 1, "SS NCO": 3, "SS Veteran": 2, "SS Schutze": 6},
 			"White": {"NCO": 2, "Rifleman": 5, "Recruit": 3},

@@ -191,9 +191,10 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    soft-skin (armor 0, nessun'arma montata, FAST, crew Driver/Co-Driver; i 12
    posti passeggero del display NON sono modellati). make_vehicle salta l'arma
    se vd["weapon"]=="". PIU' VEICOLI NEGLI SCENARI (v0.58, scelta di design -
-   vedi sotto la nota Vassal): s12 Overrun (Opel Blitz SS), s15 (Jeep),
-   s16 (GMC), s19 (Jeep), oltre a s20/s21/s22. Posizioni validate su terreno
-   non-VEHICLE_BLOCKED. NOTA VASSAL (Vol.2): i .vsav degli scenari 11-22 sono
+   vedi sotto la nota Vassal): s11 (Sherman amico), s12 Overrun (Opel Blitz SS
+   + PzIVH di punta), s14 (Jeep al CP), s15 (Jeep), s16 (GMC), s17 (Halftrack),
+   s19 (Jeep), oltre a s20/s21/s22 -> 9 dei 12 scenari Vol.2 hanno veicoli.
+   Posizioni validate su terreno non-VEHICLE_BLOCKED (sonda headless usa-e-getta). NOTA VASSAL (Vol.2): i .vsav degli scenari 11-22 sono
    ZIP+offuscati (!VCSK); la loro Main Map contiene SOLO Setup Marker (zone di
    schieramento) e marker di gioco, NESSUNA unita'/veicolo pre-piazzati (stanno
    nei Character Display, che sono globali del modulo). I PDF disponibili non
