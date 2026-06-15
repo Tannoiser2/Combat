@@ -36,14 +36,19 @@ propri**, simultanei nello stesso impulso. Aree di lavoro:
 Ogni crew member riceve un **proprio ordine** ogni impulso (31.9): es. su uno
 Sherman, nello stesso impulso, Gunner spara il cannone, Co-Driver spara la bow
 MG, Commander fa Spot, Loader ricarica.
-FATTO (primo slice, engine): i crew sono attori con `order` proprio; il veicolo
-risolve l'azione per-membro (`TurnSequence._resolve_vehicle_action`): lo scafo
-si muove con l'ordine del Driver (= ordine del veicolo) e il **Gunner** spara il
-cannone indipendentemente -> **move-and-shoot**. L'AI assegna gli ordini
-separati (`_assign_vehicle_order` + `_crew_member`).
-DA FARE: UI per i veicoli amici (il giocatore comanda ogni crew member); orari
-spot/load come ordini espliciti; Co-Driver/Commander con azioni proprie
-(armi multiple, vedi B).
+FATTO (slice 1, engine, v0.51): i crew sono attori con `order` proprio; il
+veicolo risolve l'azione per-membro (`TurnSequence._resolve_vehicle_action`): lo
+scafo si muove con l'ordine del Driver (= ordine del veicolo) e il **Gunner**
+spara il cannone indipendentemente -> **move-and-shoot**. L'AI assegna gli
+ordini separati (`_assign_vehicle_order` + `_crew_member`).
+FATTO (slice 2, UI, v0.52): nel pannello ordini di un veicolo amico con
+equipaggio c'e' il toggle "Gunner: cannone SPARA/non spara"; il giocatore
+comanda separatamente movimento (Driver) e fuoco del cannone (Gunner). Il
+Gunner spara anche se lo scafo non ha ordine. Ordini per-membro azzerati a fine
+turno (`end_phase`).
+DA FARE: Loader/Commander/Co-Driver con ordini espliciti (Load/Spot) e azioni
+proprie (armi multiple bow/coax MG, vedi B); pannello con il roster completo
+dei membri (oggi solo il Gunner ha un comando dedicato).
 
 ### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple
 - **Cannone principale** (Gunner): HE o AP — gia' presente, ma da legare al load

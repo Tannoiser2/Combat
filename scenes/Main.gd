@@ -1026,6 +1026,31 @@ func _open_order_panel(c: Character) -> void:
 		b.pressed.connect(_on_order_selected.bind(o))
 		b.mouse_entered.connect(_describe_order.bind(o))
 		order_list.add_child(b)
+	# Veicoli con equipaggio (Rule 31.9): comando per-membro. L'ordine sopra
+	# muove lo scafo (Driver); il Gunner puo' sparare il cannone in aggiunta,
+	# anche durante il movimento (move-and-shoot).
+	if c.is_vehicle:
+		var gunner: Character = TurnSequence._crew_member(c, "Gunner")
+		if gunner != null:
+			var crew_lbl := Label.new()
+			crew_lbl.text = "— Equipaggio —"
+			crew_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
+			order_list.add_child(crew_lbl)
+			var firing: bool = gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE
+			var gun_btn := Button.new()
+			gun_btn.text = "Gunner: cannone %s" % ("SPARA" if firing else "non spara")
+			gun_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			gun_btn.custom_minimum_size = Vector2(190, 0)
+			gun_btn.modulate = Color(0.6, 0.95, 0.6) if firing else Color(0.85, 0.85, 0.7)
+			gun_btn.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Gunner[/color][/b]\n\nIl cannoniere spara il cannone principale al bersaglio in linea di vista e gittata, anche mentre lo scafo si muove (move-and-shoot), col malus dell'ordine di movimento. Il cannone va ricaricato dopo ogni colpo.")
+			gun_btn.pressed.connect(func() -> void:
+				if gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE:
+					gunner.clear_order()
+				else:
+					gunner.set_order(Domain.Order.AIMED_FIRE)
+				_open_order_panel(c))
+			order_list.add_child(gun_btn)
 	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
 	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
 	# facile da colpire.
@@ -3647,6 +3672,29 @@ func _test_vehicles() -> int:
 	var gunC := TurnSequence._crew_member(pzC, "Gunner")
 	if gunC == null or not gunC.has_order or gunC.order != Domain.Order.AIMED_FIRE:
 		print("TEST equipaggio: il Gunner deve ricevere Aimed Fire col bersaglio in LOS")
+		fails += 1
+
+	# Rule 31.9: il Gunner spara anche se lo scafo non ha ordine (Driver fermo).
+	# Veicolo senza ordine + Gunner AIMED_FIRE -> resolve_action lo processa e
+	# il cannone spara (si svuota).
+	var gs := GameState.new()
+	gs.rng.seed = 0
+	Boards.fill(gs, "farmhouse")
+	var pzG := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(8, 5), 3)
+	var shG := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 6), 4)
+	shG.spotted = true
+	gs.characters = [pzG, shG]
+	pzG.facing = Move.dir_toward(pzG.position, shG.position)
+	pzG.turret_facing = Move.dir_toward(pzG.position, shG.position)
+	pzG.clear_order()   # lo scafo non ha ordine (Driver fermo)
+	TurnSequence._crew_member(pzG, "Gunner").set_order(Domain.Order.AIMED_FIRE)
+	gs.impulse = 2
+	gs.rng.seed = 0
+	TurnSequence.resolve_action(gs, pzG)
+	if pzG.main_gun_loaded:
+		print("TEST equipaggio: il Gunner deve sparare col veicolo senza ordine")
 		fails += 1
 	return fails
 

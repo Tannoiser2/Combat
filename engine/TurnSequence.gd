@@ -287,24 +287,24 @@ static func _crew_member(v: Character, role: String) -> Character:
 # spara il cannone se ha un ordine di fuoco attivo a questo impulse. Cosi' il
 # carro puo' muovere E sparare nello stesso impulse (move-and-shoot).
 static func _resolve_vehicle_action(state: GameState, v: Character) -> void:
-	var moved := false
+	# Movimento dello scafo (ordine del Driver = ordine del veicolo).
 	match Orders.impulse_action(v.order, state.impulse):
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
 			_do_move(state, v, 1)
-			moved = true
 		Domain.ImpulseAction.MUST_MOVE_2:
 			_do_move(state, v, 2)
-			moved = true
 		Domain.ImpulseAction.MAY_FIRE:
-			# Fuoco da fermo (il veicolo non muove questo impulse).
+			# Il veicolo ha un ordine di fuoco proprio (Driver fermo): spara
+			# e basta (il Gunner non raddoppia il colpo).
 			_try_fire(state, v)
 			return
-	if moved:
-		var gunner := _crew_member(v, "Gunner")
-		if gunner != null and gunner.has_order \
-				and Orders.impulse_action(gunner.order, state.impulse) \
-					== Domain.ImpulseAction.MAY_FIRE:
-			_try_fire(state, v)
+	# Il Gunner spara il cannone se ha un ordine di fuoco attivo a questo
+	# impulse, anche durante o dopo il movimento dello scafo (move-and-shoot).
+	var gunner := _crew_member(v, "Gunner")
+	if gunner != null and gunner.has_order \
+			and Orders.impulse_action(gunner.order, state.impulse) \
+				== Domain.ImpulseAction.MAY_FIRE:
+		_try_fire(state, v)
 
 
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
@@ -480,7 +480,7 @@ static func activate_passive(state: GameState, c: Character) -> void:
 # modalita' demo). Per i Friendly interattivi la UI chiama invece
 # Fire.fire_action / Move.step_to col bersaglio/percorso scelti.
 static func resolve_action(state: GameState, c: Character) -> void:
-	if c.is_dead() or not c.has_order:
+	if c.is_dead():
 		return
 	# "Slow To Start": niente azione Friendly all'impulse 1.
 	if state.impulse == 1 and c.side == Domain.Side.FRIENDLY \
@@ -488,8 +488,13 @@ static func resolve_action(state: GameState, c: Character) -> void:
 		return
 	# Rule 31.9: i veicoli risolvono l'azione per-membro (Driver muove lo scafo,
 	# Gunner spara il cannone): possono muovere E sparare nello stesso impulse.
+	# Si processa il veicolo se lo scafo O un membro (Gunner) ha un ordine.
 	if c.is_vehicle:
-		_resolve_vehicle_action(state, c)
+		var gunner := _crew_member(c, "Gunner")
+		if c.has_order or (gunner != null and gunner.has_order):
+			_resolve_vehicle_action(state, c)
+		return
+	if not c.has_order:
 		return
 	match Orders.impulse_action(c.order, state.impulse):
 		Domain.ImpulseAction.MAY_FIRE:
@@ -957,9 +962,13 @@ static func end_phase(state: GameState) -> void:
 	# Obiettivi di ricognizione raggiunti in questo turno.
 	if not state.scenario_id.is_empty():
 		Scenario.scan_objectives(state)
-	# SOP step 5d: rimuovere tutti gli ordini.
+	# SOP step 5d: rimuovere tutti gli ordini (anche quelli per-membro dei
+	# veicoli: i crew sono fuori da state.characters).
 	for c in state.characters:
 		c.clear_order()
+		if c.is_vehicle:
+			for cm in c.crew:
+				cm.clear_order()
 	state.enemy_cards_in_play.clear()
 	state.turn_fx.clear()  # i modificatori della carta valgono un turno
 	# La Friendly Card giocata va negli scarti.

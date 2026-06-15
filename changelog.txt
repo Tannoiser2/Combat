@@ -1,3 +1,12 @@
+v0.52 — 2026-06-15
+- Equipaggio veicoli (Rule 31.9), UI per-crew: nel pannello ordini di un
+  veicolo amico con equipaggio compare la sezione "Equipaggio" con un toggle
+  "Gunner: cannone SPARA/non spara". Cosi' il giocatore comanda separatamente
+  il movimento dello scafo (Driver = ordine del veicolo) e il fuoco del
+  cannone (Gunner), anche insieme (move-and-shoot). Il Gunner spara pure se lo
+  scafo non ha ordine (Driver fermo). Gli ordini per-membro si azzerano a fine
+  turno come gli altri.
+
 v0.51 — 2026-06-15
 - Equipaggio veicoli (Rule 31.9), ordini per-membro - primo slice: il veicolo
   risolve l'azione per membro. Lo scafo si muove con l'ordine del Driver e,
