@@ -1,3 +1,13 @@
+v0.57 — 2026-06-15
+- Vehicle Display con il MAT reale del veicolo: la finestra fluttuante usa ora
+  il display mat ufficiale del progetto (M4A3, PzIVH, Jeep, M3A1 in
+  assets/displays/) come sfondo, con tutte le caratteristiche di arma/armatura.
+  Le pedine dell'equipaggio (assets/counters/, ruolo stampato sul segnalino)
+  sono piazzate nelle caselle dei rispettivi ruoli, con bordo colorato per
+  stato e badge dell'azione; sui veicoli amici Gunner/Co-Driver restano
+  cliccabili per il fuoco. Pedine assegnate per ruolo in VehicleCombat
+  (CREW_COUNTERS), coordinate delle caselle in Main (DISPLAY_BOXES).
+
 v0.56 — 2026-06-15
 - Vehicle Display "mappetta del carro": la finestra fluttuante del veicolo
   mostra ora uno schema dall'alto (scafo, torretta per gli AFV) con le caselle

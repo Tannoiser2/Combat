@@ -270,10 +270,19 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    bersaglio e il Commander ha LOS 360, quindi il gating "Observed Target" non
    vincola quasi mai il fuoco; resta solo un effetto fine sullo spotting).
    FATTO (v0.56, UI): Vehicle Display "mappetta del carro" - schema dall'alto
-   (Main._build_vehicle_schematic/_crew_slot) con scafo, torretta e le caselle
-   dell'equipaggio nelle loro posizioni; bordo colorato per stato + azione; le
-   caselle Gunner (cannone/coassiale)/Co-Driver (bow MG) sono cliccabili sui
-   veicoli amici (_cycle_crew_action) per comandare il fuoco dallo schema.
+   con scafo, torretta e le caselle dell'equipaggio nelle loro posizioni.
+   FATTO (v0.57, UI): il Vehicle Display usa ora il MAT REALE del veicolo come
+   sfondo (assets/displays/display-{M4A3,PzIVH,Jeep,M3A1}.png, copiati dai
+   materiali del progetto; artwork originale stile TM, come i segnalini) con
+   tutte le statistiche arma/armatura stampate. Le PEDINE equipaggio
+   (assets/counters/<id>-f.png, ruolo STAMPATO sul segnalino) sono piazzate
+   nelle caselle del rispettivo ruolo: mappa pedina->ruolo in
+   VehicleCombat.CREW_COUNTERS (assegnata in populate_crew a cm.counter, indice
+   da vehicle.id.hash per varieta'), coordinate frazionarie delle caselle in
+   Main.DISPLAY_BOXES (M4A3/PzIVH stesso layout; Jeep e M3A1 diversi). Resa in
+   Main._build_vehicle_schematic/_add_crew_token: bordo colorato per stato,
+   badge dell'azione, bottone cliccabile per Gunner/Co-Driver sui mezzi amici
+   (_cycle_crew_action). Ripiego testuale (_crew_text_list) se manca il mat.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

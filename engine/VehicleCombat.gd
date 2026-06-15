@@ -121,6 +121,28 @@ const VEHICLE_CREW := {
 	"PzIVH":           ["Commander", "Driver", "Gunner", "Loader", "Co-Driver"],
 }
 
+# Pedine equipaggio per lato e ruolo (file in assets/counters/<id>-f.png). Il
+# ruolo e' STAMPATO sulla pedina, quindi ogni lista contiene solo pedine di
+# quel ruolo (verificate sui segnalini). Piu' voci danno varieta' fra veicoli
+# diversi nello stesso scenario; l'indice deriva dall'id del mezzo
+# (vedi populate_crew).
+const CREW_COUNTERS := {
+	"FRIENDLY": {
+		"Commander": ["US-Crew-Lt-White", "US-Crew-Sgt-Truscott", "US-Crew-Cpt-Murphy"],
+		"Gunner":    ["US-Crew-Cpl-Pierce", "US-Crew-Cpl-Blackl", "US-Crew-Cpl-George"],
+		"Driver":    ["US-Crew-Cpl-Smith", "US-Crew-Cpl-Butler", "US-Crew-Cpl-Hamilton"],
+		"Loader":    ["US-Crew-Pvt-Barrettt", "US-Crew-Pvt-Gregory", "US-Crew-Pvt-Lucas"],
+		"Co-Driver": ["US-Crew-Pvt-Cross", "US-Crew-Pvt-Garner", "US-Crew-Pvt-Newman"],
+	},
+	"ENEMY": {
+		"Commander": ["GE-Crew-UO-Graf", "GE-Crew-UO-Otto", "GE-Crew-UO-Riedel"],
+		"Gunner":    ["GE-Crew-UBSH-Kern", "GE-Crew-UBSH-Voss", "GE-Crew-UBSH-Nagel"],
+		"Driver":    ["GE-Crew-UBG-Barth", "GE-Crew-UBG-Grimm", "GE-Crew-UBG-Kessler"],
+		"Loader":    ["GE-Crew-UBSH-Bender", "GE-Crew-UBSH-Breuer", "GE-Crew-UBSH-Froehlich"],
+		"Co-Driver": ["GE-Crew-OBSH-Bayer", "GE-Crew-OBSH-Herzog", "GE-Crew-OBSH-Rose"],
+	},
+}
+
 
 # Crea un Character che rappresenta un veicolo dalla chiave VEHICLE_DATA.
 # La weapon opzionale sovrascrive quella di default (es. Jeep con M2 .50cal).
@@ -163,6 +185,9 @@ static func populate_crew(vehicle: Character) -> void:
 	var tq := int(vd.get("tq", 6))
 	var pistol := "M1911" if vehicle.side == D.Side.FRIENDLY else "P38"
 	vehicle.crew = []
+	var side_key := "FRIENDLY" if vehicle.side == D.Side.FRIENDLY else "ENEMY"
+	var pools: Dictionary = CREW_COUNTERS.get(side_key, {})
+	var off := absi(vehicle.id.hash())
 	for role in roles:
 		var uid := "%s_%s" % [vehicle.id, String(role).to_lower().replace("-", "")]
 		var cm := Character.new(uid, "%s del %s" % [role, vehicle.vehicle_type],
@@ -170,6 +195,10 @@ static func populate_crew(vehicle: Character) -> void:
 		cm.troop_quality = tq
 		cm.morale = vehicle.morale
 		cm.crew_role = role
+		# Pedina nominata per il ruolo (mostrata nel Vehicle Display).
+		var pool: Array = pools.get(role, [])
+		if not pool.is_empty():
+			cm.counter = String(pool[off % pool.size()])
 		cm.embarked = true
 		cm.position = vehicle.position
 		cm.weapon_skills[pistol] = maxi(2, tq - 3)

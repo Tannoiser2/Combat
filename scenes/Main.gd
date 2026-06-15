@@ -2043,7 +2043,7 @@ func _show_vehicle_display(vehicle: Character) -> void:
 		child.queue_free()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
-	box.custom_minimum_size = Vector2(250, 0)
+	box.custom_minimum_size = Vector2(400, 0)
 	vehicle_popup.add_child(box)
 	var title := Label.new()
 	title.text = vehicle.vehicle_type
@@ -2103,109 +2103,186 @@ func _show_vehicle_display(vehicle: Character) -> void:
 	vehicle_popup.show()
 
 
-# Posizione delle caselle equipaggio nello schema dall'alto (fronte = su).
-const CREW_SLOT_POS := {
-	"Driver":     Vector2(14, 26),
-	"Co-Driver":  Vector2(132, 26),
-	"Commander":  Vector2(73, 112),
-	"Gunner":     Vector2(73, 156),
-	"Loader":     Vector2(73, 200),
+# Display mat del veicolo (assets/displays/<stem>.png) per tipo.
+const VEHICLE_DISPLAYS := {
+	"M4A3 Sherman":   "display-M4A3",
+	"PzIVH":          "display-PzIVH",
+	"Jeep":           "display-Jeep",
+	"M3A1 Halftrack": "display-M3A1",
 }
 
+# Centro della casella di ogni ruolo sul mat, in frazione di larghezza/altezza.
+const DISPLAY_BOXES := {
+	"M4A3 Sherman": {
+		"Driver": Vector2(0.495, 0.165), "Loader": Vector2(0.495, 0.340),
+		"Co-Driver": Vector2(0.865, 0.180), "Gunner": Vector2(0.865, 0.325),
+		"Commander": Vector2(0.865, 0.440),
+	},
+	"PzIVH": {
+		"Driver": Vector2(0.495, 0.165), "Loader": Vector2(0.495, 0.340),
+		"Co-Driver": Vector2(0.865, 0.180), "Gunner": Vector2(0.865, 0.325),
+		"Commander": Vector2(0.865, 0.440),
+	},
+	"Jeep": {
+		"Driver": Vector2(0.490, 0.185), "Co-Driver": Vector2(0.865, 0.185),
+	},
+	"M3A1 Halftrack": {
+		"Driver": Vector2(0.450, 0.160), "Co-Driver": Vector2(0.655, 0.160),
+		"Gunner": Vector2(0.875, 0.160),
+	},
+}
 
-# Mappetta del carro: schema dall'alto con scafo, (torretta) e le caselle
-# dell'equipaggio piazzate. Su un veicolo amico le caselle di Gunner/Co-Driver
-# sono cliccabili per scegliere il fuoco (Rule 31.9).
+const VEHICLE_DISPLAY_W := 392.0
+
+
+# Vehicle Display: il mat reale del veicolo come sfondo, con le pedine
+# dell'equipaggio piazzate nelle caselle dei rispettivi ruoli (Rule 31). Su un
+# veicolo amico le pedine di Gunner/Co-Driver sono cliccabili per il fuoco.
 func _build_vehicle_schematic(vehicle: Character) -> Control:
+	var stem: String = VEHICLE_DISPLAYS.get(vehicle.vehicle_type, "")
+	var path := "res://assets/displays/%s.png" % stem
+	var tex: Texture2D = load(path) if (not stem.is_empty() and ResourceLoader.exists(path)) else null
+	if tex == null:
+		return _crew_text_list(vehicle)
+	var dw := VEHICLE_DISPLAY_W
+	var dh := dw * tex.get_height() / tex.get_width()
 	var schem := Control.new()
-	schem.custom_minimum_size = Vector2(248, 250)
-	# Scafo.
-	var hull := Panel.new()
-	hull.position = Vector2(10, 14)
-	hull.size = Vector2(228, 230)
-	var hs := StyleBoxFlat.new()
-	hs.bg_color = Color(0.17, 0.19, 0.15)
-	hs.set_border_width_all(3)
-	hs.border_color = Color(0.45, 0.48, 0.40)
-	hs.set_corner_radius_all(8)
-	hull.add_theme_stylebox_override("panel", hs)
-	schem.add_child(hull)
-	# Indicatore del fronte.
-	var front := Label.new()
-	front.text = "▲ FRONTE"
-	front.position = Vector2(86, -3)
-	front.add_theme_font_size_override("font_size", 11)
-	front.add_theme_color_override("font_color", Color(0.82, 0.82, 0.62))
-	schem.add_child(front)
-	# Torretta (solo AFV).
-	if VehicleCombat.has_turret(vehicle):
-		var turret := Panel.new()
-		turret.position = Vector2(60, 96)
-		turret.size = Vector2(128, 150)
-		var ts := StyleBoxFlat.new()
-		ts.bg_color = Color(0.24, 0.26, 0.21)
-		ts.set_border_width_all(2)
-		ts.border_color = Color(0.5, 0.52, 0.44)
-		ts.set_corner_radius_all(46)
-		turret.add_theme_stylebox_override("panel", ts)
-		schem.add_child(turret)
-	# Caselle equipaggio.
+	schem.custom_minimum_size = Vector2(dw, dh)
+	var mat := TextureRect.new()
+	mat.texture = tex
+	mat.position = Vector2.ZERO
+	mat.size = Vector2(dw, dh)
+	mat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mat.stretch_mode = TextureRect.STRETCH_SCALE
+	mat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	schem.add_child(mat)
+	var boxes: Dictionary = DISPLAY_BOXES.get(vehicle.vehicle_type, {})
+	var cs := dw * 0.12
 	for cm in vehicle.crew:
-		var slot := _crew_slot(vehicle, cm)
-		slot.position = CREW_SLOT_POS.get(cm.crew_role, Vector2(73, 156))
-		schem.add_child(slot)
+		if not boxes.has(cm.crew_role):
+			continue
+		var ctr: Vector2 = boxes[cm.crew_role]
+		var pos := Vector2(ctr.x * dw - cs / 2.0, ctr.y * dh - cs / 2.0)
+		_add_crew_token(schem, vehicle, cm, pos, cs)
 	return schem
 
 
-# Una casella d'equipaggio nello schema: ruolo, stato (colore del bordo) e
-# azione corrente; cliccabile se amica e con un'azione (Gunner/Co-Driver).
-func _crew_slot(vehicle: Character, cm: Character) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(102, 40)
-	b.size = Vector2(102, 40)
-	b.clip_text = true
-	b.add_theme_font_size_override("font_size", 11)
-	var status_col := Color(0.5, 0.8, 0.5)
-	var action := "a bordo"
+# Piazza la pedina di un membro sul mat (pos = angolo, cs = lato), con bordo per
+# stato, badge dell'azione e — se amica e con fuoco — un bottone cliccabile.
+func _add_crew_token(parent: Control, vehicle: Character, cm: Character, pos: Vector2, cs: float) -> void:
+	var cpath := "res://assets/counters/%s-f.png" % cm.counter
+	var ctex: Texture2D = load(cpath) if (not cm.counter.is_empty() and ResourceLoader.exists(cpath)) else null
+	var token: Control
+	if ctex != null:
+		var tr := TextureRect.new()
+		tr.texture = ctex
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		token = tr
+	else:
+		var lbl := Label.new()
+		lbl.text = cm.crew_role.left(3)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		token = lbl
+	token.position = pos
+	token.size = Vector2(cs, cs)
+	token.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if cm.is_dead():
+		token.modulate = Color(0.55, 0.22, 0.18)
+	elif not cm.embarked:
+		token.modulate = Color(0.78, 0.72, 0.45)
+	parent.add_child(token)
+	# Bordo colorato per stato.
+	var status_col := Color(0.4, 0.85, 0.4)
 	if cm.is_dead():
 		status_col = Color(0.85, 0.3, 0.25)
-		action = "KIA" if cm.is_killed() else "fuori"
 	elif not cm.embarked:
 		status_col = Color(0.9, 0.8, 0.4)
-		action = "sceso"
-	else:
-		if not cm.wounds.is_empty():
-			status_col = Color(0.95, 0.7, 0.35)
-		match cm.crew_role:
-			"Gunner":
-				if cm.has_order and cm.order == Domain.Order.AIMED_FIRE:
-					action = "coassiale" if cm.fires_coax else "cannone"
-				else:
-					action = "—"
-			"Co-Driver":
-				if not VehicleCombat.bow_mg_weapon(vehicle).is_empty():
-					action = "bow MG" if (cm.has_order and cm.order == Domain.Order.AIMED_FIRE) else "—"
-	var wound := ("  " + "♥".repeat(cm.wounds.size())) if (not cm.wounds.is_empty() and not cm.is_dead()) else ""
-	b.text = "%s\n%s%s" % [cm.crew_role, action, wound]
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.12, 0.13, 0.11)
-	sb.set_border_width_all(2)
-	sb.border_color = status_col
-	sb.set_corner_radius_all(4)
-	b.add_theme_stylebox_override("normal", sb)
-	b.add_theme_stylebox_override("hover", sb)
-	b.add_theme_stylebox_override("pressed", sb)
-	var interactive: bool = vehicle.side == Domain.Side.FRIENDLY and cm.embarked \
+	elif not cm.wounds.is_empty():
+		status_col = Color(0.95, 0.7, 0.35)
+	var frame := Panel.new()
+	frame.position = pos
+	frame.size = Vector2(cs, cs)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fsb := StyleBoxFlat.new()
+	fsb.bg_color = Color(0, 0, 0, 0)
+	fsb.set_border_width_all(3)
+	fsb.border_color = status_col
+	fsb.set_corner_radius_all(3)
+	frame.add_theme_stylebox_override("panel", fsb)
+	parent.add_child(frame)
+	# Badge dell'azione/stato sotto la pedina.
+	var act := _crew_action_text(vehicle, cm)
+	if not cm.wounds.is_empty() and not cm.is_dead():
+		act = "♥".repeat(cm.wounds.size()) + " " + act
+	if not act.is_empty():
+		var badge := Label.new()
+		badge.text = act
+		badge.position = Vector2(pos.x - 8, pos.y + cs - 1)
+		badge.size = Vector2(cs + 16, 15)
+		badge.add_theme_font_size_override("font_size", 10)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.add_theme_color_override("font_color", Color(1, 1, 1))
+		var bsb := StyleBoxFlat.new()
+		bsb.bg_color = Color(0.1, 0.1, 0.12, 0.85)
+		bsb.set_corner_radius_all(3)
+		badge.add_theme_stylebox_override("normal", bsb)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(badge)
+	# Pedina cliccabile: veicolo amico, Gunner/Co-Driver vivi e a bordo.
+	var interactive := vehicle.side == Domain.Side.FRIENDLY and cm.embarked \
 		and not cm.is_dead() and cm.crew_role in ["Gunner", "Co-Driver"]
 	if interactive:
-		b.pressed.connect(func() -> void:
+		var btn := Button.new()
+		btn.position = pos
+		btn.size = Vector2(cs, cs)
+		btn.tooltip_text = "Cambia fuoco: %s" % cm.crew_role
+		var tsb := StyleBoxFlat.new()
+		tsb.bg_color = Color(0.3, 0.6, 1.0, 0.12)
+		tsb.set_border_width_all(2)
+		tsb.border_color = Color(0.5, 0.75, 1.0, 0.85)
+		tsb.set_corner_radius_all(3)
+		btn.add_theme_stylebox_override("normal", tsb)
+		btn.add_theme_stylebox_override("hover", tsb)
+		btn.add_theme_stylebox_override("pressed", tsb)
+		btn.pressed.connect(func() -> void:
 			_cycle_crew_action(vehicle, cm)
 			_update_orders_button()
 			_show_vehicle_display(vehicle))
-	else:
-		b.focus_mode = Control.FOCUS_NONE
-		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return b
+		parent.add_child(btn)
+
+
+# Azione/stato corrente di un membro per il badge del Vehicle Display.
+func _crew_action_text(vehicle: Character, cm: Character) -> String:
+	if cm.is_dead():
+		return "KIA" if cm.is_killed() else "fuori"
+	if not cm.embarked:
+		return "sceso"
+	match cm.crew_role:
+		"Gunner":
+			if cm.has_order and cm.order == Domain.Order.AIMED_FIRE:
+				return "coassiale" if cm.fires_coax else "cannone"
+			return "—"
+		"Co-Driver":
+			if not VehicleCombat.bow_mg_weapon(vehicle).is_empty():
+				return "bow MG" if (cm.has_order and cm.order == Domain.Order.AIMED_FIRE) else "—"
+	return ""
+
+
+# Ripiego testuale se manca il mat del veicolo.
+func _crew_text_list(vehicle: Character) -> Control:
+	var vb := VBoxContainer.new()
+	for cm in vehicle.crew:
+		var row := Label.new()
+		var st := "a bordo"
+		if cm.is_dead():
+			st = "KIA" if cm.is_killed() else "fuori"
+		elif not cm.embarked:
+			st = "sceso"
+		row.text = "%s — %s%s" % [cm.crew_role, st, _crew_action_text(vehicle, cm)]
+		vb.add_child(row)
+	return vb
 
 
 # Cicla l'azione di fuoco di un membro (Rule 31.9). Gunner: niente -> cannone
