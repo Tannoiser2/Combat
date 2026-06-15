@@ -59,6 +59,10 @@ const TERRAIN_MOD := {
 	D.Terrain.RUBBLE: [-5, -4, -3, -1, -2, -2, -2],
 	D.Terrain.FOXHOLE: [-4, -3, -2, -1, -1, -1, -1],
 	# Volume 2, Rule 27 (Spotting Chart). Fortified = Building, Trench = Depression.
+	# NOTA: sullo Spotting Chart ufficiale la riga Fortified pare avere la colonna
+	# Evade a -2 (non -1 come Building) e la riga Trench valori piu' duri della
+	# Depression; il regolamento (27.2/27.4) rimanda pero' a Building/Depression,
+	# quindi qui si segue il testo delle regole. Da riverificare sul chart fisico.
 	D.Terrain.FOUNTAIN: [-2, -2, -1, 0, -1, -1, -1],
 	D.Terrain.FORTIFIED_BUILDING: [-5, -4, -3, -2, -1, -2, -2],
 	D.Terrain.TRENCH: [-4, -3, -2, -1, -1, -1, -1],
