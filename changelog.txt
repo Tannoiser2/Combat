@@ -1,3 +1,11 @@
+v0.54 — 2026-06-15
+- Equipaggio veicoli (Rule 31.9.4c), MG coassiale: il Gunner puo' sparare la
+  mitragliatrice coassiale (antiuomo, con la TQ piena) invece del cannone,
+  anche mentre lo scafo si muove. La coassiale e' solidale alla torretta (serve
+  il puntamento) e NON consuma la carica del cannone. UI: il toggle del Gunner
+  cicla ora "non spara / cannone / coassiale". Sherman M1919, PzIVH MG34.
+  Completa la Fase 3 (armi multiple: cannone + bow MG + coassiale).
+
 v0.53 — 2026-06-15
 - Equipaggio veicoli (Rule 31.9.4b), armi multiple - bow MG: il Co-Driver
   degli AFV serve la mitragliatrice di scafo come arma E azione SEPARATA. Cosi'

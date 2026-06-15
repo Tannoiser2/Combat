@@ -57,9 +57,12 @@ dei membri (oggi solo il Gunner ha un comando dedicato).
   con WS = TQ-3 (no assistente) e Low/No Ammo sul singolo 9. Engine
   (`_fire_crew_weapon`), AI e UI (toggle). DA FARE: arco frontale e malus
   dell'ordine di movimento del Driver sul fuoco della bow MG.
-- **MG coassiale** (Gunner): Fire MG con la **TQ** (non WS); se il Gunner spara
-  la coax, il Loader puo' Load o Spot. **Mancante** (il Gunner sceglie cannone
-  O coassiale: serve un "fire mode" del Gunner).
+- **MG coassiale** (Gunner): FATTO (v0.54). Il Gunner sceglie cannone O
+  coassiale (flag `Character.fires_coax`, helper `_gunner_fire`); la coax usa la
+  TQ piena, e' gate dalla torretta e non consuma la carica del cannone. UI:
+  toggle Gunner a 3 stati (non spara / cannone / coassiale). DA FARE: quando il
+  Gunner spara la coax il Loader puo' Load/Spot (oggi la ricarica e' automatica).
+- **Armi leggere** dei crew a boccaporto aperto: **Mancante** (vedi C/F).
 - **Armi leggere** (qualsiasi crew con boccaporto aperto + pistola): ordine di
   fuoco standard. **Mancante.**
 - **Halftrack**: il personaggio nella **cupola** spara in qualsiasi direzione; i

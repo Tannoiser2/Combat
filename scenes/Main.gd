@@ -1036,16 +1036,22 @@ func _open_order_panel(c: Character) -> void:
 			crew_lbl.text = "— Equipaggio —"
 			crew_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
 			order_list.add_child(crew_lbl)
-			var firing: bool = gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE
+			# Ciclo: non spara -> cannone -> coassiale (se l'AFV ce l'ha) -> ...
+			var has_coax: bool = not VehicleCombat.coax_mg_weapon(c).is_empty()
+			var gfiring: bool = gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE
+			var gstate: int = (2 if gunner.fires_coax else 1) if gfiring else 0
+			var glabels := ["non spara", "cannone", "coassiale"]
 			var gun_btn := Button.new()
-			gun_btn.text = "Gunner: cannone %s" % ("SPARA" if firing else "non spara")
+			gun_btn.text = "Gunner: %s" % glabels[gstate]
 			gun_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			gun_btn.custom_minimum_size = Vector2(190, 0)
-			gun_btn.modulate = Color(0.6, 0.95, 0.6) if firing else Color(0.85, 0.85, 0.7)
+			gun_btn.modulate = Color(0.6, 0.95, 0.6) if gstate > 0 else Color(0.85, 0.85, 0.7)
 			gun_btn.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Gunner[/color][/b]\n\nIl cannoniere spara il cannone principale al bersaglio in linea di vista e gittata, anche mentre lo scafo si muove (move-and-shoot), col malus dell'ordine di movimento. Il cannone va ricaricato dopo ogni colpo.")
+				order_desc.text = "[b][color=#f3e88a]Gunner[/color][/b]\n\nSpara il [b]cannone[/b] (al bersaglio in vista e gittata, ricarica dopo ogni colpo) oppure la [b]MG coassiale[/b] (antiuomo, non consuma il cannone), anche mentre lo scafo si muove (move-and-shoot). Tocca per cambiare: non spara / cannone / coassiale.")
 			gun_btn.pressed.connect(func() -> void:
-				if gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE:
+				var nxt: int = (gstate + 1) % (3 if has_coax else 2)
+				gunner.fires_coax = (nxt == 2)
+				if nxt == 0:
 					gunner.clear_order()
 				else:
 					gunner.set_order(Domain.Order.AIMED_FIRE)
@@ -3746,6 +3752,40 @@ func _test_vehicles() -> int:
 	TurnSequence.resolve_action(bs2, shB)
 	if bs2.shots.size() == shots_b:
 		print("TEST bow MG: il Co-Driver deve aver sparato la bow MG col solo suo ordine")
+		fails += 1
+
+	# Rule 31.9.4c: il Gunner puo' sparare la coassiale (WS = TQ piena) invece
+	# del cannone; sparando la coax il cannone NON si scarica.
+	var cx := GameState.new()
+	cx.rng.seed = 0
+	Boards.fill(cx, "farmhouse")
+	var shX := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var gX := TurnSequence._crew_member(shX, "Gunner")
+	if gX == null or gX.weapon_skills.get("M1919", 0) != 7:
+		print("TEST coassiale: il Gunner deve avere la coax a TQ piena (7)")
+		fails += 1
+	var enX := Character.new("enX", "Schutze", Domain.Side.ENEMY, "Red")
+	enX.troop_quality = 5
+	enX.weapon_skills = {"KAR 98K": 5}
+	enX.position = Vector2i(8, 6)   # adiacente
+	enX.known = true
+	cx.characters = [shX, enX]
+	shX.facing = Move.dir_toward(shX.position, enX.position)
+	shX.turret_facing = Move.dir_toward(shX.position, enX.position)
+	if gX != null:
+		gX.set_order(Domain.Order.AIMED_FIRE)
+		gX.fires_coax = true
+	shX.clear_order()
+	cx.impulse = 2
+	var shots_x: int = cx.shots.size()
+	cx.rng.seed = 0
+	TurnSequence.resolve_action(cx, shX)
+	if cx.shots.size() == shots_x:
+		print("TEST coassiale: il Gunner deve aver sparato la coassiale")
+		fails += 1
+	if not shX.main_gun_loaded:
+		print("TEST coassiale: sparando la coassiale il cannone non si deve scaricare")
 		fails += 1
 	return fails
 

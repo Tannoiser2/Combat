@@ -303,18 +303,18 @@ static func _resolve_vehicle_action(state: GameState, v: Character) -> void:
 		Domain.ImpulseAction.MUST_MOVE_2:
 			_do_move(state, v, 2)
 		Domain.ImpulseAction.MAY_FIRE:
-			# Ordine di fuoco proprio del veicolo (Driver fermo): spara il cannone.
-			_try_fire(state, v)
+			# Ordine di fuoco proprio del veicolo (Driver fermo): il Gunner spara.
+			_gunner_fire(state, v)
 			vehicle_fired = true
-	# Il Gunner spara il cannone se ha un ordine di fuoco attivo, anche durante
-	# o dopo il movimento dello scafo (move-and-shoot); niente doppio colpo se
-	# il veicolo ha gia' sparato col proprio ordine.
+	# Il Gunner spara se ha un ordine di fuoco attivo, anche durante o dopo il
+	# movimento dello scafo (move-and-shoot); niente doppio colpo se il veicolo
+	# ha gia' sparato col proprio ordine.
 	if not vehicle_fired:
 		var gunner := _crew_member(v, "Gunner")
 		if gunner != null and gunner.has_order \
 				and Orders.impulse_action(gunner.order, state.impulse) \
 					== Domain.ImpulseAction.MAY_FIRE:
-			_try_fire(state, v)
+			_gunner_fire(state, v)
 	# Rule 31.9.4b: il Co-Driver serve la bow MG, arma e azione SEPARATE: spara
 	# nello stesso impulse del cannone (col WS = TQ-3 gia' nei suoi weapon_skills).
 	var bow := VehicleCombat.bow_mg_weapon(v)
@@ -326,10 +326,24 @@ static func _resolve_vehicle_action(state: GameState, v: Character) -> void:
 			_fire_crew_weapon(state, v, codriver, bow)
 
 
+# Il Gunner spara: la MG coassiale (Rule 31.9.4c, se fires_coax e il veicolo
+# ce l'ha) oppure il cannone principale. La coassiale e' allineata dalla
+# torretta (gate turretta come il cannone) e usa la TQ piena del Gunner.
+static func _gunner_fire(state: GameState, v: Character) -> void:
+	var gunner := _crew_member(v, "Gunner")
+	var coax := VehicleCombat.coax_mg_weapon(v)
+	if gunner != null and gunner.fires_coax and not coax.is_empty():
+		_fire_crew_weapon(state, v, gunner, coax, true)
+	else:
+		_try_fire(state, v)  # cannone (gate torretta + carica in Fire.fire_action)
+
+
 # Un membro d'equipaggio spara un'arma specifica dall'hex del veicolo (Rule
 # 31.9): il firer e' il crew (col proprio WS), il colpo parte dallo scafo.
+# Se require_turret, l'arma e' solidale alla torretta (coassiale): la torretta
+# deve essere puntata sul bersaglio, altrimenti ruota e non spara.
 static func _fire_crew_weapon(state: GameState, vehicle: Character,
-		crew: Character, weapon: String) -> void:
+		crew: Character, weapon: String, require_turret := false) -> void:
 	crew.position = vehicle.position
 	var best: Character = null
 	var best_d := 9999
@@ -346,8 +360,13 @@ static func _fire_crew_weapon(state: GameState, vehicle: Character,
 		if d < best_d:
 			best_d = d
 			best = t
-	if best != null:
-		Fire.fire_action(state, crew, best, weapon)
+	if best == null:
+		return
+	# Coassiale: serve la torretta puntata (la rotazione consuma l'impulse).
+	if require_turret and VehicleCombat.has_turret(vehicle) \
+			and not VehicleCombat.turret_aim(state, vehicle, best.position):
+		return
+	Fire.fire_action(state, crew, best, weapon)
 
 
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
@@ -1021,6 +1040,7 @@ static func end_phase(state: GameState) -> void:
 		if c.is_vehicle:
 			for cm in c.crew:
 				cm.clear_order()
+				cm.fires_coax = false
 	state.enemy_cards_in_play.clear()
 	state.turn_fx.clear()  # i modificatori della carta valgono un turno
 	# La Friendly Card giocata va negli scarti.
