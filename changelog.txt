@@ -1,3 +1,10 @@
+v0.50 — 2026-06-15
+- Equipaggio veicoli (Rule 31.1.3), primo passo: stato di carica del cannone
+  principale. Il cannone va caricato per sparare; ogni colpo lo svuota e la
+  ricarica (il Loader) consuma un impulso. Cadenza fuoco/ricarica per gli AFV
+  (Sherman, PzIVH). Stato mostrato nel Vehicle Display ("Cannone: carico/da
+  ricaricare"). Primo tassello della roadmap docs/veicoli_roadmap.md.
+
 v0.49 — 2026-06-15
 - Verifica incrociata coi chart ufficiali (tabelle/): corretti 5 valori
   delle armi/veicoli del Vol.2 (le armi del Vol.1 erano gia' tutte esatte):

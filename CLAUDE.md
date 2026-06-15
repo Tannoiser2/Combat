@@ -228,6 +228,10 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    l'equipaggio fedele al regolamento (attori per-membro, armi multiple
    bow/coax/main, LOS per ruolo+boccaporto, Target Marker/Observed Target, load
    state del Loader, Vehicle Order Matrix per l'AI) e' in docs/veicoli_roadmap.md.
+   FATTO (v0.50, primo passo): stato di carica del cannone (Rule 31.1.3) in
+   Character.main_gun_loaded; gate in Fire.fire_action (spara->scarico->ricarica
+   un impulso->spara), visibile nel Vehicle Display. La ricarica e' ancora
+   automatica nell'attivazione del veicolo, non un ordine esplicito del Loader.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

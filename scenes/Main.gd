@@ -1996,6 +1996,13 @@ func _show_vehicle_display(vehicle: Character) -> void:
 	hull.text = "Scafo: %s" % hull_str
 	hull.add_theme_color_override("font_color", hull_col)
 	box.add_child(hull)
+	# Rule 31.1.3: stato di carica del cannone principale (AFV con torretta).
+	if VehicleCombat.has_turret(vehicle):
+		var gun := Label.new()
+		gun.text = "Cannone: %s" % ("carico" if vehicle.main_gun_loaded else "da ricaricare")
+		gun.add_theme_color_override("font_color",
+			Color(0.55, 0.8, 0.55) if vehicle.main_gun_loaded else Color(0.9, 0.75, 0.3))
+		box.add_child(gun)
 	box.add_child(HSeparator.new())
 	var crew_head := _section_label("EQUIPAGGIO")
 	box.add_child(crew_head)
@@ -3580,6 +3587,39 @@ func _test_vehicles() -> int:
 	Fire.fire_action(fa, shF, pzF, "75mm L40 AP")
 	if fa.shots.is_empty():
 		print("TEST veicoli: il cannone deve sparare con torretta allineata")
+		fails += 1
+
+	# Rule 31.1.3: stato di carica. Spara -> scarico -> ricarica (un impulso,
+	# niente fuoco) -> torna a sparare. Torretta pre-allineata.
+	var ls := GameState.new()
+	ls.rng.seed = 0
+	Boards.fill(ls, "farmhouse")
+	var shL := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(5, 5), 3)
+	var pzL := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(5, 7), 4)
+	pzL.known = true
+	ls.characters = [shL, pzL]
+	shL.turret_facing = Move.dir_toward(shL.position, pzL.position)  # allineata
+	if not shL.main_gun_loaded:
+		print("TEST cannone: deve partire carico")
+		fails += 1
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # spara, si svuota
+	if shL.main_gun_loaded or ls.shots.is_empty():
+		print("TEST cannone: il primo colpo deve sparare e svuotare il cannone")
+		fails += 1
+	pzL.hull_damage = 0   # ripristina il bersaglio per i tiri successivi
+	var n1: int = ls.shots.size()
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # ricarica, niente fuoco
+	if ls.shots.size() != n1 or not shL.main_gun_loaded:
+		print("TEST cannone: il cannone scarico deve ricaricarsi senza sparare")
+		fails += 1
+	ls.rng.seed = 0
+	Fire.fire_action(ls, shL, pzL, "75mm L40 AP")   # spara di nuovo
+	if ls.shots.size() == n1:
+		print("TEST cannone: il cannone ricaricato deve tornare a sparare")
 		fails += 1
 	return fails
 

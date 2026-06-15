@@ -85,6 +85,9 @@ var is_buttoned_up: bool = false
 var turret_facing: int = 0
 # fire_mode per cannoni principali: "HE" (antipersonnel) o "AP" (anticarro)
 var fire_mode: String = "HE"
+# Rule 31.1.3: stato di carica del cannone principale. Il Loader deve caricarlo;
+# ogni colpo lo svuota e la ricarica consuma un impulso. Parte carico.
+var main_gun_loaded: bool = true
 # Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello
 # intermedio sono feribili/uccidibili individualmente e possono abbandonare
 # il mezzo (bail out). Tenerli come Character (non semplici contatori) rende

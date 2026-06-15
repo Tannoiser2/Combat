@@ -68,10 +68,12 @@ mantenendo il legame `vehicle.crew`.
   — anche il Commander di un altro AFV via radio — ha gia' un marker li');
   Spot Order +1; boccaporto aperto +0.
 
-### D. Stato di carica del cannone — il Loader (31.1.3)
-Il cannone principale deve essere **caricato** dal Loader, che riceve ordini
-**Load** o **Spot**. Oggi il cannone spara sempre. Serve un flag "main gun
-loaded" e l'azione Load.
+### D. Stato di carica del cannone — il Loader (31.1.3) — PARZIALE (v0.50)
+FATTO: flag `Character.main_gun_loaded`; il cannone va caricato per sparare,
+ogni colpo lo svuota, la ricarica consuma un impulso (gate in
+`Fire.fire_action`, dopo quello della torretta). Stato nel Vehicle Display.
+DA FARE col modello per-membro: la ricarica come ordine **esplicito** del
+Loader (Load/Spot) anziche' automatica nell'attivazione del veicolo.
 
 ### E. Morale e perdite per membro (31.10.6 / 31.10.9 / 31.10.11)
 Gia' parziale (morale check individuali sullo striscio). Da completare: esiti
