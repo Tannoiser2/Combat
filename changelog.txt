@@ -1,3 +1,9 @@
+v0.60 — 2026-06-15
+- Finestre fluttuanti più piccole e TRASCINABILI col mouse. Il Vehicle Display
+  era enorme: ridotto il mat (larghezza 392 -> 240). Sia il Vehicle Display sia
+  il pannello Ordini hanno ora una barra-titolo (⠿) che fa da maniglia: clicca
+  e trascina per spostare la finestra dove preferisci.
+
 v0.59 — 2026-06-15
 - Secondo giro di veicoli negli scenari Vol.2 (scelta di design): s11 Payback
   Time (Sherman amico), s12 Overrun ora con PzIVH SS di punta accanto all'Opel
