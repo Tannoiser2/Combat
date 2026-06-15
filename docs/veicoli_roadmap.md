@@ -32,12 +32,18 @@ In sostanza: **un equipaggio, un'azione, un'arma per impulso.**
 Il regolamento tratta ogni membro come un **attore con LOS, ordine e azione
 propri**, simultanei nello stesso impulso. Aree di lavoro:
 
-### A. Equipaggio come attori individuali (FONDAMENTO)
+### A. Equipaggio come attori individuali (FONDAMENTO) — PARZIALE (v0.51)
 Ogni crew member riceve un **proprio ordine** ogni impulso (31.9): es. su uno
 Sherman, nello stesso impulso, Gunner spara il cannone, Co-Driver spara la bow
-MG, Commander fa Spot, Loader ricarica. Serve renderli attori di prima classe
-(in `state.characters` o un ciclo d'attivazione dedicato del veicolo),
-mantenendo il legame `vehicle.crew`.
+MG, Commander fa Spot, Loader ricarica.
+FATTO (primo slice, engine): i crew sono attori con `order` proprio; il veicolo
+risolve l'azione per-membro (`TurnSequence._resolve_vehicle_action`): lo scafo
+si muove con l'ordine del Driver (= ordine del veicolo) e il **Gunner** spara il
+cannone indipendentemente -> **move-and-shoot**. L'AI assegna gli ordini
+separati (`_assign_vehicle_order` + `_crew_member`).
+DA FARE: UI per i veicoli amici (il giocatore comanda ogni crew member); orari
+spot/load come ordini espliciti; Co-Driver/Commander con azioni proprie
+(armi multiple, vedi B).
 
 ### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple
 - **Cannone principale** (Gunner): HE o AP — gia' presente, ma da legare al load

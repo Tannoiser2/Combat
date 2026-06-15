@@ -232,6 +232,12 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Character.main_gun_loaded; gate in Fire.fire_action (spara->scarico->ricarica
    un impulso->spara), visibile nel Vehicle Display. La ricarica e' ancora
    automatica nell'attivazione del veicolo, non un ordine esplicito del Loader.
+   FATTO (v0.51, Fase 1 primo slice): ordini per-membro (Rule 31.9). Il veicolo
+   risolve l'azione per-membro in TurnSequence._resolve_vehicle_action: lo scafo
+   muove con l'ordine del Driver (= ordine del veicolo) e il Gunner spara il
+   cannone indipendentemente (move-and-shoot). _assign_vehicle_order assegna gli
+   ordini separati per gli AFV nemici; _crew_member(v, ruolo) trova il membro.
+   I veicoli AMICI restano sul comando singolo (manca la UI per-crew).
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

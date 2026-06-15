@@ -3621,6 +3621,33 @@ func _test_vehicles() -> int:
 	if ls.shots.size() == n1:
 		print("TEST cannone: il cannone ricaricato deve tornare a sparare")
 		fails += 1
+
+	# Rule 31.9: ordini per-membro. _crew_member trova il ruolo; il Gunner
+	# riceve un ordine di fuoco col bersaglio in LOS (base del move-and-shoot).
+	var cs := GameState.new()
+	cs.rng.seed = 0
+	Boards.fill(cs, "farmhouse")
+	var pzC := VehicleCombat.make_vehicle(
+		"PzIVH", Domain.Side.ENEMY, "Red", Vector2i(10, 10), 3)
+	var jeepC := VehicleCombat.make_vehicle(
+		"Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(12, 10))
+	if TurnSequence._crew_member(pzC, "Gunner") == null:
+		print("TEST equipaggio: il PzIVH deve avere un Gunner")
+		fails += 1
+	if TurnSequence._crew_member(jeepC, "Gunner") != null:
+		print("TEST equipaggio: la Jeep non ha un Gunner")
+		fails += 1
+	var foeC := Character.new("foeC", "Foe", Domain.Side.FRIENDLY, "Able")
+	foeC.troop_quality = 6
+	foeC.weapon_skills = {"M1 Garand": 6}
+	foeC.position = Vector2i(10, 9)   # adiacente al PzIVH
+	foeC.spotted = true
+	cs.characters = [pzC, foeC]
+	TurnSequence._assign_vehicle_order(cs, pzC)
+	var gunC := TurnSequence._crew_member(pzC, "Gunner")
+	if gunC == null or not gunC.has_order or gunC.order != Domain.Order.AIMED_FIRE:
+		print("TEST equipaggio: il Gunner deve ricevere Aimed Fire col bersaglio in LOS")
+		fails += 1
 	return fails
 
 
