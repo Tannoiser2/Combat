@@ -251,6 +251,12 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    spara cannone + bow MG nello stesso impulse. AI e UI (toggle Co-Driver).
    SEMPLIFICAZIONE: arco frontale e malus dell'ordine di movimento non applicati
    alla bow MG; coassiale del Gunner ancora da fare.
+   FATTO (v0.54, Fase 3 - coassiale): il Gunner sceglie cannone O MG coassiale
+   (Character.fires_coax; helper TurnSequence._gunner_fire). La coax usa la TQ
+   piena, e' gate dalla torretta (_fire_crew_weapon require_turret) e non
+   consuma la carica del cannone. UI: toggle Gunner a 3 stati (non spara/
+   cannone/coassiale). Sherman/PzIVH coax = M1919/MG34. FASE 3 COMPLETA (armi
+   multiple: cannone + bow MG + coassiale).
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

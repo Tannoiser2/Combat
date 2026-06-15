@@ -88,6 +88,9 @@ var fire_mode: String = "HE"
 # Rule 31.1.3: stato di carica del cannone principale. Il Loader deve caricarlo;
 # ogni colpo lo svuota e la ricarica consuma un impulso. Parte carico.
 var main_gun_loaded: bool = true
+# Rule 31.9.4c: se true il Gunner spara la MG coassiale invece del cannone
+# (usato sul membro Gunner del veicolo).
+var fires_coax: bool = false
 # Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello
 # intermedio sono feribili/uccidibili individualmente e possono abbandonare
 # il mezzo (bail out). Tenerli come Character (non semplici contatori) rende
