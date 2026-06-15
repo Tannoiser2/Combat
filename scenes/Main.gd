@@ -2112,23 +2112,24 @@ const VEHICLE_DISPLAYS := {
 }
 
 # Centro della casella di ogni ruolo sul mat, in frazione di larghezza/altezza.
+# Valori rilevati dai bordi reali dei box (tools di analisi sui mat).
 const DISPLAY_BOXES := {
 	"M4A3 Sherman": {
-		"Driver": Vector2(0.495, 0.165), "Loader": Vector2(0.495, 0.340),
-		"Co-Driver": Vector2(0.865, 0.180), "Gunner": Vector2(0.865, 0.325),
-		"Commander": Vector2(0.865, 0.440),
+		"Driver": Vector2(0.526, 0.162), "Loader": Vector2(0.526, 0.293),
+		"Co-Driver": Vector2(0.859, 0.162), "Gunner": Vector2(0.859, 0.293),
+		"Commander": Vector2(0.859, 0.398),
 	},
 	"PzIVH": {
-		"Driver": Vector2(0.495, 0.165), "Loader": Vector2(0.495, 0.340),
-		"Co-Driver": Vector2(0.865, 0.180), "Gunner": Vector2(0.865, 0.325),
-		"Commander": Vector2(0.865, 0.440),
+		"Driver": Vector2(0.526, 0.162), "Loader": Vector2(0.526, 0.293),
+		"Co-Driver": Vector2(0.859, 0.162), "Gunner": Vector2(0.859, 0.293),
+		"Commander": Vector2(0.859, 0.398),
 	},
 	"Jeep": {
-		"Driver": Vector2(0.490, 0.185), "Co-Driver": Vector2(0.865, 0.185),
+		"Driver": Vector2(0.525, 0.206), "Co-Driver": Vector2(0.859, 0.206),
 	},
 	"M3A1 Halftrack": {
-		"Driver": Vector2(0.450, 0.160), "Co-Driver": Vector2(0.655, 0.160),
-		"Gunner": Vector2(0.875, 0.160),
+		"Driver": Vector2(0.475, 0.155), "Co-Driver": Vector2(0.645, 0.155),
+		"Gunner": Vector2(0.875, 0.155),
 	},
 }
 
