@@ -223,6 +223,11 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    vicina al bersaglio (dir_toward), non un settore a 4 archi; coassiale/bow MG
    non gestiti col vincolo "torretta che ruota non spara". Riferimento completo
    regole 31.4-31.6 piu' sotto.
+   MODELLO EQUIPAGGIO COMPLETO (da fare): il modello attuale e' "intermedio"
+   (un veicolo = un attore, un'arma, un'azione per impulso). La roadmap per
+   l'equipaggio fedele al regolamento (attori per-membro, armi multiple
+   bow/coax/main, LOS per ruolo+boccaporto, Target Marker/Observed Target, load
+   state del Loader, Vehicle Order Matrix per l'AI) e' in docs/veicoli_roadmap.md.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).
