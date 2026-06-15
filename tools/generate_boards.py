@@ -28,7 +28,46 @@ TERRAIN_NAME = {
     "BUILDING": "BUILDING", "STREAM": "STREAM", "MARSH": "MARSH",
     "HEDGEROW": "HEDGEROW", "LOGS": "LOGS",
     "OPEN_L1": "OPEN_LEVEL_1", "OPEN_L2": "OPEN_LEVEL_2",
+    # Terreni speciali Vol.2 (marcati a mano, vedi MANUAL): identita'.
+    "FOUNTAIN": "FOUNTAIN", "FORTIFIED_BUILDING": "FORTIFIED_BUILDING",
+    "TRENCH": "TRENCH", "ABBEY_EXTERIOR": "ABBEY_EXTERIOR",
+    "ABBEY_INTERIOR": "ABBEY_INTERIOR",
 }
+
+# Terreni speciali del Volume 2 marcati A MANO dai collari/simboli sulle
+# mappe ufficiali: il classificatore a colori (classify_terrain.py) li vede
+# come ROCKS/BUILDING/OPEN. Questi override sono applicati DOPO la
+# classificazione automatica e VINCONO su di essa (l'hex viene tolto dalla
+# sua classe auto e messo in quella indicata qui).
+#
+# abbey: collari sul tabellone -> rosso = ABBEY_EXTERIOR, rosso+giallo =
+# ABBEY_INTERIOR (Rule 27.5). Rilevati dai puntini con tools/detect_collars.py
+# e validati sull'esempio del regolamento (18,10 e 21,11 interni, 22,10
+# esterno).
+MANUAL = {
+    "abbey": {
+        "ABBEY_EXTERIOR": [
+            "17,9", "17,10", "17,11", "17,12", "17,13", "18,8", "18,12",
+            "19,7", "19,9", "19,13", "20,6", "20,8", "20,12", "21,7", "21,9",
+            "21,13", "22,8", "22,9", "22,10", "22,12", "23,10", "23,13",
+            "24,8", "24,9", "24,10", "24,12", "25,9", "25,10", "25,11",
+            "25,12", "25,13",
+        ],
+        "ABBEY_INTERIOR": [
+            "18,9", "18,10", "18,11", "19,10", "19,11", "19,12", "20,9",
+            "20,10", "20,11", "21,10", "21,11", "21,12", "22,11", "23,11",
+            "23,12", "24,11",
+        ],
+    },
+}
+
+
+def apply_manual(name, result):
+    """Sovrascrive la classificazione automatica con i terreni speciali
+    marcati a mano per la mappa `name`."""
+    for tname, hexes in MANUAL.get(name, {}).items():
+        for h in hexes:
+            result[h] = tname
 
 
 def hex_sort_key(k):
@@ -92,6 +131,7 @@ def main():
     for name, (path, x0, y0, tan_l1) in MAPS.items():
         clf = Classifier(path, x0, y0, tan_l1)
         result = clf.classify_all()
+        apply_manual(name, result)
         feats = clf.edge_features()
         all_feats[name] = feats
         print(name, Counter(result.values()), "| hexsides:", Counter(feats.values()))

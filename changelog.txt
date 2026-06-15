@@ -1,3 +1,15 @@
+v0.46 — 2026-06-15
+- Mappa Abbazia (Rule 27.5): i terreni d'abbazia sono finalmente piazzati
+  sulla board "abbey" (prima erano classificati come rocce/edifici). 31 hex
+  ABBEY_EXTERIOR (collare rosso, colpibili da fuori) e 16 hex ABBEY_INTERIOR
+  (collare rosso+giallo, immuni al fuoco da fuori). Footprint ricavato dai
+  collari stampati sulla mappa ufficiale e validato sull'esempio del
+  regolamento (18,10 e 21,11 interni, 22,10 esterno). Usata da s16 e s18.
+- Strumenti: gli override manuali dei terreni speciali Vol.2 (che il
+  classificatore a colori non riconosce) vivono ora nel dizionario MANUAL di
+  tools/generate_boards.py ed entrano nella rigenerazione delle board; nuovo
+  tools/detect_collars.py rileva i collari colorati per ricavarli.
+
 v0.45 — 2026-06-14
 - Veicoli (Rule 31.4-31.6): facing dello scafo e torretta ora corretti.
   Lo scafo si orienta nella direzione di marcia a ogni passo (hit_face

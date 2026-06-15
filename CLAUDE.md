@@ -118,8 +118,15 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    (Fire._abbey_hexes_crossed); gli interni sono immuni al fuoco da fuori
    (Fire.can_fire); la LOS dentro l'abbazia non e' bloccata dai muri ma da fuori
    il muro esterno blocca (LOS both_abbey, HEIGHT2 2). Test Main._test_abbey.
-   RULE 27 COMPLETA. I terreni nuovi non sono ancora piazzati in nessuno
-   scenario (markers/board da scenario).
+   RULE 27 COMPLETA. PIAZZAMENTO SULLE BOARD (v0.46+): i terreni speciali che
+   il classificatore a colori non vede sono marcati a mano nel dizionario
+   MANUAL di tools/generate_boards.py (applicati sopra la classificazione auto,
+   vincono su di essa) e ricavati dai collari con tools/detect_collars.py.
+   FATTO: Abbazia sulla board "abbey" (31 ABBEY_EXTERIOR collare rosso, 16
+   ABBEY_INTERIOR collare rosso+giallo; validati sull'esempio del regolamento
+   18,10/21,11 interni, 22,10 esterno; usata da s16 e s18). DA FARE: trincee
+   ed edifici fortificati sul "ridge" (s21/s22), fontane, e l'eventuale filo
+   spinato per-scenario sulle nuove board.
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
