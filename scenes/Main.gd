@@ -2109,6 +2109,8 @@ const VEHICLE_DISPLAYS := {
 	"PzIVH":          "display-PzIVH",
 	"Jeep":           "display-Jeep",
 	"M3A1 Halftrack": "display-M3A1",
+	"GMC 2.5t":       "display-GMC",
+	"Opel Blitz":     "display-Opel",
 }
 
 # Centro della casella di ogni ruolo sul mat, in frazione di larghezza/altezza.
@@ -2130,6 +2132,12 @@ const DISPLAY_BOXES := {
 	"M3A1 Halftrack": {
 		"Driver": Vector2(0.475, 0.155), "Co-Driver": Vector2(0.645, 0.155),
 		"Gunner": Vector2(0.875, 0.155),
+	},
+	"GMC 2.5t": {
+		"Driver": Vector2(0.345, 0.175), "Co-Driver": Vector2(0.695, 0.175),
+	},
+	"Opel Blitz": {
+		"Driver": Vector2(0.345, 0.250), "Co-Driver": Vector2(0.695, 0.250),
 	},
 }
 
