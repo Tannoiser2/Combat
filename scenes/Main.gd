@@ -1051,6 +1051,29 @@ func _open_order_panel(c: Character) -> void:
 					gunner.set_order(Domain.Order.AIMED_FIRE)
 				_open_order_panel(c))
 			order_list.add_child(gun_btn)
+		# Rule 31.9.4b: bow MG del Co-Driver (arma separata, fuoco simultaneo).
+		var codriver: Character = TurnSequence._crew_member(c, "Co-Driver")
+		if codriver != null and not VehicleCombat.bow_mg_weapon(c).is_empty():
+			if gunner == null:
+				var crew_lbl2 := Label.new()
+				crew_lbl2.text = "— Equipaggio —"
+				crew_lbl2.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
+				order_list.add_child(crew_lbl2)
+			var bfiring: bool = codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE
+			var bow_btn := Button.new()
+			bow_btn.text = "Co-Driver: bow MG %s" % ("SPARA" if bfiring else "non spara")
+			bow_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			bow_btn.custom_minimum_size = Vector2(190, 0)
+			bow_btn.modulate = Color(0.6, 0.95, 0.6) if bfiring else Color(0.85, 0.85, 0.7)
+			bow_btn.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Co-Driver[/color][/b]\n\nServe la mitragliatrice di scafo (bow MG): spara al bersaglio piu' vicino in vista, anche mentre il carro muove e mentre il Gunner spara col cannone. Senza secondo servente usa la TQ-3 e va a corto di munizioni con un singolo 9.")
+			bow_btn.pressed.connect(func() -> void:
+				if codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE:
+					codriver.clear_order()
+				else:
+					codriver.set_order(Domain.Order.AIMED_FIRE)
+				_open_order_panel(c))
+			order_list.add_child(bow_btn)
 	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
 	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
 	# facile da colpire.
@@ -3695,6 +3718,34 @@ func _test_vehicles() -> int:
 	TurnSequence.resolve_action(gs, pzG)
 	if pzG.main_gun_loaded:
 		print("TEST equipaggio: il Gunner deve sparare col veicolo senza ordine")
+		fails += 1
+
+	# Rule 31.9.4b: la bow MG del Co-Driver e' un'arma separata (WS = TQ-3) e
+	# spara nello stesso impulse, anche con lo scafo fermo.
+	var bs2 := GameState.new()
+	bs2.rng.seed = 0
+	Boards.fill(bs2, "farmhouse")
+	var shB := VehicleCombat.make_vehicle(
+		"M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var codB := TurnSequence._crew_member(shB, "Co-Driver")
+	if codB == null or codB.weapon_skills.get("M1919", 0) != 4:
+		print("TEST bow MG: il Co-Driver del Sherman deve avere la bow MG a TQ-3 (4)")
+		fails += 1
+	var enemyB := Character.new("enB", "Schutze", Domain.Side.ENEMY, "Red")
+	enemyB.troop_quality = 5
+	enemyB.weapon_skills = {"KAR 98K": 5}
+	enemyB.position = Vector2i(8, 6)   # adiacente al Sherman
+	enemyB.known = true
+	bs2.characters = [shB, enemyB]
+	shB.clear_order()   # scafo fermo, nessun ordine del veicolo/Gunner
+	if codB != null:
+		codB.set_order(Domain.Order.AIMED_FIRE)
+	bs2.impulse = 2
+	var shots_b: int = bs2.shots.size()
+	bs2.rng.seed = 0
+	TurnSequence.resolve_action(bs2, shB)
+	if bs2.shots.size() == shots_b:
+		print("TEST bow MG: il Co-Driver deve aver sparato la bow MG col solo suo ordine")
 		fails += 1
 	return fails
 

@@ -272,6 +272,14 @@ static func _assign_medic_order(state: GameState, c: Character) -> void:
 
 # AI veicolo nemico (Rule 31): avanza verso il nemico piu' vicino e spara
 # se entro gittata utile; altrimenti avanza (RUN_AND_GUN o SPRINT).
+# Vero se un membro d'equipaggio vivo e imbarcato ha un ordine attivo.
+static func _vehicle_crew_has_order(v: Character) -> bool:
+	for cm in v.crew:
+		if cm.embarked and not cm.is_dead() and cm.has_order:
+			return true
+	return false
+
+
 # Il membro d'equipaggio vivo e imbarcato con un dato ruolo (o null).
 static func _crew_member(v: Character, role: String) -> Character:
 	if not v.is_vehicle:
@@ -288,33 +296,71 @@ static func _crew_member(v: Character, role: String) -> Character:
 # carro puo' muovere E sparare nello stesso impulse (move-and-shoot).
 static func _resolve_vehicle_action(state: GameState, v: Character) -> void:
 	# Movimento dello scafo (ordine del Driver = ordine del veicolo).
+	var vehicle_fired := false
 	match Orders.impulse_action(v.order, state.impulse):
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
 			_do_move(state, v, 1)
 		Domain.ImpulseAction.MUST_MOVE_2:
 			_do_move(state, v, 2)
 		Domain.ImpulseAction.MAY_FIRE:
-			# Il veicolo ha un ordine di fuoco proprio (Driver fermo): spara
-			# e basta (il Gunner non raddoppia il colpo).
+			# Ordine di fuoco proprio del veicolo (Driver fermo): spara il cannone.
 			_try_fire(state, v)
-			return
-	# Il Gunner spara il cannone se ha un ordine di fuoco attivo a questo
-	# impulse, anche durante o dopo il movimento dello scafo (move-and-shoot).
-	var gunner := _crew_member(v, "Gunner")
-	if gunner != null and gunner.has_order \
-			and Orders.impulse_action(gunner.order, state.impulse) \
-				== Domain.ImpulseAction.MAY_FIRE:
-		_try_fire(state, v)
+			vehicle_fired = true
+	# Il Gunner spara il cannone se ha un ordine di fuoco attivo, anche durante
+	# o dopo il movimento dello scafo (move-and-shoot); niente doppio colpo se
+	# il veicolo ha gia' sparato col proprio ordine.
+	if not vehicle_fired:
+		var gunner := _crew_member(v, "Gunner")
+		if gunner != null and gunner.has_order \
+				and Orders.impulse_action(gunner.order, state.impulse) \
+					== Domain.ImpulseAction.MAY_FIRE:
+			_try_fire(state, v)
+	# Rule 31.9.4b: il Co-Driver serve la bow MG, arma e azione SEPARATE: spara
+	# nello stesso impulse del cannone (col WS = TQ-3 gia' nei suoi weapon_skills).
+	var bow := VehicleCombat.bow_mg_weapon(v)
+	if not bow.is_empty():
+		var codriver := _crew_member(v, "Co-Driver")
+		if codriver != null and codriver.has_order \
+				and Orders.impulse_action(codriver.order, state.impulse) \
+					== Domain.ImpulseAction.MAY_FIRE:
+			_fire_crew_weapon(state, v, codriver, bow)
+
+
+# Un membro d'equipaggio spara un'arma specifica dall'hex del veicolo (Rule
+# 31.9): il firer e' il crew (col proprio WS), il colpo parte dallo scafo.
+static func _fire_crew_weapon(state: GameState, vehicle: Character,
+		crew: Character, weapon: String) -> void:
+	crew.position = vehicle.position
+	var best: Character = null
+	var best_d := 9999
+	for t in state.characters:
+		if t.side == crew.side or t.is_dead():
+			continue
+		if t.side == Domain.Side.ENEMY and not t.known:
+			continue
+		if t.side == Domain.Side.FRIENDLY and not t.spotted:
+			continue
+		if not Fire.can_fire(state, crew, t, weapon):
+			continue
+		var d := Spotting.hex_distance(crew.position, t.position)
+		if d < best_d:
+			best_d = d
+			best = t
+	if best != null:
+		Fire.fire_action(state, crew, best, weapon)
 
 
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 	c.had_first_order = true
 	var gunner := _crew_member(c, "Gunner")
+	var codriver := _crew_member(c, "Co-Driver")
 	var target := Move.nearest_enemy(state, c)
 	if target == null:
 		_set_enemy_order(state, c, Domain.Order.SNEAK)
 		if gunner != null:
 			gunner.clear_order()
+		if codriver != null:
+			codriver.clear_order()
 		return
 	var dist := Spotting.hex_distance(c.position, target.position)
 	var los := LOS.clear(state, c, target)
@@ -324,6 +370,13 @@ static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 		gunner.set_order(Domain.Order.AIMED_FIRE)
 	elif gunner != null:
 		gunner.clear_order()
+	# Rule 31.9.4b: il Co-Driver serve la bow MG (gittata corta): spara se ha
+	# LOS ed e' vicino. Arma e azione separate dal cannone.
+	if codriver != null and not VehicleCombat.bow_mg_weapon(c).is_empty() \
+			and los and dist <= 20:
+		codriver.set_order(Domain.Order.AIMED_FIRE)
+	elif codriver != null:
+		codriver.clear_order()
 	if los and dist <= 12:
 		# Buona gittata: il carro si ferma e spara col cannone.
 		_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
@@ -487,11 +540,10 @@ static func resolve_action(state: GameState, c: Character) -> void:
 			and state.turn_fx.get("no_impulse1", false):
 		return
 	# Rule 31.9: i veicoli risolvono l'azione per-membro (Driver muove lo scafo,
-	# Gunner spara il cannone): possono muovere E sparare nello stesso impulse.
-	# Si processa il veicolo se lo scafo O un membro (Gunner) ha un ordine.
+	# Gunner spara il cannone, Co-Driver la bow MG): possono muovere E sparare
+	# nello stesso impulse. Si processa se lo scafo O un membro ha un ordine.
 	if c.is_vehicle:
-		var gunner := _crew_member(c, "Gunner")
-		if c.has_order or (gunner != null and gunner.has_order):
+		if c.has_order or _vehicle_crew_has_order(c):
 			_resolve_vehicle_action(state, c)
 		return
 	if not c.has_order:

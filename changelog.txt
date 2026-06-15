@@ -1,3 +1,13 @@
+v0.53 — 2026-06-15
+- Equipaggio veicoli (Rule 31.9.4b), armi multiple - bow MG: il Co-Driver
+  degli AFV serve la mitragliatrice di scafo come arma E azione SEPARATA. Cosi'
+  un AFV puo' sparare il cannone (Gunner) e la bow MG (Co-Driver) nello stesso
+  impulse, anche mentre lo scafo si muove. Senza secondo servente la bow MG usa
+  la TQ-3 e va Low/No Ammo col singolo 9 (Rule 14.3 non si applica). Sherman:
+  M1919; PzIVH: MG34. AI e UI (toggle "Co-Driver: bow MG SPARA/non spara").
+  SEMPLIFICAZIONE: l'arco frontale e il malus dell'ordine di movimento del
+  Driver sulla bow MG non sono ancora modellati.
+
 v0.52 — 2026-06-15
 - Equipaggio veicoli (Rule 31.9), UI per-crew: nel pannello ordini di un
   veicolo amico con equipaggio compare la sezione "Equipaggio" con un toggle

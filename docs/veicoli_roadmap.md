@@ -50,13 +50,16 @@ DA FARE: Loader/Commander/Co-Driver con ordini espliciti (Load/Spot) e azioni
 proprie (armi multiple bow/coax MG, vedi B); pannello con il roster completo
 dei membri (oggi solo il Gunner ha un comando dedicato).
 
-### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple
-- **Cannone principale** (Gunner): HE o AP — gia' presente, ma da legare al load
-  state (vedi D).
+### B. Azioni di fuoco per ruolo (31.9.4) — armi multiple — PARZIALE (v0.53)
+- **Cannone principale** (Gunner): HE o AP — FATTO, con load state (vedi D).
+- **Bow MG** (Co-Driver): FATTO (v0.53). Arma e azione separate: il Co-Driver
+  spara la bow MG (Sherman M1919, PzIVH MG34) nello stesso impulse del cannone,
+  con WS = TQ-3 (no assistente) e Low/No Ammo sul singolo 9. Engine
+  (`_fire_crew_weapon`), AI e UI (toggle). DA FARE: arco frontale e malus
+  dell'ordine di movimento del Driver sul fuoco della bow MG.
 - **MG coassiale** (Gunner): Fire MG con la **TQ** (non WS); se il Gunner spara
-  la coax, il Loader puo' Load o Spot. **Mancante.**
-- **Bow MG** (Co-Driver): Fire MG, **niente assistente** -> -3 TQ e Low/No Ammo
-  sul singolo 9 (Rule 14.3 non si applica). **Mancante.**
+  la coax, il Loader puo' Load o Spot. **Mancante** (il Gunner sceglie cannone
+  O coassiale: serve un "fire mode" del Gunner).
 - **Armi leggere** (qualsiasi crew con boccaporto aperto + pistola): ordine di
   fuoco standard. **Mancante.**
 - **Halftrack**: il personaggio nella **cupola** spara in qualsiasi direzione; i
