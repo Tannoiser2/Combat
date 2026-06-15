@@ -1068,6 +1068,11 @@ const SCENARIOS := {
 			"15,3", "15,5", "15,13", "17,7", "17,9", "17,15",
 			"19,10", "21,7", "22,3", "23,15", "24,9"],
 		"gun_hexes": ["13,11", "17,9"],
+		# Le due MG (gun_hexes) sono in nido fortificato (Rule 27.2): non
+		# caricabili, vanno neutralizzate col fuoco o col C4. Trincee (27.4)
+		# per la fanteria di supporto lungo la linea che batte la cresta.
+		"fortified": ["13,11", "17,9"],
+		"trench": ["11,12", "13,8", "15,5", "17,7", "19,10"],
 		"c4": true,
 		"vehicles": [
 			{"type": "M4A3 Sherman", "side": "friendly", "team": "Able",
@@ -1093,6 +1098,10 @@ const SCENARIOS := {
 		"dummies": 14,
 		"enemy_setup": ["1,4", "1,8", "1,12", "2,6", "2,10", "3,5",
 			"31,4", "31,8", "31,12", "32,6", "32,10", "33,5", "35,3", "35,9"],
+		# Difesa scavata al centro della cresta (US, zona di schieramento):
+		# linea di trincee (27.4) con un caposaldo fortificato (27.2, 18,10).
+		"trench": ["16,7", "17,8", "18,9", "17,10", "16,11", "18,12"],
+		"fortified": ["18,10"],
 		"first_order_d6": ["SPRINT 6", "SPRINT 5", "RUN_AND_GUN 6",
 			"RUN_AND_GUN 5", "SPRINT 6/5", "SPRINT 5/6"],
 		"waves": [
@@ -1173,6 +1182,19 @@ static func build(state: GameState, scenario_id: String) -> void:
 		var wh := state.hex_at(int(wp[0]), int(wp[1]))
 		if wh != null:
 			wh.wire = true
+	# Trincee (Rule 27.4) ed edifici fortificati (Rule 27.2): per regola si
+	# piazzano via scenario (chiavi "trench"/"fortified"). Sovrascrivono il
+	# terreno dell'hex col tipo speciale gia' modellato in Domain.Terrain.
+	for tk in sc.get("trench", []):
+		var tp: PackedStringArray = String(tk).split(",")
+		var th := state.hex_at(int(tp[0]), int(tp[1]))
+		if th != null:
+			th.terrain = D.Terrain.TRENCH
+	for fk in sc.get("fortified", []):
+		var fp: PackedStringArray = String(fk).split(",")
+		var fh := state.hex_at(int(fp[0]), int(fp[1]))
+		if fh != null:
+			fh.terrain = D.Terrain.FORTIFIED_BUILDING
 	if state.weather != Weather.Type.CLEAR or state.ground != Weather.Ground.NONE:
 		state.log_event("Meteo: %s, terreno: %s%s" % [
 			Weather.TYPE_NAMES[state.weather], Weather.GROUND_NAMES[state.ground],

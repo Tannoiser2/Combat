@@ -1,3 +1,17 @@
+v0.48 — 2026-06-15
+- Trincee (Rule 27.4) ed edifici fortificati (Rule 27.2) come terreno di
+  scenario: nuove chiavi "trench"/"fortified" (come "wire"), che impostano
+  il terreno speciale gia' modellato sugli hex elencati. Disegnati su mappa
+  con marker dedicati (GEN-Trench/Fortified-Marker) anche sopra l'immagine
+  della board. Finalmente i terreni Rule 27 sono usati in partita.
+  - s21 Machine-Gun Ridge: le due MG (13,11 / 17,9) sono in nido fortificato
+    (non caricabili: vanno neutralizzate col fuoco o col C4), con trincee per
+    la fanteria di supporto lungo la cresta.
+  - s22 Outflanked: linea di trincee centrale + caposaldo fortificato (18,10)
+    per la difesa US aggirata sui fianchi.
+  Posizioni di design (lo Scenario Book copre solo il Vol.1 e i salvataggi
+  VASSAL sono partite giocate: nessun setup ufficiale Vol.2 nei materiali).
+
 v0.47 — 2026-06-15
 - Mappa Town (Rule 27.1): la fontana ornamentale della piazza e' piazzata
   come terreno FOUNTAIN (9 hex, 15-17 x 13-15; prima erano lastricato/campo).

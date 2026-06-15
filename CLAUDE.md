@@ -129,8 +129,16 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    ornamentale (15-17 x 13-15); e' l'unica mappa con fontane. NOTA: edifici
    fortificati (27.2) e trincee (27.4) NON sono stampati sulle mappe ("placed
    via a scenario special rule"): vanno aggiunti per-scenario (come il filo
-   spinato, chiave "wire"), non sulle board. Quindi il terreno speciale
-   STAMPATO sulle board e' tutto piazzato; il resto e' lavoro lato scenario.
+   spinato, chiave "wire"), non sulle board. FATTO (v0.48): chiavi di scenario
+   "trench" (27.4) e "fortified" (27.2) in Scenario._make (impostano
+   hex.terrain), con marker MapView (GEN-Trench/Fortified-Marker) anche sopra
+   l'immagine della board. Piazzati in s21 (MG nest fortificati 13,11/17,9 +
+   trincee) e s22 (linea trincee + caposaldo 18,10). Posizioni di design: lo
+   Scenario Book copre solo il Vol.1, i .vsav VASSAL sono PARTITE GIOCATE
+   (embeddano i pool interi dei counter, identici tra scenari, e posizioni di
+   meta' partita), quindi NON esiste un setup/OOB ufficiale Vol.2 nei materiali.
+   Tutto il terreno speciale STAMPATO sulle board (abbazia, fontana) e quello
+   di scenario (trincee, fortificati) e' ora piazzato e usato in partita.
 5. FATTO: Incendi (Rule 29) in Area.gd. Type.FIRE/RAGING_FIRE; tabelle
    KINDLING/FIRE_GROWTH/FIRE_SPREAD (d10<=valore, +1 con pioggia battente).
    Artiglieria/mortaio accendono il terreno infiammabile (Area._try_kindle in
