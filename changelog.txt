@@ -1,3 +1,10 @@
+v0.59 — 2026-06-15
+- Secondo giro di veicoli negli scenari Vol.2 (scelta di design): s11 Payback
+  Time (Sherman amico), s12 Overrun ora con PzIVH SS di punta accanto all'Opel
+  Blitz (assalto corazzato; il Bazooka Man fa l'anticarro), s14 Defend the CP
+  (Jeep di collegamento), s17 Clear Them Out (Halftrack con la .50cal). Ora
+  9 dei 12 scenari Vol.2 hanno veicoli. Posizioni validate su terreno passabile.
+
 v0.58 — 2026-06-15
 - Due camion da trasporto soft-skin (Rule 31): "GMC 2.5t" (USA) e
   "Opel Blitz" (tedesco), senza corazza né arma montata, con i loro display
