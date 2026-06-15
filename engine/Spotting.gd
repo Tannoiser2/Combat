@@ -123,6 +123,9 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	var tq := Checks.effective_tq(spotter)
 	if spotter.has_skill(Character.SKILL_EAGLE_EYES):
 		tq = mini(tq + 1, 8)
+	# Rule 31.7: un veicolo col boccaporto chiuso ha visibilita' ridotta (-2 TQ).
+	if spotter.is_vehicle and spotter.is_buttoned_up:
+		tq -= 2
 	var threshold := tq \
 		+ target_modifier(state, target, spotter) + range_modifier(dist)
 	# Winter Camouflage (Rule 28.2): -1 a individuare il bersaglio sulla neve.

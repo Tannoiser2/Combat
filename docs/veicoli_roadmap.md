@@ -71,7 +71,15 @@ dei membri (oggi solo il Gunner ha un comando dedicato).
   spara la M2 come arma del mezzo). Il Co-Driver del Truck spara pistola/SMG a
   fronte/destra (31.9.2).
 
-### C. Spotting e LOS per ruolo + boccaporto (31.7)
+### C. Spotting e LOS per ruolo + boccaporto (31.7) — PARZIALE (v0.55)
+FATTO (boccaporto + esposizione): stato boccaporto aperto/chiuso (gli AFV
+partono chiusi, `is_buttoned_up`); chiuso = -2 allo spotting del mezzo
+(`Spotting.attempt`) e equipaggio al sicuro dal fuoco leggero; aperto / mezzi
+scoperti = equipaggio esposto, colpibile dalle armi leggere
+(`VehicleCombat.crew_exposed`, `Fire.can_fire` + `Fire._fire_at_exposed_crew`
+ferisce i crew). UI: toggle boccaporto + stato nel Vehicle Display.
+DA FARE: archi di LOS per ruolo e per boccaporto, Target Marker / Observed
+Target (sotto).
 - **Jeep**: Driver/Co-Driver e passeggeri pos.1/2 = LOS 360 gradi.
 - **Truck/Halftrack**: Driver/Co-Driver solo archi anteriore+laterali;
   passeggeri posteriori = arco posteriore; cupola = 360 gradi.

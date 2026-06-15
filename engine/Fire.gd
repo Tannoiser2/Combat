@@ -92,12 +92,14 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 	var th := state.hex_at(target.position.x, target.position.y)
 	if th != null and th.terrain == D.Terrain.ABBEY_INTERIOR and not _in_abbey(state, firer.position):
 		return false
-	# Rule 31-32: un bersaglio-veicolo richiede un'arma AT o main_gun.
-	# Le armi normali non lo feriscono (al massimo morale check sull'equipaggio).
+	# Rule 31-32: un bersaglio-veicolo richiede un'arma AT o main_gun per
+	# danneggiare lo scafo. Le armi leggere possono colpire solo l'equipaggio
+	# ESPOSTO (mezzo scoperto o AFV col boccaporto aperto, Rule 31.10).
 	if target.is_vehicle:
 		var flags: Array = Weapons.info(weapon)["flags"]
 		if not ("at" in flags or "main_gun" in flags):
-			return false
+			if not VehicleCombat.crew_exposed(target):
+				return false
 	return LOS.clear(state, firer, target)
 
 
@@ -138,7 +140,12 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		# Spara: il colpo svuota il cannone (va ricaricato prima del prossimo).
 		firer.main_gun_loaded = false
 	if target.is_vehicle:
-		VehicleCombat.at_fire(state, firer, target, weapon)
+		var vflags: Array = Weapons.info(weapon)["flags"]
+		if "at" in vflags or "main_gun" in vflags:
+			VehicleCombat.at_fire(state, firer, target, weapon)
+		else:
+			# Armi leggere: colpiscono l'equipaggio esposto (Rule 31.10).
+			_fire_at_exposed_crew(state, firer, target, weapon)
 		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var rof := Weapons.rof_at(weapon, dist)
@@ -178,6 +185,40 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	state.shots.append({
 		"from": firer.position, "to": target.position,
 		"hit": any_hit, "side": firer.side, "outcome": outcome,
+		"weapon": weapon,
+	})
+	Replay.shot(state, state.shots.back())
+	state.audio_events.append({"type": "shot", "weapon": weapon,
+		"outcome": outcome, "hex": firer.position})
+
+
+# Rule 31.10: fuoco di armi leggere contro l'equipaggio esposto di un veicolo.
+# WS check come un attacco normale; ogni colpo a segno ferisce un crew a caso.
+static func _fire_at_exposed_crew(state: GameState, firer: Character,
+		vehicle: Character, weapon: String) -> void:
+	var dist := Spotting.hex_distance(firer.position, vehicle.position)
+	var rof := Weapons.rof_at(weapon, dist)
+	var ws := int(_compute_ws(state, firer, vehicle, weapon)["ws"])
+	var hits := 0
+	var nines := 0
+	for i in range(rof):
+		if firer.no_ammo:
+			break
+		var roll := Checks.roll_d10(state.rng)
+		if roll == 9:
+			nines += 1
+		if roll == 0 or roll <= ws:   # nat 0 colpisce sempre
+			hits += 1
+	if nines >= 1:
+		_spend_ammo(state, firer, weapon)
+	for i in range(hits):
+		VehicleCombat._crew_casualty(state, vehicle)
+	var outcome := "Colpito!" if hits > 0 else "Mancato"
+	state.log_event("%s spara all'equipaggio esposto di %s (%s): %d colpo/i a segno" % [
+		firer.display_name, vehicle.display_name, weapon, hits])
+	state.shots.append({
+		"from": firer.position, "to": vehicle.position,
+		"hit": hits > 0, "side": firer.side, "outcome": outcome,
 		"weapon": weapon,
 	})
 	Replay.shot(state, state.shots.back())

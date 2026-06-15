@@ -70,6 +70,16 @@ static func has_turret(c: Character) -> bool:
 	return c.is_vehicle and c.vehicle_type in TURRETED
 
 
+# Rule 31.10: l'equipaggio e' esposto al fuoco leggero? I mezzi scoperti
+# (Jeep/Halftrack) sempre; gli AFV solo col boccaporto aperto.
+static func crew_exposed(v: Character) -> bool:
+	if not v.is_vehicle:
+		return false
+	if not has_turret(v):
+		return true
+	return not v.is_buttoned_up
+
+
 # Punta la torretta sul bersaglio (Rule 31.6). Se e' gia' allineata col
 # bersaglio (front arc = la direzione esagonale del bersaglio) ritorna true:
 # il cannone puo' sparare. Altrimenti ruota di 1 hex-side verso il bersaglio
@@ -125,6 +135,9 @@ static func make_vehicle(v_name: String, side: int, team: String,
 	c.turret_facing = facing if v_name in TURRETED else 0
 	c.is_vehicle = true
 	c.vehicle_type = v_name
+	# Rule 31.7/31.10: gli AFV partono col boccaporto chiuso (al sicuro dal
+	# fuoco leggero, ma -2 allo spotting). I mezzi scoperti restano esposti.
+	c.is_buttoned_up = v_name in TURRETED
 	c.counter = VEHICLE_COUNTER.get(v_name, "")
 	c.troop_quality = int(vd["tq"])
 	c.morale = D.Morale.BOLD
