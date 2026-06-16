@@ -554,6 +554,8 @@ func _begin_friendly_action(c: Character, act: Dictionary) -> void:
 	action_kind = act["kind"]
 	moves_left = act["hexes"]
 	map_view.selected = c
+	_refresh_roster()
+	_refresh_enemy_roster()
 	if action_kind == TurnSequence.Act.FIRE:
 		var targets := TurnSequence.valid_fire_targets(state, c)
 		map_view.cue_hexes = _hexes_of(targets)
@@ -1000,6 +1002,8 @@ func _on_map_clicked() -> void:
 	map_view.highlight_hex = hex
 	map_view.queue_redraw()
 	_show_info(hex, c)
+	_refresh_roster()
+	_refresh_enemy_roster()
 	if here.size() > 1:
 		hint_label.text = "Pila di %d uomini: riclicca l'hex per il prossimo (%s)" % [
 			here.size(), c.display_name]
@@ -2993,6 +2997,8 @@ func _refresh_roster() -> void:
 					camera.position = map_view.hex_center(ch.position.x, ch.position.y)
 					map_view.queue_redraw()
 					_show_info(ch.position, ch)
+					_refresh_roster()
+					_refresh_enemy_roster()
 					if phase == Phase.ORDERS and not ch.is_dead():
 						_open_order_panel(ch))
 			roster_body.add_child(row)
@@ -3121,7 +3127,9 @@ func _refresh_enemy_roster() -> void:
 				map_view.highlight_hex = ch.position
 				camera.position = map_view.hex_center(ch.position.x, ch.position.y)
 				map_view.queue_redraw()
-				_show_info(ch.position, ch))
+				_show_info(ch.position, ch)
+				_refresh_roster()
+				_refresh_enemy_roster())
 		enemy_roster_body.add_child(pc)
 
 
