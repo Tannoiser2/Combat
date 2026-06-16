@@ -852,6 +852,33 @@ func _end_replay() -> void:
 
 # ---------------------------------------------------------------- input
 
+# Gestione touch (iPad/mobile): intercetta i gesti PRIMA dei nodi figli.
+# _input ha priorita' massima: i Control della HUD non possono consumare questi eventi.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_points[event.index] = event.position
+		else:
+			_touch_points.erase(event.index)
+		# NON marcare come handled: il rilascio del tocco deve generare il clic sulla mappa
+		# tramite l'emulazione MouseButton che Godot inietta per i Control.
+	elif event is InputEventScreenDrag:
+		var other_idx: int = 0 if event.index == 1 else 1
+		if other_idx in _touch_points:
+			# Pinch-zoom: confronta distanza vecchia vs nuova tra le due dita.
+			var old_pos: Vector2 = event.position - event.relative
+			var other_pos: Vector2 = _touch_points[other_idx]
+			var old_dist: float = old_pos.distance_to(other_pos)
+			var new_dist: float = event.position.distance_to(other_pos)
+			if old_dist > 1.0:
+				_zoom(new_dist / old_dist)
+		else:
+			# Una sola dita: pan della mappa.
+			camera.position -= event.relative / camera.zoom.x
+		_touch_points[event.index] = event.position
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Tasto F: adatta la vista all'intera mappa.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F \
@@ -888,26 +915,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_label.text = "Archi di blindatura: %s (A per nascondere)" % \
 			("ON" if map_view.show_arc_overlay else "off")
 		return
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			_touch_points[event.index] = event.position
-		else:
-			_touch_points.erase(event.index)
-	elif event is InputEventScreenDrag:
-		var other_idx: int = 0 if event.index == 1 else 1
-		if other_idx in _touch_points:
-			# Pinch-zoom: confronta distanza vecchia vs nuova tra le due dita.
-			var old_pos: Vector2 = event.position - event.relative
-			var other_pos: Vector2 = _touch_points[other_idx]
-			var old_dist: float = old_pos.distance_to(other_pos)
-			var new_dist: float = event.position.distance_to(other_pos)
-			if old_dist > 1.0:
-				_zoom(new_dist / old_dist)
-		else:
-			# Una sola dita: pan della mappa.
-			camera.position -= event.relative / camera.zoom.x
-		_touch_points[event.index] = event.position
-	elif event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				_zoom(1.15)
