@@ -53,6 +53,7 @@ var played_card_text: RichTextLabel
 var hand_discard_button: Button  # "Carte in mano (N)" visibile fuori dalla CARD phase
 var discard_popup: PanelContainer  # popup con le DISCARD cards rimanenti
 var vehicle_popup: PanelContainer  # Vehicle Display: equipaggio e stato del mezzo
+var _display_vehicle: Character = null  # veicolo attualmente mostrato nel Vehicle Display
 var _initiative_card_pending: bool = false  # carta Initiative giocata: attende click su un uomo
 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
@@ -1123,10 +1124,14 @@ func _on_order_selected(id: int) -> void:
 		return
 	order_panel.hide()
 	order_target.set_order(id)
+	# I veicoli usano la terminologia di marcia (Crawl/Ahead Slow/...).
+	var order_name: String = DRIVER_ORDER_NAMES.get(id, Domain.ORDER_NAMES[id]) \
+		if order_target.is_vehicle else Domain.ORDER_NAMES[id]
 	state.log_event("%s riceve l'ordine %s" % [
-		order_target.display_name, Domain.ORDER_NAMES[id]])
+		order_target.display_name, order_name])
 	_update_orders_button()
 	_refresh()
+	_refresh_vehicle_display()
 
 
 # Conferma sempre possibile: il pulsante segnala quanti sono senza ordine.
@@ -1982,6 +1987,7 @@ func _toggle_discard_popup() -> void:
 # Vehicle Display (Rule 31): stato del mezzo + roster dell'equipaggio.
 # Mostra ruolo, morale e ferite di ogni crew, e se e' a bordo o sceso.
 func _show_vehicle_display(vehicle: Character) -> void:
+	_display_vehicle = vehicle
 	for child in vehicle_popup.get_children():
 		child.queue_free()
 	var box := VBoxContainer.new()
@@ -2040,9 +2046,17 @@ func _show_vehicle_display(vehicle: Character) -> void:
 	box.add_child(HSeparator.new())
 	var close := Button.new()
 	close.text = "Chiudi"
-	close.pressed.connect(func(): vehicle_popup.hide())
+	close.pressed.connect(func():
+		_display_vehicle = null
+		vehicle_popup.hide())
 	box.add_child(close)
 	vehicle_popup.show()
+
+
+# Ricostruisce il Vehicle Display (segnalini ordine sull'equipaggio) se aperto.
+func _refresh_vehicle_display() -> void:
+	if _display_vehicle != null and vehicle_popup.visible:
+		_show_vehicle_display(_display_vehicle)
 
 
 # Display mat del veicolo (assets/displays/<stem>.png) per tipo.
@@ -2356,7 +2370,8 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				vehicle.clear_order()
 				state.log_event("%s resta fermo" % vehicle.vehicle_type)
 				_update_orders_button()
-				_refresh())
+				_refresh()
+				_refresh_vehicle_display())
 			order_list.add_child(none)
 		"Gunner":
 			var has_coax: bool = not VehicleCombat.coax_mg_weapon(vehicle).is_empty()
@@ -2526,7 +2541,8 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				func() -> void:
 					VehicleCombat.bail_out(state, vehicle)
 					order_panel.hide()
-					_refresh())
+					_refresh()
+					_refresh_vehicle_display())
 			var info_cmd := Label.new()
 			info_cmd.text = "Dirige l'avvistamento del mezzo."
 			info_cmd.add_theme_color_override("font_color", Color(0.75, 0.85, 0.95))
@@ -2537,6 +2553,8 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 	cancel.pressed.connect(func() -> void: order_panel.hide())
 	order_list.add_child(cancel)
 	order_panel.show()
+	# Aggiorna i segnalini ordine sull'equipaggio nel Vehicle Display.
+	_refresh_vehicle_display()
 
 
 # Bottone standard per le scelte di fuoco/azione crew: evidenziato se attivo.
