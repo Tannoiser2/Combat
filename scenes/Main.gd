@@ -60,7 +60,9 @@ var _initiative_card_pending: bool = false  # carta Initiative giocata: attende 
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
 var los_button: Button
 var los_mode := false
-var los_first := Vector2i(-99, -99)
+var los_hex_a := Vector2i(-99, -99)  # prima estremita' strumento LOS
+var los_hex_b := Vector2i(-99, -99)  # seconda estremita'
+var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
 
 # Editor di mappa: pannello pittura terreno (tasto E).
 var editor_panel: PanelContainer
@@ -888,12 +890,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_DOWN:
 				_zoom(1.0 / 1.15)
 			MOUSE_BUTTON_LEFT:
-				_on_map_clicked()
+				if los_mode and map_view != null:
+					_los_handle_press(map_view.get_local_mouse_position())
+				else:
+					_on_map_clicked()
+	elif event is InputEventMouseButton and not event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and los_mode:
+			los_dragging = -1
 	elif event is InputEventMouseMotion:
-		if event.button_mask & MOUSE_BUTTON_MASK_LEFT \
-				and map_view != null and map_view.editor_mode:
-			_editor_act(map_view.get_local_mouse_position())
-		elif event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT and map_view != null:
+			if map_view.editor_mode:
+				_editor_act(map_view.get_local_mouse_position())
+			elif los_mode and los_dragging >= 0:
+				_los_drag_update(map_view.get_local_mouse_position())
+		if event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
 			camera.position -= event.relative / camera.zoom.x
 
 
@@ -922,42 +932,75 @@ func _fit_map() -> void:
 	camera.zoom = Vector2(z, z)
 
 
-# Strumento LOS: ON congela il gioco (i click servono solo alla verifica).
+# Strumento LOS: ON mostra due estremita' trascinabili con LOS in tempo reale.
 func _on_los_toggled(on: bool) -> void:
 	los_mode = on
-	los_first = Vector2i(-99, -99)
+	los_dragging = -1
 	map_view.los_tool = {}
 	next_button.disabled = on
-	hint_label.text = "Strumento LOS: clicca il PRIMO hex" if on \
-		else "Strumento LOS chiuso"
+	if on and state != null and not state.map.is_empty():
+		# Posiziona le estremita' agli estremi della mappa (angolo top-left / bottom-right).
+		var mn := Vector2i(9999, 9999)
+		var mx := Vector2i(-9999, -9999)
+		for key in state.map:
+			var parts: PackedStringArray = (key as String).split(",")
+			var h := Vector2i(int(parts[0]), int(parts[1]))
+			if h.x < mn.x or (h.x == mn.x and h.y < mn.y): mn = h
+			if h.x > mx.x or (h.x == mx.x and h.y > mx.y): mx = h
+		los_hex_a = mn
+		los_hex_b = mx
+		_los_update()
+		hint_label.text = "LOS: trascina i cerchi — %02d.%02d → %02d.%02d" % [mn.x, mn.y, mx.x, mx.y]
+	else:
+		los_hex_a = Vector2i(-99, -99)
+		los_hex_b = Vector2i(-99, -99)
+		hint_label.text = "Strumento LOS chiuso"
 	map_view.queue_redraw()
 
 
-func _handle_los_click(hex: Vector2i) -> void:
-	if los_first.x <= -99:
-		los_first = hex
-		map_view.los_tool = {}
-		map_view.highlight_hex = hex
-		hint_label.text = "Strumento LOS: %02d.%02d -> clicca il SECONDO hex" % [hex.x, hex.y]
-		map_view.queue_redraw()
-		return
-	# Se ci sono unita' sui due hex usa la LOS vera (ordini inclusi).
-	var ca := state.character_at(los_first.x, los_first.y)
-	var cb := state.character_at(hex.x, hex.y)
-	var free: bool
-	if ca != null and cb != null and not ca.is_dead() and not cb.is_dead():
-		free = LOS.clear(state, ca, cb)
+func _los_handle_press(local_pos: Vector2) -> void:
+	var snap := MapView.HEX_SIZE * 0.9
+	var pa := map_view.hex_center(los_hex_a.x, los_hex_a.y)
+	var pb := map_view.hex_center(los_hex_b.x, los_hex_b.y)
+	if local_pos.distance_to(pa) <= snap:
+		los_dragging = 0
+	elif local_pos.distance_to(pb) <= snap:
+		los_dragging = 1
 	else:
-		free = LOS.clear_hexes(state, los_first, hex)
+		# Click lontano: sposta l'estremita' piu' vicina a quell'hex.
+		var hex := map_view.pick_hex(local_pos)
+		if hex.x <= -99:
+			return
+		if local_pos.distance_to(pa) <= local_pos.distance_to(pb):
+			los_hex_a = hex
+		else:
+			los_hex_b = hex
+		_los_update()
+
+
+func _los_drag_update(local_pos: Vector2) -> void:
+	var hex := map_view.pick_hex(local_pos)
+	if hex.x <= -99:
+		return
+	if los_dragging == 0:
+		los_hex_a = hex
+	else:
+		los_hex_b = hex
+	_los_update()
+
+
+func _los_update() -> void:
+	if los_hex_a.x <= -99 or los_hex_b.x <= -99:
+		return
+	var free := LOS.clear_hexes(state, los_hex_a, los_hex_b)
 	map_view.los_tool = {
-		"from": map_view.hex_center(los_first.x, los_first.y),
-		"to": map_view.hex_center(hex.x, hex.y),
+		"from": map_view.hex_center(los_hex_a.x, los_hex_a.y),
+		"to": map_view.hex_center(los_hex_b.x, los_hex_b.y),
 		"clear": free,
 	}
-	hint_label.text = "LOS %02d.%02d -> %02d.%02d: %s   (clicca per un'altra verifica)" % [
-		los_first.x, los_first.y, hex.x, hex.y,
+	hint_label.text = "LOS %02d.%02d → %02d.%02d: %s" % [
+		los_hex_a.x, los_hex_a.y, los_hex_b.x, los_hex_b.y,
 		"LIBERA" if free else "BLOCCATA"]
-	los_first = Vector2i(-99, -99)
 	map_view.queue_redraw()
 
 
@@ -970,9 +1013,6 @@ func _on_map_clicked() -> void:
 	_play_sfx("click")
 	if map_view.editor_mode:
 		_editor_act(map_view.get_local_mouse_position())
-		return
-	if los_mode:
-		_handle_los_click(hex)
 		return
 	if phase == Phase.DEPLOY:
 		_handle_deploy_click(hex)
