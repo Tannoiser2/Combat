@@ -1012,6 +1012,10 @@ func _on_map_clicked() -> void:
 # Selettore ordini: bottoni a sinistra (solo quelli legali), descrizione
 # con track degli impulsi a destra quando passi sopra un ordine.
 func _open_order_panel(c: Character) -> void:
+	# Veicoli: apre la scheda equipaggio (ogni membro ha il suo pannello ordini).
+	if c.is_vehicle:
+		_show_vehicle_display(c)
+		return
 	order_target = c
 	for child in order_list.get_children():
 		child.queue_free()
@@ -1024,73 +1028,6 @@ func _open_order_panel(c: Character) -> void:
 		b.pressed.connect(_on_order_selected.bind(o))
 		b.mouse_entered.connect(_describe_order.bind(o))
 		order_list.add_child(b)
-	# Veicoli con equipaggio (Rule 31.9): comando per-membro. L'ordine sopra
-	# muove lo scafo (Driver); il Gunner puo' sparare il cannone in aggiunta,
-	# anche durante il movimento (move-and-shoot).
-	if c.is_vehicle:
-		var gunner: Character = TurnSequence._crew_member(c, "Gunner")
-		if gunner != null:
-			var crew_lbl := Label.new()
-			crew_lbl.text = "— Equipaggio —"
-			crew_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
-			order_list.add_child(crew_lbl)
-			# Ciclo: non spara -> cannone -> coassiale (se l'AFV ce l'ha) -> ...
-			var has_coax: bool = not VehicleCombat.coax_mg_weapon(c).is_empty()
-			var gfiring: bool = gunner.has_order and gunner.order == Domain.Order.AIMED_FIRE
-			var gstate: int = (2 if gunner.fires_coax else 1) if gfiring else 0
-			var glabels := ["non spara", "cannone", "coassiale"]
-			var gun_btn := Button.new()
-			gun_btn.text = "Gunner: %s" % glabels[gstate]
-			gun_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			gun_btn.custom_minimum_size = Vector2(190, 0)
-			gun_btn.modulate = Color(0.6, 0.95, 0.6) if gstate > 0 else Color(0.85, 0.85, 0.7)
-			gun_btn.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Gunner[/color][/b]\n\nSpara il [b]cannone[/b] (al bersaglio in vista e gittata, ricarica dopo ogni colpo) oppure la [b]MG coassiale[/b] (antiuomo, non consuma il cannone), anche mentre lo scafo si muove (move-and-shoot). Tocca per cambiare: non spara / cannone / coassiale.")
-			gun_btn.pressed.connect(func() -> void:
-				var nxt: int = (gstate + 1) % (3 if has_coax else 2)
-				gunner.fires_coax = (nxt == 2)
-				if nxt == 0:
-					gunner.clear_order()
-				else:
-					gunner.set_order(Domain.Order.AIMED_FIRE)
-				_open_order_panel(c))
-			order_list.add_child(gun_btn)
-		# Rule 31.9.4b: bow MG del Co-Driver (arma separata, fuoco simultaneo).
-		var codriver: Character = TurnSequence._crew_member(c, "Co-Driver")
-		if codriver != null and not VehicleCombat.bow_mg_weapon(c).is_empty():
-			if gunner == null:
-				var crew_lbl2 := Label.new()
-				crew_lbl2.text = "— Equipaggio —"
-				crew_lbl2.add_theme_color_override("font_color", Color(0.7, 0.85, 0.98))
-				order_list.add_child(crew_lbl2)
-			var bfiring: bool = codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE
-			var bow_btn := Button.new()
-			bow_btn.text = "Co-Driver: bow MG %s" % ("SPARA" if bfiring else "non spara")
-			bow_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			bow_btn.custom_minimum_size = Vector2(190, 0)
-			bow_btn.modulate = Color(0.6, 0.95, 0.6) if bfiring else Color(0.85, 0.85, 0.7)
-			bow_btn.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Co-Driver[/color][/b]\n\nServe la mitragliatrice di scafo (bow MG): spara al bersaglio piu' vicino in vista, anche mentre il carro muove e mentre il Gunner spara col cannone. Senza secondo servente usa la TQ-3 e va a corto di munizioni con un singolo 9.")
-			bow_btn.pressed.connect(func() -> void:
-				if codriver.has_order and codriver.order == Domain.Order.AIMED_FIRE:
-					codriver.clear_order()
-				else:
-					codriver.set_order(Domain.Order.AIMED_FIRE)
-				_open_order_panel(c))
-			order_list.add_child(bow_btn)
-		# Rule 31.7/31.10: boccaporto aperto/chiuso (solo AFV con torretta).
-		if VehicleCombat.has_turret(c):
-			var hatch_btn := Button.new()
-			hatch_btn.text = "Boccaporto: %s" % ("CHIUSO" if c.is_buttoned_up else "APERTO")
-			hatch_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			hatch_btn.custom_minimum_size = Vector2(190, 0)
-			hatch_btn.modulate = Color(0.7, 0.85, 0.98) if c.is_buttoned_up else Color(0.95, 0.8, 0.5)
-			hatch_btn.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Boccaporto[/color][/b]\n\n[b]Chiuso[/b]: equipaggio al sicuro dal fuoco leggero, ma avvista a -2 (visibilita' ridotta).\n[b]Aperto[/b]: avvista normalmente, ma l'equipaggio e' esposto al fuoco leggero.")
-			hatch_btn.pressed.connect(func() -> void:
-				c.is_buttoned_up = not c.is_buttoned_up
-				_open_order_panel(c))
-			order_list.add_child(hatch_btn)
 	# Lasciare un uomo SENZA ordine e' lecito (le tabelle hanno la colonna
 	# 'No Order'): non agira' negli impulsi, ma allo scoperto e' piu'
 	# facile da colpire.
@@ -2096,7 +2033,7 @@ func _show_vehicle_display(vehicle: Character) -> void:
 		box.add_child(_build_vehicle_schematic(vehicle))
 		if vehicle.side == Domain.Side.FRIENDLY:
 			var hint := Label.new()
-			hint.text = "Clic su Gunner/Co-Driver per il fuoco"
+			hint.text = "Clic su un membro per assegnare l'ordine"
 			hint.add_theme_font_size_override("font_size", 10)
 			hint.modulate = Color(0.65, 0.65, 0.6)
 			box.add_child(hint)
@@ -2277,14 +2214,14 @@ func _add_crew_token(parent: Control, vehicle: Character, cm: Character, pos: Ve
 		badge.add_theme_stylebox_override("normal", bsb)
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		parent.add_child(badge)
-	# Pedina cliccabile: veicolo amico, Gunner/Co-Driver vivi e a bordo.
+	# Pedina cliccabile: ogni membro vivo e a bordo di un veicolo amico.
 	var interactive := vehicle.side == Domain.Side.FRIENDLY and cm.embarked \
-		and not cm.is_dead() and cm.crew_role in ["Gunner", "Co-Driver"]
+		and not cm.is_dead()
 	if interactive:
 		var btn := Button.new()
 		btn.position = pos
 		btn.size = Vector2(cs, cs)
-		btn.tooltip_text = "Cambia fuoco: %s" % cm.crew_role
+		btn.tooltip_text = "%s — assegna ordine" % cm.crew_role
 		var tsb := StyleBoxFlat.new()
 		tsb.bg_color = Color(0.3, 0.6, 1.0, 0.12)
 		tsb.set_border_width_all(2)
@@ -2294,9 +2231,7 @@ func _add_crew_token(parent: Control, vehicle: Character, cm: Character, pos: Ve
 		btn.add_theme_stylebox_override("hover", tsb)
 		btn.add_theme_stylebox_override("pressed", tsb)
 		btn.pressed.connect(func() -> void:
-			_cycle_crew_action(vehicle, cm)
-			_update_orders_button()
-			_show_vehicle_display(vehicle))
+			_open_crew_order_panel(vehicle, cm))
 		parent.add_child(btn)
 
 
@@ -2307,6 +2242,8 @@ func _crew_action_text(vehicle: Character, cm: Character) -> String:
 	if not cm.embarked:
 		return "sceso"
 	match cm.crew_role:
+		"Driver":
+			return Domain.ORDER_NAMES[vehicle.order] if vehicle.has_order else "—"
 		"Gunner":
 			if cm.has_order and cm.order == Domain.Order.AIMED_FIRE:
 				return "coassiale" if cm.fires_coax else "cannone"
@@ -2314,7 +2251,167 @@ func _crew_action_text(vehicle: Character, cm: Character) -> String:
 		"Co-Driver":
 			if not VehicleCombat.bow_mg_weapon(vehicle).is_empty():
 				return "bow MG" if (cm.has_order and cm.order == Domain.Order.AIMED_FIRE) else "—"
+		"Loader":
+			if VehicleCombat.has_turret(vehicle):
+				return "carico" if vehicle.main_gun_loaded else "ricarica"
+		"Commander":
+			if VehicleCombat.has_turret(vehicle):
+				return "BU" if vehicle.is_buttoned_up else "aperto"
 	return ""
+
+
+# Pannello ordini per un membro specifico dell'equipaggio (Rule 31.11.2).
+# Apre il pannello ordini sinistro con i controlli appropriati al ruolo.
+func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
+	for child in order_list.get_children():
+		child.queue_free()
+	order_title_label.text = "⠿  %s — %s" % [cm.crew_role, vehicle.vehicle_type]
+	order_desc.text = "[i]Passa il mouse su un'azione per la spiegazione.[/i]"
+	match cm.crew_role:
+		"Driver":
+			# Il Driver esegue l'ordine di movimento del veicolo.
+			order_target = vehicle
+			var driver_orders: Array[int] = [
+				Domain.Order.HIDE, Domain.Order.SNEAK,
+				Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
+				Domain.Order.EVADE, Domain.Order.DUCK_BACK,
+			]
+			for o: int in driver_orders:
+				if Weather.order_forbidden(state.ground, o):
+					continue
+				var b := Button.new()
+				b.text = Domain.ORDER_NAMES[o]
+				b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				b.custom_minimum_size = Vector2(190, 0)
+				if vehicle.has_order and vehicle.order == o:
+					b.modulate = Color(0.5, 1.0, 0.5)
+				b.pressed.connect(_on_order_selected.bind(o))
+				b.mouse_entered.connect(_describe_order.bind(o))
+				order_list.add_child(b)
+			var none := Button.new()
+			none.text = "Senza ordine (fermo)"
+			none.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			none.modulate = Color(0.8, 0.8, 0.65)
+			none.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Senza ordine[/color][/b]\n\nIl veicolo non si muove questo impulso.")
+			none.pressed.connect(func() -> void:
+				order_panel.hide()
+				vehicle.clear_order()
+				state.log_event("%s resta fermo" % vehicle.vehicle_type)
+				_update_orders_button()
+				_refresh())
+			order_list.add_child(none)
+		"Gunner":
+			var has_coax: bool = not VehicleCombat.coax_mg_weapon(vehicle).is_empty()
+			var gfiring: bool = cm.has_order and cm.order == Domain.Order.AIMED_FIRE
+			var gstate: int = (2 if cm.fires_coax else 1) if gfiring else 0
+			var b0 := Button.new()
+			b0.text = "Non spara"
+			b0.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			b0.custom_minimum_size = Vector2(190, 0)
+			b0.modulate = Color(0.5, 1.0, 0.5) if gstate == 0 else Color(0.85, 0.85, 0.7)
+			b0.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Non spara[/color][/b]\n\nIl Gunner non apre il fuoco questo impulso.")
+			b0.pressed.connect(func() -> void:
+				cm.fires_coax = false
+				cm.clear_order()
+				_update_orders_button()
+				_open_crew_order_panel(vehicle, cm))
+			order_list.add_child(b0)
+			var b1 := Button.new()
+			b1.text = "Cannone principale"
+			b1.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			b1.custom_minimum_size = Vector2(190, 0)
+			b1.modulate = Color(0.5, 1.0, 0.5) if gstate == 1 else Color(0.85, 0.85, 0.7)
+			b1.mouse_entered.connect(func() -> void:
+				order_desc.text = "[b][color=#f3e88a]Cannone principale[/color][/b]\n\nSpara il cannone al bersaglio nel front arc della torretta. Consuma la carica: il Loader ricarica all'impulso successivo.")
+			b1.pressed.connect(func() -> void:
+				cm.fires_coax = false
+				cm.set_order(Domain.Order.AIMED_FIRE)
+				_update_orders_button()
+				_open_crew_order_panel(vehicle, cm))
+			order_list.add_child(b1)
+			if has_coax:
+				var b2 := Button.new()
+				b2.text = "MG coassiale"
+				b2.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				b2.custom_minimum_size = Vector2(190, 0)
+				b2.modulate = Color(0.5, 1.0, 0.5) if gstate == 2 else Color(0.85, 0.85, 0.7)
+				b2.mouse_entered.connect(func() -> void:
+					order_desc.text = "[b][color=#f3e88a]MG coassiale[/color][/b]\n\nSpara la mitragliatrice coassiale (antiuomo). Non consuma la carica del cannone; richiede torretta allineata.")
+				b2.pressed.connect(func() -> void:
+					cm.fires_coax = true
+					cm.set_order(Domain.Order.AIMED_FIRE)
+					_update_orders_button()
+					_open_crew_order_panel(vehicle, cm))
+				order_list.add_child(b2)
+		"Co-Driver":
+			if not VehicleCombat.bow_mg_weapon(vehicle).is_empty():
+				var bfiring: bool = cm.has_order and cm.order == Domain.Order.AIMED_FIRE
+				var b_on := Button.new()
+				b_on.text = "Bow MG: SPARA"
+				b_on.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				b_on.custom_minimum_size = Vector2(190, 0)
+				b_on.modulate = Color(0.5, 1.0, 0.5) if bfiring else Color(0.85, 0.85, 0.7)
+				b_on.mouse_entered.connect(func() -> void:
+					order_desc.text = "[b][color=#f3e88a]Bow MG: SPARA[/color][/b]\n\nServe la mitragliatrice di scafo. Senza secondo servente usa TQ-3 e rischia di esaurire i colpi col 9.")
+				b_on.pressed.connect(func() -> void:
+					cm.set_order(Domain.Order.AIMED_FIRE)
+					_update_orders_button()
+					_open_crew_order_panel(vehicle, cm))
+				order_list.add_child(b_on)
+				var b_off := Button.new()
+				b_off.text = "Non spara"
+				b_off.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				b_off.custom_minimum_size = Vector2(190, 0)
+				b_off.modulate = Color(0.5, 1.0, 0.5) if not bfiring else Color(0.85, 0.85, 0.7)
+				b_off.mouse_entered.connect(func() -> void:
+					order_desc.text = "[b][color=#f3e88a]Non spara[/color][/b]\n\nIl Co-Driver non apre il fuoco questo impulso.")
+				b_off.pressed.connect(func() -> void:
+					cm.clear_order()
+					_update_orders_button()
+					_open_crew_order_panel(vehicle, cm))
+				order_list.add_child(b_off)
+			else:
+				var info := Label.new()
+				info.text = "Nessuna bow MG montata."
+				info.add_theme_color_override("font_color", Color(0.65, 0.65, 0.6))
+				order_list.add_child(info)
+		"Loader":
+			if VehicleCombat.has_turret(vehicle):
+				var gun_state := "carico" if vehicle.main_gun_loaded else "da ricaricare"
+				var info := Label.new()
+				info.text = "Cannone: %s\n(ricarica automatica)" % gun_state
+				info.add_theme_color_override("font_color", Color(0.75, 0.9, 0.75))
+				order_list.add_child(info)
+			else:
+				var info := Label.new()
+				info.text = "Nessun cannone su questo mezzo."
+				info.add_theme_color_override("font_color", Color(0.65, 0.65, 0.6))
+				order_list.add_child(info)
+		"Commander":
+			if VehicleCombat.has_turret(vehicle):
+				var hatch_btn := Button.new()
+				hatch_btn.text = "Boccaporto: %s" % ("CHIUSO" if vehicle.is_buttoned_up else "APERTO")
+				hatch_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				hatch_btn.custom_minimum_size = Vector2(190, 0)
+				hatch_btn.modulate = Color(0.7, 0.85, 0.98) if vehicle.is_buttoned_up else Color(0.95, 0.8, 0.5)
+				hatch_btn.mouse_entered.connect(func() -> void:
+					order_desc.text = "[b][color=#f3e88a]Boccaporto[/color][/b]\n\n[b]Chiuso[/b]: equipaggio al sicuro dal fuoco leggero, ma avvista a -2.\n[b]Aperto[/b]: avvista normalmente, ma l'equipaggio e' esposto al fuoco leggero.")
+				hatch_btn.pressed.connect(func() -> void:
+					vehicle.is_buttoned_up = not vehicle.is_buttoned_up
+					_open_crew_order_panel(vehicle, cm))
+				order_list.add_child(hatch_btn)
+			var info_cmd := Label.new()
+			info_cmd.text = "Dirige l'avvistamento del mezzo."
+			info_cmd.add_theme_color_override("font_color", Color(0.75, 0.85, 0.95))
+			order_list.add_child(info_cmd)
+	var cancel := Button.new()
+	cancel.text = "Annulla"
+	cancel.modulate = Color(0.85, 0.7, 0.7)
+	cancel.pressed.connect(func() -> void: order_panel.hide())
+	order_list.add_child(cancel)
+	order_panel.show()
 
 
 # Ripiego testuale se manca il mat del veicolo.
@@ -2369,26 +2466,6 @@ func _make_draggable(win: Control, handle: Control) -> void:
 		elif ev is InputEventMouseMotion and handle.get_meta("_dragging", false):
 			win.global_position += ev.relative)
 
-
-# Cicla l'azione di fuoco di un membro (Rule 31.9). Gunner: niente -> cannone
-# -> coassiale (se l'AFV ce l'ha) -> niente. Co-Driver: bow MG on/off.
-func _cycle_crew_action(vehicle: Character, cm: Character) -> void:
-	match cm.crew_role:
-		"Gunner":
-			var has_coax: bool = not VehicleCombat.coax_mg_weapon(vehicle).is_empty()
-			var firing: bool = cm.has_order and cm.order == Domain.Order.AIMED_FIRE
-			var st: int = (2 if cm.fires_coax else 1) if firing else 0
-			var nxt: int = (st + 1) % (3 if has_coax else 2)
-			cm.fires_coax = (nxt == 2)
-			if nxt == 0:
-				cm.clear_order()
-			else:
-				cm.set_order(Domain.Order.AIMED_FIRE)
-		"Co-Driver":
-			if cm.has_order and cm.order == Domain.Order.AIMED_FIRE:
-				cm.clear_order()
-			else:
-				cm.set_order(Domain.Order.AIMED_FIRE)
 
 
 func _show_card_preview(tex: Texture2D) -> void:
