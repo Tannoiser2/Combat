@@ -2160,8 +2160,16 @@ func _build_vehicle_schematic(vehicle: Character) -> Control:
 		return _crew_text_list(vehicle)
 	var dw := VEHICLE_DISPLAY_W
 	var dh := dw * tex.get_height() / tex.get_width()
+	var boxes: Dictionary = DISPLAY_BOXES.get(vehicle.vehicle_type, {})
+	# Mostra solo la porzione del mat fino al box equipaggio piu' basso + margine.
+	var max_crew_y := 0.0
+	for ctr in boxes.values():
+		max_crew_y = max(max_crew_y, ctr.y)
+	var crop_fraction: float = min(max_crew_y + 0.28, 1.0) if max_crew_y > 0.0 else 1.0
+	var crop_h := dh * crop_fraction
 	var schem := Control.new()
-	schem.custom_minimum_size = Vector2(dw, dh)
+	schem.custom_minimum_size = Vector2(dw, crop_h)
+	schem.clip_contents = true
 	var mat := TextureRect.new()
 	mat.texture = tex
 	mat.position = Vector2.ZERO
@@ -2170,8 +2178,7 @@ func _build_vehicle_schematic(vehicle: Character) -> Control:
 	mat.stretch_mode = TextureRect.STRETCH_SCALE
 	mat.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	schem.add_child(mat)
-	var boxes: Dictionary = DISPLAY_BOXES.get(vehicle.vehicle_type, {})
-	var cs := dw * 0.12
+	var cs := dw * 0.15
 	for cm in vehicle.crew:
 		if not boxes.has(cm.crew_role):
 			continue
