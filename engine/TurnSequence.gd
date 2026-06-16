@@ -399,6 +399,63 @@ static func _fire_crew_weapon(state: GameState, vehicle: Character,
 	Fire.fire_action(state, crew, best, weapon)
 
 
+# True se il Gunner ha un ordine di fuoco attivo a questo impulse (move-and-shoot).
+static func vehicle_gunner_fires_impulse(v: Character, impulse: int) -> bool:
+	var gunner := _crew_member(v, "Gunner")
+	if gunner == null or not gunner.has_order:
+		return false
+	return Orders.impulse_action(gunner.order, impulse) == Domain.ImpulseAction.MAY_FIRE
+
+
+# Come _gunner_fire ma spara su un bersaglio SCELTO dal giocatore (fire interattivo).
+static func fire_vehicle_gunner_at(state: GameState, v: Character, target: Character) -> void:
+	var gunner := _crew_member(v, "Gunner")
+	var coax := VehicleCombat.coax_mg_weapon(v)
+	if gunner != null and gunner.fires_coax and not coax.is_empty():
+		var old_pos := gunner.position
+		gunner.position = v.position
+		if not (VehicleCombat.has_turret(v) and not VehicleCombat.turret_aim(state, v, target.position)):
+			Fire.fire_action(state, gunner, target, coax)
+		gunner.position = old_pos
+		return
+	var had_order := v.has_order
+	var old_order: int = v.order if v.has_order else 0
+	if gunner != null and gunner.has_order:
+		v.has_order = true
+		v.order = gunner.order
+	var removed_weapon := ""
+	var removed_ws := 0
+	if not v.fire_mode.is_empty():
+		for w: String in v.weapon_skills.keys():
+			if "AP" in w or "HE" in w:
+				var wrong: bool = (v.fire_mode == "AP" and "HE" in w) \
+					or (v.fire_mode == "HE" and "AP" in w)
+				if wrong:
+					removed_weapon = w; removed_ws = int(v.weapon_skills[w]); break
+		if not removed_weapon.is_empty():
+			v.weapon_skills.erase(removed_weapon)
+	var weapon: String = v.weapon_skills.keys()[0] if not v.weapon_skills.is_empty() else ""
+	if not weapon.is_empty():
+		Fire.fire_action(state, v, target, weapon)
+	if not removed_weapon.is_empty():
+		v.weapon_skills[removed_weapon] = removed_ws
+	v.has_order = had_order
+	if had_order:
+		v.order = old_order
+
+
+# Spara solo la bow MG del Co-Driver (usato dopo il fuoco interattivo del Gunner).
+static func resolve_vehicle_bow_mg(state: GameState, v: Character) -> void:
+	var bow := VehicleCombat.bow_mg_weapon(v)
+	if bow.is_empty():
+		return
+	var codriver := _crew_member(v, "Co-Driver")
+	if codriver != null and codriver.has_order \
+			and Orders.impulse_action(codriver.order, state.impulse) \
+				== Domain.ImpulseAction.MAY_FIRE:
+		_fire_crew_weapon(state, v, codriver, bow)
+
+
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 	c.had_first_order = true
 	var gunner := _crew_member(c, "Gunner")

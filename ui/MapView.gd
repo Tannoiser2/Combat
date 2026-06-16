@@ -116,6 +116,8 @@ var editor_mode := false
 var map_opacity: float = 1.0
 # Opacita' dell'overlay di terreno rigenerato (debug/editor): 0 = nascosto.
 var overlay_opacity: float = 1.0
+# Tasto A: mostra gli archi di blindatura (Front/Rear) del veicolo selezionato.
+var show_arc_overlay: bool = false
 # Strumento LOS: {from: Vector2, to: Vector2, clear: bool} oppure {}.
 var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
@@ -573,7 +575,7 @@ func _draw() -> void:
 	else:
 		# Primo passaggio: marker KIA sotto le pedine vive.
 		for c in state.characters:
-			if not c.is_dead():
+			if not c.is_dead() or c.embarked:
 				continue
 			var kia_name := "kia-ENEMY" if c.side == D.Side.ENEMY else "kia-FRIENDLY"
 			_draw_marker(_named_tex(kia_name), _pos_of(c), radius)
@@ -582,7 +584,7 @@ func _draw() -> void:
 		var stack_idx := {}      # Character -> indice
 		var stack_count := {}    # chiave hex -> totale vivi
 		for c in state.characters:
-			if c.is_dead():
+			if c.is_dead() or c.embarked:
 				continue
 			var k := GameState.hex_key(c.position.x, c.position.y)
 			var n: int = stack_count.get(k, 0)
@@ -592,7 +594,7 @@ func _draw() -> void:
 		# in una pila l'unita' scelta resta leggibile in cima.
 		for pass_selected in [false, true]:
 			for c in state.characters:
-				if c.is_dead() or (c == selected) != pass_selected:
+				if c.embarked or c.is_dead() or (c == selected) != pass_selected:
 					continue
 				var hidden := c.side == D.Side.ENEMY and not c.known
 				var center := _pos_of(c) + _stack_offset(c, stack_idx, stack_count, radius)
@@ -684,6 +686,50 @@ func _draw_vehicle_overlay(radius: float, center: Vector2, c: Character) -> void
 		var bp := center + Vector2(radius * 0.36, radius * 0.36)
 		draw_circle(bp, radius * 0.18, Color(1.0, 0.45, 0.0))
 		draw_circle(bp, radius * 0.18, Color(0, 0, 0, 0.6), false, radius * 0.03)
+	# Overlay archi di blindatura (tasto A): tinta verde=Front, rossa=Rear
+	# sugli hex adiacenti. La classificazione segue la stessa logica di
+	# VehicleCombat.hit_face (dot product tra facing e delta verso l'hex).
+	if show_arc_overlay and c == selected and c.facing > 0 and state != null:
+		_draw_arc_overlay(center, radius, c)
+
+
+# Overlay archi di blindatura: evidenzia gli hex adiacenti per arc (Front/Rear).
+func _draw_arc_overlay(center: Vector2, radius: float, v: Character) -> void:
+	const ARC_FRONT := Color(0.2, 0.85, 0.3, 0.28)
+	const ARC_REAR  := Color(0.9, 0.2, 0.2, 0.28)
+	const ARC_FRONT_BORDER := Color(0.2, 0.85, 0.3, 0.75)
+	const ARC_REAR_BORDER  := Color(0.9, 0.2, 0.2, 0.75)
+	var vdir: Vector3i = Move.CUBE_DIRS[(v.facing - 1) % 6]
+	for d in range(6):
+		var dir: Vector3i = Move.CUBE_DIRS[d]
+		var neighbor_cube := Move.to_cube(v.position) + dir
+		var neighbor_hex := Move.from_cube(neighbor_cube)
+		if not state.map.has(GameState.hex_key(neighbor_hex.x, neighbor_hex.y)):
+			continue
+		var nc := hex_center(neighbor_hex.x, neighbor_hex.y)
+		var front_dot: int = vdir.x * dir.x + vdir.y * dir.y + vdir.z * dir.z
+		var is_front: bool = front_dot > 0
+		var fill_col: Color = ARC_FRONT if is_front else ARC_REAR
+		var border_col: Color = ARC_FRONT_BORDER if is_front else ARC_REAR_BORDER
+		var pts := _hex_points(nc, radius * 0.88)
+		draw_colored_polygon(pts, fill_col)
+		draw_polyline(_closed(pts), border_col, radius * 0.05)
+	# Etichette FRONT / REAR sui due hex opposti (facing e suo contrario).
+	var font := ThemeDB.fallback_font
+	var fs := maxi(10, int(radius * 0.26))
+	var front_hex_cube := Move.to_cube(v.position) + vdir
+	var front_hex := Move.from_cube(front_hex_cube)
+	if state.map.has(GameState.hex_key(front_hex.x, front_hex.y)):
+		var fc := hex_center(front_hex.x, front_hex.y)
+		draw_string(font, fc + Vector2(-radius * 0.35, radius * 0.1), "FRONT",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.1, 0.6, 0.1))
+	var rear_dir: Vector3i = Move.CUBE_DIRS[(v.facing + 2) % 6]
+	var rear_hex_cube := Move.to_cube(v.position) + rear_dir
+	var rear_hex := Move.from_cube(rear_hex_cube)
+	if state.map.has(GameState.hex_key(rear_hex.x, rear_hex.y)):
+		var rc := hex_center(rear_hex.x, rear_hex.y)
+		draw_string(font, rc + Vector2(-radius * 0.3, radius * 0.1), "REAR",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.7, 0.1, 0.1))
 
 
 # Piccola freccia sul bordo del segnalino, nella direzione del facing scafo.

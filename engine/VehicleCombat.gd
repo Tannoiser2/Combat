@@ -316,6 +316,20 @@ static func _free_hex_near(state: GameState, pos: Vector2i) -> Vector2i:
 	return pos
 
 
+# Mount Up: un personaggio a piedi sale sul veicolo come passeggero.
+# Il passeggero sparisce dalla mappa (embarked=true) e viene aggiunto a vehicle.crew
+# con ruolo "Passenger". Scende normalmente con bail_out alla distruzione/selezione.
+static func mount_up(state: GameState, passenger: Character, vehicle: Character) -> void:
+	passenger.crew_role = "Passenger"
+	passenger.embarked = true
+	passenger.position = vehicle.position
+	passenger.clear_order()
+	vehicle.crew.append(passenger)
+	state.log_event("%s sale sul %s in %02d.%02d" % [
+		passenger.display_name, vehicle.display_name,
+		vehicle.position.x, vehicle.position.y])
+
+
 # Bail Out (Rule 31.9.3): i crew vivi a bordo scendono nell'hex del mezzo
 # (o adiacente), diventano fanteria normale e si aggiungono a state.characters.
 # Scendono scossi (sotto il fuoco) e senza ordine.
