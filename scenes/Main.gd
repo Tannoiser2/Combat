@@ -59,7 +59,10 @@ var _initiative_card_pending: bool = false  # carta Initiative giocata: attende 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
 var los_button: Button
+var editor_button: Button
 var los_mode := false
+# Touch input (mobile/iPad): traccia le dita attive per pan e pinch-zoom.
+var _touch_points: Dictionary = {}
 var los_hex_a := Vector2i(-99, -99)  # prima estremita' strumento LOS
 var los_hex_b := Vector2i(-99, -99)  # seconda estremita'
 var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
@@ -874,6 +877,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		map_view.queue_redraw()
 		hint_label.text = "Editor mappa: %s (E per uscire)" % \
 			("ON — clicca hex + trascina per dipingere terreno" if map_view.editor_mode else "off")
+		if editor_button != null:
+			editor_button.set_pressed_no_signal(map_view.editor_mode)
 		return
 	# Tasto A: overlay archi di blindatura (Front/Rear) sul veicolo selezionato.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_A \
@@ -883,7 +888,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_label.text = "Archi di blindatura: %s (A per nascondere)" % \
 			("ON" if map_view.show_arc_overlay else "off")
 		return
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_points[event.index] = event.position
+		else:
+			_touch_points.erase(event.index)
+	elif event is InputEventScreenDrag:
+		var other_idx: int = 0 if event.index == 1 else 1
+		if other_idx in _touch_points:
+			# Pinch-zoom: confronta distanza vecchia vs nuova tra le due dita.
+			var old_pos: Vector2 = event.position - event.relative
+			var other_pos: Vector2 = _touch_points[other_idx]
+			var old_dist: float = old_pos.distance_to(other_pos)
+			var new_dist: float = event.position.distance_to(other_pos)
+			if old_dist > 1.0:
+				_zoom(new_dist / old_dist)
+		else:
+			# Una sola dita: pan della mappa.
+			camera.position -= event.relative / camera.zoom.x
+		_touch_points[event.index] = event.position
+	elif event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				_zoom(1.15)
@@ -1422,6 +1446,23 @@ func _build_hud() -> void:
 	los_button.custom_minimum_size = Vector2(70, 40)
 	los_button.toggled.connect(_on_los_toggled)
 	top_box.add_child(los_button)
+	editor_button = Button.new()
+	editor_button.text = "Mappa"
+	editor_button.toggle_mode = true
+	editor_button.tooltip_text = "Editor mappa (E): clicca e trascina per dipingere terreno."
+	editor_button.custom_minimum_size = Vector2(80, 40)
+	editor_button.toggled.connect(func(on: bool) -> void:
+		if map_view == null:
+			return
+		map_view.editor_mode = on
+		editor_panel.visible = on
+		map_view.debug_terrain = on
+		overlay_legend.visible = false
+		map_view.queue_redraw()
+		hint_label.text = "Editor mappa: %s (E per uscire)" % \
+			("ON — clicca hex + trascina per dipingere terreno" if on else "off")
+	)
+	top_box.add_child(editor_button)
 	replay_button = Button.new()
 	replay_button.text = "Replay turno"
 	replay_button.tooltip_text = "Rivedi il turno appena giocato: percorsi e\ncombattimenti in flusso cinematografico continuo."
