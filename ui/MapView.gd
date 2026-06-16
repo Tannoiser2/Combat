@@ -509,8 +509,11 @@ func _draw() -> void:
 			else Color(0.95, 0.2, 0.15, 0.95)
 		_draw_dashed(los_tool["from"], los_tool["to"], lt_col,
 			radius * 0.12, radius * 0.5)
-		draw_circle(los_tool["from"], radius * 0.2, lt_col)
-		draw_circle(los_tool["to"], radius * 0.2, lt_col)
+		# Cerchi grandi (handle trascinabili) con puntino bianco interno.
+		draw_circle(los_tool["from"], radius * 0.38, lt_col)
+		draw_circle(los_tool["from"], radius * 0.18, Color(1.0, 1.0, 1.0, 0.9))
+		draw_circle(los_tool["to"], radius * 0.38, lt_col)
+		draw_circle(los_tool["to"], radius * 0.18, Color(1.0, 1.0, 1.0, 0.9))
 		if not los_tool["clear"]:
 			var mid: Vector2 = (los_tool["from"] + los_tool["to"]) * 0.5
 			draw_line(mid + Vector2(-1, -1) * radius * 0.3, mid + Vector2(1, 1) * radius * 0.3, lt_col, radius * 0.1)
@@ -617,7 +620,7 @@ func _draw() -> void:
 			_draw_unit(font, radius, _replay_pos(idx), u["counter"], u["side"],
 				u["team"], u["hidden"], u["morale"], u["order"], u["name"], false,
 				"", u.get("facing", 0))
-	else:
+	elif not editor_mode:
 		# Primo passaggio: marker KIA sotto le pedine vive.
 		for c in state.characters:
 			if not c.is_dead() or c.embarked:
@@ -652,15 +655,18 @@ func _draw() -> void:
 				if c.side == D.Side.FRIENDLY and c.spotted:
 					draw_circle(center + Vector2(radius * 0.52, -radius * 0.52),
 						radius * 0.12, Color(0.9, 0.15, 0.15))
-	# Editor di mappa: etichette col,row su ogni hex + tinta terreno.
+	# Editor di mappa: solo il livello di elevazione (se > 0) al centro dell'hex.
 	if editor_mode:
 		for key in state.map:
+			var eh: GameState.MapHex = state.map[key]
+			if eh.level <= 0:
+				continue
 			var ec := _key_to_cell(key)
 			var ecenter := hex_center(ec.x, ec.y)
-			draw_circle(ecenter, radius * 0.28, Color(0.0, 0.0, 0.0, 0.55))
-			draw_string(font, ecenter + Vector2(-radius * 0.45, radius * 0.12),
-				"%02d.%02d" % [ec.x, ec.y],
-				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.28), Color.WHITE)
+			draw_circle(ecenter, radius * 0.24, Color(0.0, 0.0, 0.0, 0.65))
+			draw_string(font, ecenter + Vector2(0.0, radius * 0.12),
+				str(eh.level),
+				HORIZONTAL_ALIGNMENT_CENTER, -1, int(radius * 0.36), Color(1.0, 0.9, 0.3))
 	# Widget bussola: mostra le 6 direzioni dello scenario (Rule 9.3).
 	if state != null and state.compass.size() == 7:
 		var vp_size := get_viewport_rect().size

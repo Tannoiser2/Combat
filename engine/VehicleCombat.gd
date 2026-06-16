@@ -402,6 +402,11 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	var ws: int = firer.weapon_skills.get(weapon, firer.troop_quality - 2) + int(rmod)
 	ws += firer.wound_tq_modifier()
 	ws += int(Orders.FIRE_WS_MOD.get(firer.order if firer.has_order else -1, 0))
+	# Rule 31.6 Emergency Stop: +1 WS per chi spara al carro fermo, -2 al carro stesso.
+	if vehicle.emergency_stop:
+		ws += 1
+	if firer.is_vehicle and firer.emergency_stop:
+		ws -= 2
 	var roll: int = Checks.roll_d10(state.rng)
 	var hit: bool = (roll == 0 or roll <= ws) and roll != 9
 	state.log_event("%s -> %s con %s (WS %d, d10: %d): %s" % [

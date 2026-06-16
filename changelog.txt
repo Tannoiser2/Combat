@@ -1,3 +1,13 @@
+v0.63 — 2026-06-16
+- Fix roster: highlight (sfondo colorato) si aggiorna ora su ogni clic sulla
+  mappa, sul roster amici e sul roster nemici, e all'inizio di ogni azione.
+  Pedina del soldato ingrandita (48->58px) e allineata in basso ai segnalini.
+- Rule 31.7 (LOS arc boccaporto chiuso): veicolo con boccaporto chiuso ora
+  può spottare SOLO nel front arc (front_dot > 0 vs facing) oltre al -2 TQ.
+- Rule 31.6 (Emergency Stop): se un veicolo nemico riconosce una minaccia AT
+  in LOS e supera un TQC, smette di avanzare (Emergency Stop). Effetti:
+  -2 WS a tutto il fuoco del carro, +1 WS per chi spara contro il carro.
+
 v0.62 — 2026-06-16
 - Balance test automatico (COMBAT_BALANCE=1): simula ogni scenario 20 volte
   con seed diversi e stampa WIN%/DRAW%/LOSS%, VP medi, caduti e turni.

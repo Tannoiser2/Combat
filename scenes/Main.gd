@@ -59,8 +59,13 @@ var _initiative_card_pending: bool = false  # carta Initiative giocata: attende 
 # Strumento LOS: il gioco si congela e due click tracciano una linea
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
 var los_button: Button
+var editor_button: Button
 var los_mode := false
-var los_first := Vector2i(-99, -99)
+# Touch input (mobile/iPad): traccia le dita attive per pan e pinch-zoom.
+var _touch_points: Dictionary = {}
+var los_hex_a := Vector2i(-99, -99)  # prima estremita' strumento LOS
+var los_hex_b := Vector2i(-99, -99)  # seconda estremita'
+var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
 
 # Editor di mappa: pannello pittura terreno (tasto E).
 var editor_panel: PanelContainer
@@ -872,6 +877,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		map_view.queue_redraw()
 		hint_label.text = "Editor mappa: %s (E per uscire)" % \
 			("ON — clicca hex + trascina per dipingere terreno" if map_view.editor_mode else "off")
+		if editor_button != null:
+			editor_button.set_pressed_no_signal(map_view.editor_mode)
 		return
 	# Tasto A: overlay archi di blindatura (Front/Rear) sul veicolo selezionato.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_A \
@@ -881,19 +888,46 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_label.text = "Archi di blindatura: %s (A per nascondere)" % \
 			("ON" if map_view.show_arc_overlay else "off")
 		return
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_points[event.index] = event.position
+		else:
+			_touch_points.erase(event.index)
+	elif event is InputEventScreenDrag:
+		var other_idx: int = 0 if event.index == 1 else 1
+		if other_idx in _touch_points:
+			# Pinch-zoom: confronta distanza vecchia vs nuova tra le due dita.
+			var old_pos: Vector2 = event.position - event.relative
+			var other_pos: Vector2 = _touch_points[other_idx]
+			var old_dist: float = old_pos.distance_to(other_pos)
+			var new_dist: float = event.position.distance_to(other_pos)
+			if old_dist > 1.0:
+				_zoom(new_dist / old_dist)
+		else:
+			# Una sola dita: pan della mappa.
+			camera.position -= event.relative / camera.zoom.x
+		_touch_points[event.index] = event.position
+	elif event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				_zoom(1.15)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				_zoom(1.0 / 1.15)
 			MOUSE_BUTTON_LEFT:
-				_on_map_clicked()
+				if los_mode and map_view != null:
+					_los_handle_press(map_view.get_local_mouse_position())
+				else:
+					_on_map_clicked()
+	elif event is InputEventMouseButton and not event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and los_mode:
+			los_dragging = -1
 	elif event is InputEventMouseMotion:
-		if event.button_mask & MOUSE_BUTTON_MASK_LEFT \
-				and map_view != null and map_view.editor_mode:
-			_editor_act(map_view.get_local_mouse_position())
-		elif event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT and map_view != null:
+			if map_view.editor_mode:
+				_editor_act(map_view.get_local_mouse_position())
+			elif los_mode and los_dragging >= 0:
+				_los_drag_update(map_view.get_local_mouse_position())
+		if event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
 			camera.position -= event.relative / camera.zoom.x
 
 
@@ -922,42 +956,75 @@ func _fit_map() -> void:
 	camera.zoom = Vector2(z, z)
 
 
-# Strumento LOS: ON congela il gioco (i click servono solo alla verifica).
+# Strumento LOS: ON mostra due estremita' trascinabili con LOS in tempo reale.
 func _on_los_toggled(on: bool) -> void:
 	los_mode = on
-	los_first = Vector2i(-99, -99)
+	los_dragging = -1
 	map_view.los_tool = {}
 	next_button.disabled = on
-	hint_label.text = "Strumento LOS: clicca il PRIMO hex" if on \
-		else "Strumento LOS chiuso"
+	if on and state != null and not state.map.is_empty():
+		# Posiziona le estremita' agli estremi della mappa (angolo top-left / bottom-right).
+		var mn := Vector2i(9999, 9999)
+		var mx := Vector2i(-9999, -9999)
+		for key in state.map:
+			var parts: PackedStringArray = (key as String).split(",")
+			var h := Vector2i(int(parts[0]), int(parts[1]))
+			if h.x < mn.x or (h.x == mn.x and h.y < mn.y): mn = h
+			if h.x > mx.x or (h.x == mx.x and h.y > mx.y): mx = h
+		los_hex_a = mn
+		los_hex_b = mx
+		_los_update()
+		hint_label.text = "LOS: trascina i cerchi — %02d.%02d → %02d.%02d" % [mn.x, mn.y, mx.x, mx.y]
+	else:
+		los_hex_a = Vector2i(-99, -99)
+		los_hex_b = Vector2i(-99, -99)
+		hint_label.text = "Strumento LOS chiuso"
 	map_view.queue_redraw()
 
 
-func _handle_los_click(hex: Vector2i) -> void:
-	if los_first.x <= -99:
-		los_first = hex
-		map_view.los_tool = {}
-		map_view.highlight_hex = hex
-		hint_label.text = "Strumento LOS: %02d.%02d -> clicca il SECONDO hex" % [hex.x, hex.y]
-		map_view.queue_redraw()
-		return
-	# Se ci sono unita' sui due hex usa la LOS vera (ordini inclusi).
-	var ca := state.character_at(los_first.x, los_first.y)
-	var cb := state.character_at(hex.x, hex.y)
-	var free: bool
-	if ca != null and cb != null and not ca.is_dead() and not cb.is_dead():
-		free = LOS.clear(state, ca, cb)
+func _los_handle_press(local_pos: Vector2) -> void:
+	var snap := MapView.HEX_SIZE * 0.9
+	var pa := map_view.hex_center(los_hex_a.x, los_hex_a.y)
+	var pb := map_view.hex_center(los_hex_b.x, los_hex_b.y)
+	if local_pos.distance_to(pa) <= snap:
+		los_dragging = 0
+	elif local_pos.distance_to(pb) <= snap:
+		los_dragging = 1
 	else:
-		free = LOS.clear_hexes(state, los_first, hex)
+		# Click lontano: sposta l'estremita' piu' vicina a quell'hex.
+		var hex := map_view.pick_hex(local_pos)
+		if hex.x <= -99:
+			return
+		if local_pos.distance_to(pa) <= local_pos.distance_to(pb):
+			los_hex_a = hex
+		else:
+			los_hex_b = hex
+		_los_update()
+
+
+func _los_drag_update(local_pos: Vector2) -> void:
+	var hex := map_view.pick_hex(local_pos)
+	if hex.x <= -99:
+		return
+	if los_dragging == 0:
+		los_hex_a = hex
+	else:
+		los_hex_b = hex
+	_los_update()
+
+
+func _los_update() -> void:
+	if los_hex_a.x <= -99 or los_hex_b.x <= -99:
+		return
+	var free := LOS.clear_hexes(state, los_hex_a, los_hex_b)
 	map_view.los_tool = {
-		"from": map_view.hex_center(los_first.x, los_first.y),
-		"to": map_view.hex_center(hex.x, hex.y),
+		"from": map_view.hex_center(los_hex_a.x, los_hex_a.y),
+		"to": map_view.hex_center(los_hex_b.x, los_hex_b.y),
 		"clear": free,
 	}
-	hint_label.text = "LOS %02d.%02d -> %02d.%02d: %s   (clicca per un'altra verifica)" % [
-		los_first.x, los_first.y, hex.x, hex.y,
+	hint_label.text = "LOS %02d.%02d → %02d.%02d: %s" % [
+		los_hex_a.x, los_hex_a.y, los_hex_b.x, los_hex_b.y,
 		"LIBERA" if free else "BLOCCATA"]
-	los_first = Vector2i(-99, -99)
 	map_view.queue_redraw()
 
 
@@ -970,9 +1037,6 @@ func _on_map_clicked() -> void:
 	_play_sfx("click")
 	if map_view.editor_mode:
 		_editor_act(map_view.get_local_mouse_position())
-		return
-	if los_mode:
-		_handle_los_click(hex)
 		return
 	if phase == Phase.DEPLOY:
 		_handle_deploy_click(hex)
@@ -1382,6 +1446,23 @@ func _build_hud() -> void:
 	los_button.custom_minimum_size = Vector2(70, 40)
 	los_button.toggled.connect(_on_los_toggled)
 	top_box.add_child(los_button)
+	editor_button = Button.new()
+	editor_button.text = "Mappa"
+	editor_button.toggle_mode = true
+	editor_button.tooltip_text = "Editor mappa (E): clicca e trascina per dipingere terreno."
+	editor_button.custom_minimum_size = Vector2(80, 40)
+	editor_button.toggled.connect(func(on: bool) -> void:
+		if map_view == null:
+			return
+		map_view.editor_mode = on
+		editor_panel.visible = on
+		map_view.debug_terrain = on
+		overlay_legend.visible = false
+		map_view.queue_redraw()
+		hint_label.text = "Editor mappa: %s (E per uscire)" % \
+			("ON — clicca hex + trascina per dipingere terreno" if on else "off")
+	)
+	top_box.add_child(editor_button)
 	replay_button = Button.new()
 	replay_button.text = "Replay turno"
 	replay_button.tooltip_text = "Rivedi il turno appena giocato: percorsi e\ncombattimenti in flusso cinematografico continuo."
@@ -4676,10 +4757,10 @@ func _test_vehicles() -> int:
 	var sps := GameState.new()
 	sps.rng.seed = 5
 	Boards.fill(sps, "farmhouse")
-	var spv := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var spv := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 6)
 	var tgS := Character.new("tgS", "T", Domain.Side.ENEMY, "Red")
 	tgS.troop_quality = 6
-	tgS.position = Vector2i(8, 6)   # adiacente -> LOS garantita
+	tgS.position = Vector2i(8, 6)   # adiacente nel front arc (facing 6) -> LOS garantita
 	sps.characters = [spv, tgS]
 	spv.is_buttoned_up = true
 	var th_closed: int = Spotting.attempt(sps, spv, tgS)["threshold"]

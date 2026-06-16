@@ -456,6 +456,20 @@ static func resolve_vehicle_bow_mg(state: GameState, v: Character) -> void:
 		_fire_crew_weapon(state, v, codriver, bow)
 
 
+# Rule 31.6 Emergency Stop: true se c'e' un nemico del veicolo con arma AT in LOS.
+static func _vehicle_has_at_threat(state: GameState, vehicle: Character) -> bool:
+	for c: Character in state.characters:
+		if c.side == vehicle.side or c.is_dead():
+			continue
+		if not LOS.clear(state, vehicle, c):
+			continue
+		for w: String in c.weapon_skills:
+			var flags: Array = Weapons.info(w).get("flags", [])
+			if "at" in flags or "main_gun" in flags:
+				return true
+	return false
+
+
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 	c.had_first_order = true
 	var gunner := _crew_member(c, "Gunner")
@@ -483,6 +497,15 @@ static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 		codriver.set_order(Domain.Order.AIMED_FIRE)
 	elif codriver != null:
 		codriver.clear_order()
+	# Rule 31.6 Emergency Stop: se il carro si muoverebbe ma c'e' una minaccia
+	# AT visibile, il Driver fa un TQC. Se passa, si ferma per questo turno.
+	var would_move := not (los and dist <= 12)
+	if would_move and not c.emergency_stop and _vehicle_has_at_threat(state, c):
+		if Checks.troop_quality_check(c, state.rng)["passed"]:
+			c.emergency_stop = true
+			state.log_event("%s: Emergency Stop! (minaccia AT in LOS)" % c.display_name)
+			_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
+			return
 	if los and dist <= 12:
 		# Buona gittata: il carro si ferma e spara col cannone.
 		_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
@@ -1126,6 +1149,7 @@ static func end_phase(state: GameState) -> void:
 	for c in state.characters:
 		c.clear_order()
 		if c.is_vehicle:
+			c.emergency_stop = false
 			for cm in c.crew:
 				cm.clear_order()
 				cm.fires_coax = false

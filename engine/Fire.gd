@@ -386,6 +386,10 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 			and not _has_mg_assistant(state, firer):
 		bits.append("-3 senza assistente MG")
 		ws -= 3
+	# Rule 31.6 Emergency Stop: -2 WS a tutto il fuoco del veicolo.
+	if firer.is_vehicle and firer.emergency_stop:
+		bits.append("-2 Emergency Stop")
+		ws -= 2
 	return {"ws": ws, "bits": bits}
 
 
