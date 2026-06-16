@@ -161,16 +161,16 @@ func hex_at(col: int, row: int) -> MapHex:
 	return map.get(hex_key(col, row))
 
 
-# Tutti i personaggi di un dato Team.
+# Tutti i personaggi di un dato Team (esclude i passeggeri imbarcati).
 func characters_of_team(team: String) -> Array[Character]:
 	var result: Array[Character] = []
 	for c in characters:
-		if c.team == team:
+		if c.team == team and not c.embarked:
 			result.append(c)
 	return result
 
 
-# Personaggio in una data cella, o null.
+# Personaggio in una data cella, o null (esclude i passeggeri imbarcati).
 func character_at(col: int, row: int) -> Character:
 	# Preferisce un personaggio VIVO: i corpi e le esche rivelate restano
 	# nell'array (gli indici del replay non cambiano mai) e farebbero da
@@ -178,6 +178,8 @@ func character_at(col: int, row: int) -> Character:
 	# che spawna sull'esca: senza questo, il click non lo trova).
 	var fallback: Character = null
 	for c in characters:
+		if c.embarked:
+			continue
 		if c.position.x == col and c.position.y == row:
 			if not c.is_dead():
 				return c

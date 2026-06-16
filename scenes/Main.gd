@@ -483,6 +483,10 @@ func _on_next_pressed() -> void:
 		return
 	# Durante l'attesa di un'azione friendly, il pulsante = "passa/fine".
 	if acting != null:
+		# Veicolo in fase di fuoco Gunner: risolvi bow MG prima di passare.
+		if acting.is_vehicle and action_kind == TurnSequence.Act.FIRE:
+			TurnSequence.resolve_vehicle_bow_mg(state, acting)
+			_consume_audio_events()
 		_finish_friendly_action()
 		return
 	match phase:
@@ -864,6 +868,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		hint_label.text = "Editor mappa: %s (E per uscire)" % \
 			("ON — clicca hex + trascina per dipingere terreno" if map_view.editor_mode else "off")
 		return
+	# Tasto A: overlay archi di blindatura (Front/Rear) sul veicolo selezionato.
+	if event is InputEventKey and event.pressed and event.keycode == KEY_A \
+			and map_view != null:
+		map_view.show_arc_overlay = not map_view.show_arc_overlay
+		map_view.queue_redraw()
+		hint_label.text = "Archi di blindatura: %s (A per nascondere)" % \
+			("ON" if map_view.show_arc_overlay else "off")
+		return
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
@@ -1046,6 +1058,28 @@ func _open_order_panel(c: Character) -> void:
 			_update_orders_button()
 			_refresh())
 	order_list.add_child(none)
+	# Mount Up: se c'e' un veicolo amico in questo hex o adiacente, offri
+	# l'opzione di salire a bordo come passeggero.
+	var nearby_vehicle := _find_nearby_friendly_vehicle(c)
+	if nearby_vehicle != null:
+		var mount_sep := HSeparator.new()
+		order_list.add_child(mount_sep)
+		var mount_btn := Button.new()
+		mount_btn.text = "Sali sul mezzo"
+		mount_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		mount_btn.custom_minimum_size = Vector2(190, 0)
+		mount_btn.modulate = Color(0.75, 0.92, 1.0)
+		var vname := nearby_vehicle.display_name
+		mount_btn.mouse_entered.connect(func():
+			order_desc.text = "[b][color=#aadfff]Sali sul mezzo[/color][/b]\n\n%s sale sul [b]%s[/b]. Non agira' piu' sul campo finche' rimane a bordo. Scende automaticamente con Bail Out o alla distruzione del mezzo." % [c.display_name, vname])
+		var cv := c
+		var veh := nearby_vehicle
+		mount_btn.pressed.connect(func():
+			order_panel.hide()
+			VehicleCombat.mount_up(state, cv, veh)
+			_update_orders_button()
+			_refresh())
+		order_list.add_child(mount_btn)
 	var cancel := Button.new()
 	cancel.text = "Annulla"
 	cancel.modulate = Color(0.85, 0.7, 0.7)
@@ -1053,6 +1087,17 @@ func _open_order_panel(c: Character) -> void:
 	order_list.add_child(cancel)
 	order_desc.text = "[i]Passa il mouse su un ordine per la spiegazione.[/i]"
 	order_panel.show()
+
+
+# Cerca un veicolo amico in questo hex o adiacente (per il Mount Up).
+func _find_nearby_friendly_vehicle(c: Character) -> Character:
+	for other in state.characters:
+		if not other.is_vehicle or other.side != Domain.Side.FRIENDLY or other.is_dead():
+			continue
+		var d := Spotting.hex_distance(c.position, other.position)
+		if d <= 1:
+			return other
+	return null
 
 
 func _describe_order(o: int) -> void:
@@ -1079,8 +1124,7 @@ func _describe_order(o: int) -> void:
 
 func _handle_action_click(hex: Vector2i) -> void:
 	if action_kind == TurnSequence.Act.FIRE:
-		# Cerca il primo bersaglio valido nella hex cliccata (evita che
-		# character_at restituisca un nemico non avvistato davanti a uno noto).
+		# Cerca il primo bersaglio valido nella hex cliccata.
 		var valid_targets := TurnSequence.valid_fire_targets(state, acting)
 		var target: Character = null
 		for t in valid_targets:
@@ -1089,7 +1133,13 @@ func _handle_action_click(hex: Vector2i) -> void:
 				break
 		if target == null:
 			return  # click non valido: si ignora
-		Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
+		if acting.is_vehicle:
+			# Veicolo: Gunner spara sul bersaglio scelto, poi bow MG auto.
+			TurnSequence.fire_vehicle_gunner_at(state, acting, target)
+			TurnSequence.resolve_vehicle_bow_mg(state, acting)
+		else:
+			# Fanteria: usa il primo weapon disponibile (con preferenza fire_mode).
+			Fire.fire_action(state, acting, target, acting.weapon_skills.keys()[0])
 		_consume_audio_events()
 		_finish_friendly_action()
 	elif action_kind == TurnSequence.Act.THROW:
@@ -1110,6 +1160,22 @@ func _handle_action_click(hex: Vector2i) -> void:
 			moves_left = 0
 			state.log_event("%s scavalca il bocage e si ferma" % acting.display_name)
 		if moves_left <= 0:
+			# Move-and-shoot: dopo il movimento del veicolo, il Gunner spara
+			# interattivamente se ha un ordine di fuoco attivo questo impulse.
+			if acting.is_vehicle and TurnSequence.vehicle_gunner_fires_impulse(acting, state.impulse):
+				var targets := TurnSequence.valid_fire_targets(state, acting)
+				if not targets.is_empty():
+					action_kind = TurnSequence.Act.FIRE
+					map_view.cue_hexes = _hexes_of(targets)
+					map_view.cue_color = Color(0.95, 0.55, 0.05, 0.95)
+					map_view.fire_lines_source = acting.position
+					hint_label.text = "%s Gunner: clicca un bersaglio (arancio) o premi Passa" % \
+						acting.display_name
+					next_button.text = "Passa"
+					_refresh()
+					return
+				# Nessun bersaglio: risolvi bow MG e concludi.
+				TurnSequence.resolve_vehicle_bow_mg(state, acting)
 			_finish_friendly_action()
 		else:
 			# aggiorna evidenziazione e prompt per il passo successivo
@@ -1632,6 +1698,21 @@ func _build_hud() -> void:
 		map_view.map_opacity = v
 		map_view.queue_redraw())
 	ep_box.add_child(op_slider)
+	# Opacita' dell'overlay di terreno rigenerato (i poligoni colorati sopra la board).
+	var ov_label := Label.new()
+	ov_label.text = "Opacita' mappa rigenerata:"
+	ov_label.add_theme_font_size_override("font_size", 12)
+	ep_box.add_child(ov_label)
+	var ov_slider := HSlider.new()
+	ov_slider.min_value = 0.0
+	ov_slider.max_value = 1.0
+	ov_slider.step = 0.05
+	ov_slider.value = 1.0
+	ov_slider.custom_minimum_size = Vector2(200, 24)
+	ov_slider.value_changed.connect(func(v: float):
+		map_view.overlay_opacity = v
+		map_view.queue_redraw())
+	ep_box.add_child(ov_slider)
 	ep_box.add_child(HSeparator.new())
 	ep_box.add_child(_section_label("Terreno da dipingere:"))
 	var ep_scroll := ScrollContainer.new()
