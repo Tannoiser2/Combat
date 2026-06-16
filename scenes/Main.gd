@@ -1632,6 +1632,21 @@ func _build_hud() -> void:
 		map_view.map_opacity = v
 		map_view.queue_redraw())
 	ep_box.add_child(op_slider)
+	# Opacita' dell'overlay di terreno rigenerato (i poligoni colorati sopra la board).
+	var ov_label := Label.new()
+	ov_label.text = "Opacita' mappa rigenerata:"
+	ov_label.add_theme_font_size_override("font_size", 12)
+	ep_box.add_child(ov_label)
+	var ov_slider := HSlider.new()
+	ov_slider.min_value = 0.0
+	ov_slider.max_value = 1.0
+	ov_slider.step = 0.05
+	ov_slider.value = 1.0
+	ov_slider.custom_minimum_size = Vector2(200, 24)
+	ov_slider.value_changed.connect(func(v: float):
+		map_view.overlay_opacity = v
+		map_view.queue_redraw())
+	ep_box.add_child(ov_slider)
 	ep_box.add_child(HSeparator.new())
 	ep_box.add_child(_section_label("Terreno da dipingere:"))
 	var ep_scroll := ScrollContainer.new()

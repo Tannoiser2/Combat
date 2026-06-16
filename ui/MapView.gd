@@ -114,6 +114,8 @@ var debug_terrain := false
 # Editor di mappa: modalita' pittura terreno (tasto E).
 var editor_mode := false
 var map_opacity: float = 1.0
+# Opacita' dell'overlay di terreno rigenerato (debug/editor): 0 = nascosto.
+var overlay_opacity: float = 1.0
 # Strumento LOS: {from: Vector2, to: Vector2, clear: bool} oppure {}.
 var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
@@ -894,6 +896,9 @@ func _draw_terrain_overlay(radius: float) -> void:
 		var base: Color = BASE_COLORS.get(hex.terrain, Color.MAGENTA)
 		var tint: Color = OVERLAY_TINTS.get(hex.terrain,
 			Color(base.r, base.g, base.b, 0.45))
+		tint.a *= overlay_opacity
+		if tint.a <= 0.0:
+			continue
 		draw_colored_polygon(_hex_points(hex_center(c.x, c.y), radius * 0.92), tint)
 
 
