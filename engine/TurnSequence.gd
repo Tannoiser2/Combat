@@ -334,8 +334,38 @@ static func _gunner_fire(state: GameState, v: Character) -> void:
 	var coax := VehicleCombat.coax_mg_weapon(v)
 	if gunner != null and gunner.fires_coax and not coax.is_empty():
 		_fire_crew_weapon(state, v, gunner, coax, true)
-	else:
-		_try_fire(state, v)  # cannone (gate torretta + carica in Fire.fire_action)
+		return
+	# Propaga l'ordine del Gunner al veicolo per il WS mod corretto: at_fire legge
+	# firer.order, ma il veicolo ha l'ordine di movimento (SPRINT etc.), non quello
+	# di fuoco. Con SUPPRESSIVE/RAPID_FIRE il Gunner avrebbe -2 WS, ma senza questa
+	# propagazione non veniva applicato.
+	var had_order := v.has_order
+	var old_order: int = v.order if v.has_order else 0
+	if gunner != null and gunner.has_order:
+		v.has_order = true
+		v.order = gunner.order
+	# fire_mode AP/HE scelto dal Loader: rimuovi temporaneamente l'arma non
+	# selezionata cosi' _try_fire usa solo quella scelta (poi la ripristiniamo).
+	var removed_weapon := ""
+	var removed_ws := 0
+	if not v.fire_mode.is_empty():
+		for w: String in v.weapon_skills.keys():
+			if "AP" in w or "HE" in w:
+				var wrong: bool = (v.fire_mode == "AP" and "HE" in w) \
+					or (v.fire_mode == "HE" and "AP" in w)
+				if wrong:
+					removed_weapon = w
+					removed_ws = int(v.weapon_skills[w])
+					break
+		if not removed_weapon.is_empty():
+			v.weapon_skills.erase(removed_weapon)
+	_try_fire(state, v)  # cannone (gate torretta + carica in Fire.fire_action)
+	# Ripristina weapon_skills e ordine del veicolo.
+	if not removed_weapon.is_empty():
+		v.weapon_skills[removed_weapon] = removed_ws
+	v.has_order = had_order
+	if had_order:
+		v.order = old_order
 
 
 # Un membro d'equipaggio spara un'arma specifica dall'hex del veicolo (Rule

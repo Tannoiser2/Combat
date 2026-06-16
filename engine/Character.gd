@@ -83,8 +83,8 @@ var is_buttoned_up: bool = false
 # 0 = non applicabile (Jeep/Halftrack senza torretta). Lo scafo (facing) gira
 # col movimento, la torretta gira 1 hex-side per impulso verso il bersaglio.
 var turret_facing: int = 0
-# fire_mode per cannoni principali: "HE" (antipersonnel) o "AP" (anticarro)
-var fire_mode: String = "HE"
+# fire_mode per cannoni principali: "AP" o "HE" scelto dal Loader; "" = auto (prima arma)
+var fire_mode: String = ""
 # Rule 31.1.3: stato di carica del cannone principale. Il Loader deve caricarlo;
 # ogni colpo lo svuota e la ricarica consuma un impulso. Parte carico.
 var main_gun_loaded: bool = true
