@@ -233,12 +233,15 @@ REPO:   https://github.com/TeamForbiddenLLC/warfork-free-soundpacks/tree/master/
 LICENSE: CC0 1.0 Universal (Public Domain)
 
 ----------------------------------------------------------------------
-FILE: vehicle.ogg  (cingoli/motore veicolo corazzato)
-SOURCES: 100-CC0-SFX/machine_01-03.ogg
-         3 transient metallici sequenziati a 400ms, lowpass 800Hz
-ORIGIN: "100 CC0 SFX" pack
-REPO:   https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds/tree/main/100-CC0-SFX
-LICENSE: CC0 1.0 Universal (Public Domain)
+FILE: vehicle.ogg  (motore diesel + cingoli veicolo corazzato WWII)
+SOURCES: generato proceduralmente con numpy (CC0, public domain)
+         - Fondamentale motore diesel 45 Hz + armoniche (1x 0.55, 2x 0.25, 3x 0.14, 4x 0.07, 6x 0.04)
+         - Modulazione ritmica 8.5 Hz (vibrazioni motore)
+         - Rumore bianco filtrato passa-banda 120-400 Hz (attrito cingoli)
+         - Clank metallici periodici 380 Hz, periodo ~0.18s (maglie cingolo)
+         Durata: 1.8s, fade-in 0.08s, fade-out 0.25s, mono 44100Hz
+ORIGIN: sintesi procedurale originale (nessuna fonte audio esterna)
+LICENSE: CC0 1.0 Universal (Public Domain) — opera originale
 
 ----------------------------------------------------------------------
 FILE: click.ogg  (click UI sul mouse)

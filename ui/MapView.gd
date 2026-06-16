@@ -118,6 +118,9 @@ var map_opacity: float = 1.0
 var overlay_opacity: float = 1.0
 # Tasto A: mostra gli archi di blindatura (Front/Rear) del veicolo selezionato.
 var show_arc_overlay: bool = false
+# Archi di lancio granate in animazione: {from, to, age, total}.
+var _arc_throws: Array = []
+var _seen_arcs: int = 0
 # Strumento LOS: {from: Vector2, to: Vector2, clear: bool} oppure {}.
 var los_tool: Dictionary = {}
 var _counter_cache := {}            # id -> Texture2D oppure null (assente)
@@ -233,6 +236,24 @@ func _process(delta: float) -> void:
 		for m2 in _melees:
 			m2["age"] += delta
 		_melees = _melees.filter(func(m2): return m2["age"] < 1.2)
+	# Nuovi archi granata.
+	if state.throw_arcs.size() < _seen_arcs:
+		_seen_arcs = 0
+	while _seen_arcs < state.throw_arcs.size():
+		var arc: Dictionary = state.throw_arcs[_seen_arcs]
+		_arc_throws.append({
+			"from": hex_center(arc["from"].x, arc["from"].y),
+			"to":   hex_center(arc["to"].x,   arc["to"].y),
+			"age":  0.0,
+		})
+		_seen_arcs += 1
+	# Invecchia e rimuovi archi esauriti (durata 0.7 s).
+	var keep_arcs: Array = []
+	for a in _arc_throws:
+		a["age"] += delta
+		if a["age"] < 0.7:
+			keep_arcs.append(a)
+	_arc_throws = keep_arcs
 	# Nuovi colpi -> traccianti.
 	if state.shots.size() < _seen_shots:
 		_seen_shots = 0  # azzerati a inizio impulse
@@ -506,6 +527,30 @@ func _draw() -> void:
 				var p: Vector2 = l["to"]
 				draw_line(p + Vector2(-1, -1) * radius * 0.2, p + Vector2(1, 1) * radius * 0.2, col, radius * 0.06)
 				draw_line(p + Vector2(-1, 1) * radius * 0.2, p + Vector2(1, -1) * radius * 0.2, col, radius * 0.06)
+	# Archi di lancio granata: curva parabolica dal lanciatore all'hex target.
+	for arc in _arc_throws:
+		var t_norm: float = arc["age"] / 0.7
+		var fade: float = 1.0 - t_norm
+		var p0: Vector2 = arc["from"]
+		var p2: Vector2 = arc["to"]
+		var mid: Vector2 = p0.lerp(p2, 0.5)
+		var dist: float = p0.distance_to(p2)
+		var ctrl: Vector2 = mid + Vector2(0, -dist * 0.55)  # apice parabolico
+		# Disegna la curva come 16 segmenti (bezier quadratico)
+		var prev := p0
+		var ball_pos := Vector2.ZERO
+		for i in range(1, 17):
+			var u: float = float(i) / 16.0
+			var pt: Vector2 = (1.0 - u) * (1.0 - u) * p0 \
+				+ 2.0 * (1.0 - u) * u * ctrl \
+				+ u * u * p2
+			draw_line(prev, pt, Color(0.2, 0.95, 0.35, 0.85 * fade), radius * 0.055)
+			if abs(u - t_norm) < 0.07:
+				ball_pos = pt
+			prev = pt
+		# Pallina animata che scorre lungo l'arco.
+		if ball_pos != Vector2.ZERO:
+			draw_circle(ball_pos, radius * 0.18, Color(0.3, 1.0, 0.4, 0.95 * fade))
 	# Traccianti dei colpi: tratteggio "in marcia" dal tiratore al
 	# bersaglio, proiettile in volo, poi balloon con l'esito che sale.
 	for t in _tracers:
@@ -616,6 +661,37 @@ func _draw() -> void:
 			draw_string(font, ecenter + Vector2(-radius * 0.45, radius * 0.12),
 				"%02d.%02d" % [ec.x, ec.y],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.28), Color.WHITE)
+	# Widget bussola: mostra le 6 direzioni dello scenario (Rule 9.3).
+	if state != null and state.compass.size() == 7:
+		var vp_size := get_viewport_rect().size
+		var screen_corner := Vector2(14.0, vp_size.y - 14.0)  # angolo basso-sinistra
+		var cv := get_canvas_transform().affine_inverse() * screen_corner
+		var cr: float = maxf(18.0, radius * 0.55)  # raggio widget
+		# Sfondo semitrasparente
+		draw_circle(cv, cr * 1.55, Color(0.05, 0.05, 0.05, 0.65))
+		var font2 := ThemeDB.fallback_font
+		var fs2 := maxi(9, int(cr * 0.52))
+		# Freccia e numero per ogni direzione 1..6
+		for k in range(1, 7):
+			var d: Vector3i = state.compass[k]
+			# Proietta il vettore cubico in 2D (flat-top hex)
+			var ang := atan2(float(d.z - d.y) * 0.866, float(d.x))
+			var tip: Vector2 = cv + Vector2(cos(ang), sin(ang)) * cr
+			var base: Vector2 = cv + Vector2(cos(ang), sin(ang)) * (cr * 0.18)
+			draw_line(base, tip, Color(0.9, 0.75, 0.2, 0.85), maxf(1.5, cr * 0.09))
+			# Puntina della freccia
+			var perp := Vector2(-sin(ang), cos(ang)) * cr * 0.18
+			draw_line(tip, tip - Vector2(cos(ang), sin(ang)) * cr * 0.32 + perp,
+				Color(0.9, 0.75, 0.2, 0.85), maxf(1.5, cr * 0.09))
+			draw_line(tip, tip - Vector2(cos(ang), sin(ang)) * cr * 0.32 - perp,
+				Color(0.9, 0.75, 0.2, 0.85), maxf(1.5, cr * 0.09))
+			# Etichetta numerica
+			var lpos: Vector2 = cv + Vector2(cos(ang), sin(ang)) * (cr * 1.22)
+			draw_string(font2, lpos - Vector2(fs2 * 0.3, -fs2 * 0.35),
+				str(k), HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, Color(1.0, 0.95, 0.6))
+		# Etichetta "BSS" (bussola)
+		draw_string(font2, cv - Vector2(fs2 * 0.9, fs2 * 0.5),
+			"BSS", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(7, fs2 - 2), Color(0.7, 0.7, 0.7))
 
 
 # Un segnalino completo: pedina (o cerchietto di ripiego), pallino del
