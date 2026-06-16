@@ -2049,7 +2049,7 @@ func _show_vehicle_display(vehicle: Character) -> void:
 		child.queue_free()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
-	box.custom_minimum_size = Vector2(252, 0)
+	box.custom_minimum_size = Vector2(140, 0)
 	vehicle_popup.add_child(box)
 	# Barra-titolo: afferrala per spostare la finestra col mouse.
 	var header := _title_bar(vehicle.vehicle_type)
@@ -2153,39 +2153,65 @@ const VEHICLE_DISPLAY_W := 240.0
 # dell'equipaggio piazzate nelle caselle dei rispettivi ruoli (Rule 31). Su un
 # veicolo amico le pedine di Gunner/Co-Driver sono cliccabili per il fuoco.
 func _build_vehicle_schematic(vehicle: Character) -> Control:
-	var stem: String = VEHICLE_DISPLAYS.get(vehicle.vehicle_type, "")
-	var path := "res://assets/displays/%s.png" % stem
-	var tex: Texture2D = load(path) if (not stem.is_empty() and ResourceLoader.exists(path)) else null
-	if tex == null:
-		return _crew_text_list(vehicle)
-	var dw := VEHICLE_DISPLAY_W
-	var dh := dw * tex.get_height() / tex.get_width()
 	var boxes: Dictionary = DISPLAY_BOXES.get(vehicle.vehicle_type, {})
-	# Mostra solo la porzione del mat fino al box equipaggio piu' basso + margine.
-	var max_crew_y := 0.0
+	if boxes.is_empty():
+		return _crew_text_list(vehicle)
+	# Griglia posizionale: col=sinistra/destra dello scafo, riga=fronte/retro.
+	# I token sono grandi come quelli sulla mappa (64px), piazzati nelle caselle
+	# del rispettivo ruolo in disposizione spaziale fedele al regolamento.
+	const CS := 64.0
+	const PAD := 10.0
+	const BADGE_H := 16.0
+	const CELL_W := CS + PAD
+	const CELL_H := CS + BADGE_H + PAD
+	# Coordinate x e y uniche (tolleranza 4%) per ricavare col/riga di griglia.
+	var xs := []
+	var ys := []
 	for ctr in boxes.values():
-		max_crew_y = max(max_crew_y, ctr.y)
-	var crop_fraction: float = min(max_crew_y + 0.28, 1.0) if max_crew_y > 0.0 else 1.0
-	var crop_h := dh * crop_fraction
-	var schem := Control.new()
-	schem.custom_minimum_size = Vector2(dw, crop_h)
-	schem.clip_contents = true
-	var mat := TextureRect.new()
-	mat.texture = tex
-	mat.position = Vector2.ZERO
-	mat.size = Vector2(dw, dh)
-	mat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mat.stretch_mode = TextureRect.STRETCH_SCALE
-	mat.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	schem.add_child(mat)
-	var cs := dw * 0.15
+		var found := false
+		for ex in xs:
+			if abs(ex - ctr.x) < 0.04: found = true; break
+		if not found: xs.append(ctr.x)
+		found = false
+		for ey in ys:
+			if abs(ey - ctr.y) < 0.04: found = true; break
+		if not found: ys.append(ctr.y)
+	xs.sort()
+	ys.sort()
+	var gw := xs.size() * CELL_W + PAD
+	var gh := ys.size() * CELL_H + PAD
+	var grid := Control.new()
+	grid.custom_minimum_size = Vector2(gw, gh)
+	var crew_by_role := {}
 	for cm in vehicle.crew:
-		if not boxes.has(cm.crew_role):
-			continue
-		var ctr: Vector2 = boxes[cm.crew_role]
-		var pos := Vector2(ctr.x * dw - cs / 2.0, ctr.y * dh - cs / 2.0)
-		_add_crew_token(schem, vehicle, cm, pos, cs)
-	return schem
+		crew_by_role[cm.crew_role] = cm
+	for role in boxes:
+		var ctr: Vector2 = boxes[role]
+		var col := 0
+		for i in xs.size():
+			if abs(xs[i] - ctr.x) < 0.04: col = i; break
+		var row := 0
+		for i in ys.size():
+			if abs(ys[i] - ctr.y) < 0.04: row = i; break
+		var ox := PAD * 0.5 + col * CELL_W
+		var oy := PAD * 0.5 + row * CELL_H
+		# Casella di sfondo con nome del ruolo come tooltip.
+		var bg := Panel.new()
+		bg.position = Vector2(ox, oy)
+		bg.size = Vector2(CS, CS)
+		bg.tooltip_text = role
+		var bgsb := StyleBoxFlat.new()
+		bgsb.bg_color = Color(0.12, 0.14, 0.20)
+		bgsb.set_border_width_all(1)
+		bgsb.border_color = Color(0.35, 0.38, 0.52)
+		bgsb.set_corner_radius_all(3)
+		bg.add_theme_stylebox_override("panel", bgsb)
+		bg.mouse_filter = Control.MOUSE_FILTER_PASS
+		grid.add_child(bg)
+		var cm = crew_by_role.get(role, null)
+		if cm != null:
+			_add_crew_token(grid, vehicle, cm, Vector2(ox, oy), CS)
+	return grid
 
 
 # Piazza la pedina di un membro sul mat (pos = angolo, cs = lato), con bordo per
