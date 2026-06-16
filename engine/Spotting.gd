@@ -123,9 +123,13 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	var tq := Checks.effective_tq(spotter)
 	if spotter.has_skill(Character.SKILL_EAGLE_EYES):
 		tq = mini(tq + 1, 8)
-	# Rule 31.7: un veicolo col boccaporto chiuso ha visibilita' ridotta (-2 TQ).
+	# Rule 31.7: boccaporto chiuso -> -2 TQ E spotting solo nel front arc del veicolo.
 	if spotter.is_vehicle and spotter.is_buttoned_up:
 		tq -= 2
+		var vdir: Vector3i = Move.CUBE_DIRS[(spotter.facing - 1) % 6]
+		var delta: Vector3i = Move.to_cube(target.position) - Move.to_cube(spotter.position)
+		if vdir.x * delta.x + vdir.y * delta.y + vdir.z * delta.z <= 0:
+			return {"roll": -1, "threshold": -1, "dist": -1, "success": false}
 	var threshold := tq \
 		+ target_modifier(state, target, spotter) + range_modifier(dist)
 	# Winter Camouflage (Rule 28.2): -1 a individuare il bersaglio sulla neve.

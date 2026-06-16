@@ -4676,10 +4676,10 @@ func _test_vehicles() -> int:
 	var sps := GameState.new()
 	sps.rng.seed = 5
 	Boards.fill(sps, "farmhouse")
-	var spv := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 3)
+	var spv := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5), 6)
 	var tgS := Character.new("tgS", "T", Domain.Side.ENEMY, "Red")
 	tgS.troop_quality = 6
-	tgS.position = Vector2i(8, 6)   # adiacente -> LOS garantita
+	tgS.position = Vector2i(8, 6)   # adiacente nel front arc (facing 6) -> LOS garantita
 	sps.characters = [spv, tgS]
 	spv.is_buttoned_up = true
 	var th_closed: int = Spotting.attempt(sps, spv, tgS)["threshold"]

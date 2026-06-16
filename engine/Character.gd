@@ -91,6 +91,9 @@ var main_gun_loaded: bool = true
 # Rule 31.9.4c: se true il Gunner spara la MG coassiale invece del cannone
 # (usato sul membro Gunner del veicolo).
 var fires_coax: bool = false
+# Rule 31.6: Emergency Stop — il Driver ha smesso di avanzare per una minaccia AT.
+# -2 WS a tutto il fuoco del veicolo; +1 WS per chi spara contro il veicolo.
+var emergency_stop: bool = false
 # Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello
 # intermedio sono feribili/uccidibili individualmente e possono abbandonare
 # il mezzo (bail out). Tenerli come Character (non semplici contatori) rende
