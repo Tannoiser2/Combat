@@ -2093,12 +2093,20 @@ const DRIVER_ORDER_NAMES: Dictionary = {
 	Domain.Order.DUCK_BACK:   "Stop!",
 }
 const DRIVER_ORDER_DESC: Dictionary = {
-	Domain.Order.HIDE:        "[b][color=#f3e88a]Spot & Halt[/color][/b]\n\nFerma il veicolo; il Commander avvista normalmente. Nessun movimento.",
-	Domain.Order.SNEAK:       "[b][color=#f3e88a]Crawl[/color][/b]\n\nMovimento lento e cauto (1 hex agli impulsi 2 e 4). Difficile da individuare.",
-	Domain.Order.RUN_AND_GUN: "[b][color=#f3e88a]Ahead Slow[/color][/b]\n\nAvanza e spara: muove 1 hex agli impulsi 1 e 3, il Gunner puo' sparare agli impulsi 2 e 4 con -2 WS.",
-	Domain.Order.SPRINT:      "[b][color=#f3e88a]Forward / Fast[/color][/b]\n\nAvanzata rapida (1-2-2-2 hex per impulso). Molto esposto al fuoco nemico.",
-	Domain.Order.EVADE:       "[b][color=#f3e88a]Evasive Maneuver[/color][/b]\n\nMovimento evasivo zigzag (1 hex a ogni impulso). Difficile da colpire.",
-	Domain.Order.DUCK_BACK:   "[b][color=#f3e88a]Stop![/color][/b]\n\nFermata d'emergenza (Duck Back). Nessun movimento.",
+	Domain.Order.HIDE:        "Ferma il veicolo; il Commander avvista normalmente. Nessun movimento.",
+	Domain.Order.SNEAK:       "Movimento lento e cauto (1 hex agli impulsi 2 e 4). Difficile da individuare.",
+	Domain.Order.RUN_AND_GUN: "Avanza e spara: muove 1 hex agli impulsi 1 e 3, il Gunner puo' sparare agli impulsi 2 e 4 con -2 WS.",
+	Domain.Order.SPRINT:      "Avanzata rapida (1-2-2-2 hex per impulso). Molto esposto al fuoco nemico.",
+	Domain.Order.EVADE:       "Movimento evasivo zigzag (1 hex a ogni impulso). Difficile da colpire.",
+	Domain.Order.DUCK_BACK:   "Fermata d'emergenza (Duck Back). Nessun movimento.",
+}
+const DRIVER_ORDER_MARKER: Dictionary = {
+	Domain.Order.HIDE:        "Spot-Marker-f",
+	Domain.Order.SNEAK:       "Crawl-Marker-f",
+	Domain.Order.RUN_AND_GUN: "Ahead-Slow-Marker-f",
+	Domain.Order.SPRINT:      "Forwrd-Marker-f",
+	Domain.Order.EVADE:       "Evade-Marker-1-f",
+	Domain.Order.DUCK_BACK:   "STOP-Marker-f",
 }
 
 const VEHICLE_DISPLAY_W := 240.0
@@ -2214,6 +2222,20 @@ func _add_crew_token(parent: Control, vehicle: Character, cm: Character, pos: Ve
 	fsb.set_corner_radius_all(3)
 	frame.add_theme_stylebox_override("panel", fsb)
 	parent.add_child(frame)
+	# Segnalino ordine corrente: sovrapposto e centrato sul counter.
+	var mpath := _crew_order_marker(vehicle, cm)
+	if not mpath.is_empty():
+		var mtex: Texture2D = load(mpath)
+		if mtex != null:
+			var osz := cs * 0.78
+			var mo := TextureRect.new()
+			mo.texture = mtex
+			mo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			mo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			mo.size = Vector2(osz, osz)
+			mo.position = pos + Vector2((cs - osz) * 0.5, (cs - osz) * 0.15)
+			mo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			parent.add_child(mo)
 	# Badge dell'azione/stato sotto la pedina.
 	var act := _crew_action_text(vehicle, cm)
 	if not cm.wounds.is_empty() and not cm.is_dead():
@@ -2296,6 +2318,8 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 		child.queue_free()
 	order_title_label.text = "⠿  %s — %s" % [cm.crew_role, vehicle.vehicle_type]
 	order_desc.text = "[i]Passa il mouse su un'azione per la spiegazione.[/i]"
+	var side := "US" if vehicle.side == Domain.Side.FRIENDLY else "GE"
+	var base := "res://assets/counters/"
 	match cm.crew_role:
 		"Driver":
 			order_target = vehicle
@@ -2313,9 +2337,11 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				b.custom_minimum_size = Vector2(200, 0)
 				if vehicle.has_order and vehicle.order == o:
 					b.modulate = Color(0.5, 1.0, 0.5)
-				var desc: String = DRIVER_ORDER_DESC.get(o, "")
-				b.mouse_entered.connect(func() -> void:
-					order_desc.text = desc)
+				var mk: String = DRIVER_ORDER_MARKER.get(o, "")
+				var mpath := ("%s%s-%s.png" % [base, side, mk]) if not mk.is_empty() else ""
+				var d := _crew_order_desc(DRIVER_ORDER_NAMES.get(o, ""), mpath,
+					DRIVER_ORDER_DESC.get(o, ""), o)
+				b.mouse_entered.connect(func() -> void: order_desc.text = d)
 				b.pressed.connect(_on_order_selected.bind(o))
 				order_list.add_child(b)
 			var none := Button.new()
@@ -2323,7 +2349,8 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 			none.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			none.modulate = Color(0.8, 0.8, 0.65)
 			none.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Senza ordine[/color][/b]\n\nIl veicolo non si muove questo impulso.")
+				order_desc.text = _crew_order_desc("Senza ordine", "",
+					"Il veicolo non si muove questo impulso."))
 			none.pressed.connect(func() -> void:
 				order_panel.hide()
 				vehicle.clear_order()
@@ -2333,41 +2360,45 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 			order_list.add_child(none)
 		"Gunner":
 			var has_coax: bool = not VehicleCombat.coax_mg_weapon(vehicle).is_empty()
-			# Stato attuale: 0=non spara, 1=cannone aimed, 2=cannone suppressive,
-			# 3=cannone rapid, 4=coassiale
 			var gstate := 0
 			if cm.has_order:
-				if cm.fires_coax:
-					gstate = 4
-				elif cm.order == Domain.Order.AIMED_FIRE:
-					gstate = 1
-				elif cm.order == Domain.Order.SUPPRESSIVE_FIRE:
-					gstate = 2
-				elif cm.order == Domain.Order.RAPID_FIRE:
-					gstate = 3
+				if cm.fires_coax:                              gstate = 4
+				elif cm.order == Domain.Order.AIMED_FIRE:      gstate = 1
+				elif cm.order == Domain.Order.SUPPRESSIVE_FIRE: gstate = 2
+				elif cm.order == Domain.Order.RAPID_FIRE:       gstate = 3
 			_add_crew_fire_btn(order_list, order_desc, "Non spara", gstate == 0,
-				"[b][color=#f3e88a]Non spara[/color][/b]\n\nIl Gunner non apre il fuoco questo impulso.",
+				_crew_order_desc("Non spara", "",
+					"Il Gunner non apre il fuoco questo impulso."),
 				func() -> void:
 					cm.fires_coax = false
 					cm.clear_order()
 					_update_orders_button()
 					_open_crew_order_panel(vehicle, cm))
-			_add_crew_fire_btn(order_list, order_desc, "Cannone — Aimed Fire", gstate == 1,
-				"[b][color=#f3e88a]Cannone — Aimed Fire[/color][/b]\n\nSpara agli impulsi 2 e 4. Mira precisa; consuma la carica: il Loader ricarica all'impulso successivo.",
+			_add_crew_fire_btn(order_list, order_desc, "Cannone Aimed", gstate == 1,
+				_crew_order_desc("Cannone — Aimed Fire",
+					"%s%s-Fire-Main-Marker-f.png" % [base, side],
+					"Spara agli impulsi 2 e 4. Mira precisa; consuma la carica del cannone.",
+					Domain.Order.AIMED_FIRE),
 				func() -> void:
 					cm.fires_coax = false
 					cm.set_order(Domain.Order.AIMED_FIRE)
 					_update_orders_button()
 					_open_crew_order_panel(vehicle, cm))
-			_add_crew_fire_btn(order_list, order_desc, "Cannone — Suppressive Fire", gstate == 2,
-				"[b][color=#f3e88a]Cannone — Suppressive Fire[/color][/b]\n\n-2 WS, spara a tutti e 4 gli impulsi. Forza morale check sul bersaglio; utile per sopprimere fanteria numerosa.",
+			_add_crew_fire_btn(order_list, order_desc, "Cannone Supp.", gstate == 2,
+				_crew_order_desc("Cannone — Suppressive Fire",
+					"%s%s-SupprFire-Marker-1-f.png" % [base, side],
+					"-2 WS, spara a tutti e 4 gli impulsi. Forza morale check sul bersaglio.",
+					Domain.Order.SUPPRESSIVE_FIRE),
 				func() -> void:
 					cm.fires_coax = false
 					cm.set_order(Domain.Order.SUPPRESSIVE_FIRE)
 					_update_orders_button()
 					_open_crew_order_panel(vehicle, cm))
-			_add_crew_fire_btn(order_list, order_desc, "Cannone — Rapid Fire", gstate == 3,
-				"[b][color=#f3e88a]Cannone — Rapid Fire[/color][/b]\n\n-2 WS, spara a tutti e 4 gli impulsi. Fuoco intenso ad alta cadenza; rischio di esaurire le munizioni.",
+			_add_crew_fire_btn(order_list, order_desc, "Cannone Rapid", gstate == 3,
+				_crew_order_desc("Cannone — Rapid Fire",
+					"%s%s-Fire-Main-Marker-f.png" % [base, side],
+					"-2 WS, spara a tutti e 4 gli impulsi. Alta cadenza.",
+					Domain.Order.RAPID_FIRE),
 				func() -> void:
 					cm.fires_coax = false
 					cm.set_order(Domain.Order.RAPID_FIRE)
@@ -2375,7 +2406,10 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 					_open_crew_order_panel(vehicle, cm))
 			if has_coax:
 				_add_crew_fire_btn(order_list, order_desc, "MG coassiale", gstate == 4,
-					"[b][color=#f3e88a]MG coassiale[/color][/b]\n\nSpara la MG coassiale agli impulsi 2 e 4. Antiuomo; non consuma la carica del cannone. Richiede torretta allineata.",
+					_crew_order_desc("MG coassiale",
+						"%s%s-MG-Aimed-Marker-f.png" % [base, side],
+						"Spara la MG coassiale agli impulsi 2 e 4. Non consuma la carica del cannone; richiede torretta allineata.",
+						Domain.Order.AIMED_FIRE),
 					func() -> void:
 						cm.fires_coax = true
 						cm.set_order(Domain.Order.AIMED_FIRE)
@@ -2386,29 +2420,39 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				var border := 0
 				if cm.has_order:
 					match cm.order:
-						Domain.Order.AIMED_FIRE:      border = 1
+						Domain.Order.AIMED_FIRE:       border = 1
 						Domain.Order.SUPPRESSIVE_FIRE: border = 2
 						Domain.Order.RAPID_FIRE:       border = 3
 				_add_crew_fire_btn(order_list, order_desc, "Non spara", border == 0,
-					"[b][color=#f3e88a]Non spara[/color][/b]\n\nIl Co-Driver non apre il fuoco questo impulso.",
+					_crew_order_desc("Non spara", "",
+						"Il Co-Driver non apre il fuoco questo impulso."),
 					func() -> void:
 						cm.clear_order()
 						_update_orders_button()
 						_open_crew_order_panel(vehicle, cm))
-				_add_crew_fire_btn(order_list, order_desc, "Bow MG — Aimed Fire", border == 1,
-					"[b][color=#f3e88a]Bow MG — Aimed Fire[/color][/b]\n\nServe la MG di scafo agli impulsi 2 e 4. Senza assistente usa TQ-3.",
+				_add_crew_fire_btn(order_list, order_desc, "Bow MG Aimed", border == 1,
+					_crew_order_desc("Bow MG — Aimed Fire",
+						"%s%s-MG-Aimed-Marker-f.png" % [base, side],
+						"Serve la MG di scafo agli impulsi 2 e 4. Senza assistente usa TQ-3.",
+						Domain.Order.AIMED_FIRE),
 					func() -> void:
 						cm.set_order(Domain.Order.AIMED_FIRE)
 						_update_orders_button()
 						_open_crew_order_panel(vehicle, cm))
-				_add_crew_fire_btn(order_list, order_desc, "Bow MG — Suppressive Fire", border == 2,
-					"[b][color=#f3e88a]Bow MG — Suppressive Fire[/color][/b]\n\n-2 WS, spara a tutti e 4 gli impulsi. Forza morale check; senza assistente TQ-3.",
+				_add_crew_fire_btn(order_list, order_desc, "Bow MG Supp.", border == 2,
+					_crew_order_desc("Bow MG — Suppressive Fire",
+						"%s%s-MG-Supr-Marker-f.png" % [base, side],
+						"-2 WS, spara a tutti e 4 gli impulsi. Forza morale check; senza assistente TQ-3.",
+						Domain.Order.SUPPRESSIVE_FIRE),
 					func() -> void:
 						cm.set_order(Domain.Order.SUPPRESSIVE_FIRE)
 						_update_orders_button()
 						_open_crew_order_panel(vehicle, cm))
-				_add_crew_fire_btn(order_list, order_desc, "Bow MG — Rapid Fire", border == 3,
-					"[b][color=#f3e88a]Bow MG — Rapid Fire[/color][/b]\n\n-2 WS, spara a tutti e 4 gli impulsi. Alta cadenza; senza assistente TQ-3.",
+				_add_crew_fire_btn(order_list, order_desc, "Bow MG Rapid", border == 3,
+					_crew_order_desc("Bow MG — Rapid Fire",
+						"%s%s-MG-Rapid-Marker-f.png" % [base, side],
+						"-2 WS, spara a tutti e 4 gli impulsi. Alta cadenza; senza assistente TQ-3.",
+						Domain.Order.RAPID_FIRE),
 					func() -> void:
 						cm.set_order(Domain.Order.RAPID_FIRE)
 						_update_orders_button()
@@ -2429,22 +2473,28 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				status_lbl.custom_minimum_size = Vector2(200, 28)
 				order_list.add_child(status_lbl)
 				var mode_lbl := Label.new()
-				mode_lbl.text = "Munizione selezionata: %s" % \
+				mode_lbl.text = "Munizione: %s" % \
 					(vehicle.fire_mode if not vehicle.fire_mode.is_empty() else "auto")
 				mode_lbl.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
 				order_list.add_child(mode_lbl)
 				_add_crew_fire_btn(order_list, order_desc, "Carica AP", vehicle.fire_mode == "AP",
-					"[b][color=#f3e88a]Carica AP[/color][/b]\n\nIl Loader carica un proiettile perforante (AP). Efficace contro blindatura; meno danno antiuomo.",
+					_crew_order_desc("Carica AP",
+						"%s%s-Load-AP-Marker-f.png" % [base, side],
+						"Proiettile perforante (AP). Efficace contro blindatura; meno danno antiuomo."),
 					func() -> void:
 						vehicle.fire_mode = "AP"
 						_open_crew_order_panel(vehicle, cm))
 				_add_crew_fire_btn(order_list, order_desc, "Carica HE", vehicle.fire_mode == "HE",
-					"[b][color=#f3e88a]Carica HE[/color][/b]\n\nIl Loader carica un proiettile esplosivo (HE). Efficace contro fanteria e strutture; inutile contro blindatura pesante.",
+					_crew_order_desc("Carica HE",
+						"%s%s-Load-HE-Marker-f.png" % [base, side],
+						"Proiettile esplosivo (HE). Efficace contro fanteria e strutture; inutile contro blindatura pesante."),
 					func() -> void:
 						vehicle.fire_mode = "HE"
 						_open_crew_order_panel(vehicle, cm))
-				_add_crew_fire_btn(order_list, order_desc, "Auto (prima arma)", vehicle.fire_mode.is_empty(),
-					"[b][color=#f3e88a]Auto[/color][/b]\n\nIl sistema sceglie automaticamente la prima arma disponibile.",
+				_add_crew_fire_btn(order_list, order_desc, "Auto", vehicle.fire_mode.is_empty(),
+					_crew_order_desc("Auto",
+						"%s%s-Loaded-f.png" % [base, side],
+						"Il sistema sceglie automaticamente la prima arma disponibile."),
 					func() -> void:
 						vehicle.fire_mode = ""
 						_open_crew_order_panel(vehicle, cm))
@@ -2462,23 +2512,21 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 				hatch_btn.modulate = Color(0.7, 0.85, 0.98) if vehicle.is_buttoned_up \
 					else Color(0.95, 0.8, 0.5)
 				hatch_btn.mouse_entered.connect(func() -> void:
-					order_desc.text = "[b][color=#f3e88a]Boccaporto[/color][/b]\n\n[b]Chiuso[/b]: equipaggio al sicuro dal fuoco leggero, ma avvista a -2.\n[b]Aperto[/b]: avvista normalmente, ma l'equipaggio e' esposto al fuoco leggero.")
+					order_desc.text = _crew_order_desc("Boccaporto",
+						"%s%s-Button-Open-Marker-f.png" % [base, side] if not vehicle.is_buttoned_up else "",
+						"[b]Chiuso[/b]: equipaggio al sicuro dal fuoco leggero, ma avvista a -2.\n[b]Aperto[/b]: avvista normalmente, ma l'equipaggio e' esposto al fuoco leggero."))
 				hatch_btn.pressed.connect(func() -> void:
 					vehicle.is_buttoned_up = not vehicle.is_buttoned_up
 					_open_crew_order_panel(vehicle, cm))
 				order_list.add_child(hatch_btn)
-			var bail_btn := Button.new()
-			bail_btn.text = "Bail Out (abbandona mezzo)"
-			bail_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			bail_btn.custom_minimum_size = Vector2(200, 0)
-			bail_btn.modulate = Color(1.0, 0.7, 0.5)
-			bail_btn.mouse_entered.connect(func() -> void:
-				order_desc.text = "[b][color=#f3e88a]Bail Out[/color][/b]\n\nTutto l'equipaggio a bordo abbandona il mezzo (Rule 31.10). Ogni superstite scende in mappa nell'hex vicino, morale -1, diventa fanteria.")
-			bail_btn.pressed.connect(func() -> void:
-				VehicleCombat.bail_out(state, vehicle)
-				order_panel.hide()
-				_refresh())
-			order_list.add_child(bail_btn)
+			_add_crew_fire_btn(order_list, order_desc, "Bail Out", false,
+				_crew_order_desc("Bail Out",
+					"%s%s-Bail-Out-Marker-f.png" % [base, side],
+					"Tutto l'equipaggio abbandona il mezzo (Rule 31.10). Ogni superstite scende nell'hex vicino, morale -1, diventa fanteria."),
+				func() -> void:
+					VehicleCombat.bail_out(state, vehicle)
+					order_panel.hide()
+					_refresh())
 			var info_cmd := Label.new()
 			info_cmd.text = "Dirige l'avvistamento del mezzo."
 			info_cmd.add_theme_color_override("font_color", Color(0.75, 0.85, 0.95))
@@ -2502,6 +2550,89 @@ func _add_crew_fire_btn(container: Control, desc_lbl: RichTextLabel,
 	b.mouse_entered.connect(func() -> void: desc_lbl.text = tooltip)
 	b.pressed.connect(cb)
 	container.add_child(b)
+
+
+# Descrizione hover formattata: titolo + segnalino + testo + breakdown impulsi.
+func _crew_order_desc(title: String, img: String, desc: String, order: int = -1) -> String:
+	var lines: Array[String] = []
+	lines.append("[b][color=#f3e88a]%s[/color][/b]" % title)
+	if not img.is_empty() and ResourceLoader.exists(img):
+		lines.append("[img=72]%s[/img]" % img)
+	lines.append("")
+	lines.append(desc)
+	if order >= 0 and Orders.IMPULSES.has(order):
+		lines.append("")
+		lines.append("[b]Impulsi:[/b]")
+		for row in Orders.track_lines(order):
+			lines.append("  [b][color=#f3e88a]%s[/color][/b] - %s" % [
+				row.substr(0, 1), row.substr(4)])
+		var ws_mod: int = Orders.FIRE_WS_MOD.get(order, 0)
+		if ws_mod != 0:
+			lines.append("")
+			lines.append("[b]Mod. al fuoco:[/b] %+d WS" % ws_mod)
+	return "\n".join(lines)
+
+
+# Percorso del segnalino-ordine corrente per un membro equipaggio (Vehicle Display overlay).
+func _crew_order_marker(vehicle: Character, cm: Character) -> String:
+	if cm.is_dead() or not cm.embarked:
+		return ""
+	var side := "US" if vehicle.side == Domain.Side.FRIENDLY else "GE"
+	var base := "res://assets/counters/"
+	match cm.crew_role:
+		"Driver":
+			if not vehicle.has_order:
+				return ""
+			var mk: String = DRIVER_ORDER_MARKER.get(vehicle.order, "")
+			if mk.is_empty():
+				return ""
+			var p := "%s%s-%s.png" % [base, side, mk]
+			return p if ResourceLoader.exists(p) else ""
+		"Gunner":
+			if not cm.has_order:
+				return ""
+			var mk := ""
+			if cm.fires_coax:
+				match cm.order:
+					Domain.Order.AIMED_FIRE:       mk = "MG-Aimed-Marker-f"
+					Domain.Order.SUPPRESSIVE_FIRE: mk = "MG-Supr-Marker-f"
+					Domain.Order.RAPID_FIRE:       mk = "MG-Rapid-Marker-f"
+			else:
+				match cm.order:
+					Domain.Order.AIMED_FIRE:       mk = "Fire-Main-Marker-f"
+					Domain.Order.SUPPRESSIVE_FIRE: mk = "SupprFire-Marker-1-f"
+					Domain.Order.RAPID_FIRE:       mk = "Fire-Main-Marker-f"
+			if mk.is_empty():
+				return ""
+			var p := "%s%s-%s.png" % [base, side, mk]
+			return p if ResourceLoader.exists(p) else ""
+		"Co-Driver":
+			if not cm.has_order:
+				return ""
+			var mk := ""
+			match cm.order:
+				Domain.Order.AIMED_FIRE:       mk = "MG-Aimed-Marker-f"
+				Domain.Order.SUPPRESSIVE_FIRE: mk = "MG-Supr-Marker-f"
+				Domain.Order.RAPID_FIRE:       mk = "MG-Rapid-Marker-f"
+			if mk.is_empty():
+				return ""
+			var p := "%s%s-%s.png" % [base, side, mk]
+			return p if ResourceLoader.exists(p) else ""
+		"Loader":
+			if not VehicleCombat.has_turret(vehicle):
+				return ""
+			var mk := ""
+			match vehicle.fire_mode:
+				"AP": mk = "Load-AP-Marker-f"
+				"HE": mk = "Load-HE-Marker-f"
+				_:    mk = "Loaded-f"
+			var p := "%s%s-%s.png" % [base, side, mk]
+			return p if ResourceLoader.exists(p) else ""
+		"Commander":
+			if not vehicle.is_buttoned_up and VehicleCombat.has_turret(vehicle):
+				var p := "%s%s-Button-Open-Marker-f.png" % [base, side]
+				return p if ResourceLoader.exists(p) else ""
+	return ""
 
 
 # Ripiego testuale se manca il mat del veicolo.
