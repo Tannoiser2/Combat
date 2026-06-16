@@ -1,3 +1,23 @@
+v0.62 — 2026-06-16
+- Balance test automatico (COMBAT_BALANCE=1): simula ogni scenario 20 volte
+  con seed diversi e stampa WIN%/DRAW%/LOSS%, VP medi, caduti e turni.
+  Supporta COMBAT_SCENARIO=<id> per un singolo scenario.
+
+v0.61 — 2026-06-16
+- Movimento nemico: BFS a 3 livelli di lookahead sostituisce il vecchio
+  greedy 1-passo. I nemici aggirano ostacoli e edifici invece di oscillare
+  contro i muri. Fix: filtro "embarked" in nearest_enemy.
+- Bussola scenario (Rule 9.3): widget nell'angolo basso-sinistra della mappa
+  con 6 frecce numerate che mostrano le direzioni della bussola dello scenario.
+- Arco granata: curva parabolica verde animata (0.7s) con pallina che scorre
+  dal lanciatore all'hex bersaglio quando viene lanciata una granata.
+- Roster amici: sfondo giallo-verde evidenziato per il personaggio selezionato
+  sulla mappa; markers ferite/morale ridotti a 36px (evita overflow).
+- Roster nemici: stesso layout degli amici (48px thumbnail, colonna separata
+  per nome e markers, rosso per selezionato sulla mappa).
+- Suono veicolo: nuovo audio sintetico con motore diesel 45 Hz + cingoli
+  filtrati 120-400 Hz + clank metallici periodici (sintesi procedurale CC0).
+
 v0.60 — 2026-06-15
 - Finestre fluttuanti più piccole e TRASCINABILI col mouse. Il Vehicle Display
   era enorme: ridotto il mat (larghezza 392 -> 240). Sia il Vehicle Display sia
