@@ -2874,6 +2874,13 @@ func _refresh_roster() -> void:
 			if c.is_dead():
 				sb.bg_color = Color(0.12, 0.12, 0.12)
 				sb.border_color = Color(0.3, 0.3, 0.3)
+			elif map_view != null and c == map_view.selected:
+				sb.bg_color = Color(0.28, 0.38, 0.18)
+				sb.border_color = Color(0.85, 0.95, 0.35)
+				sb.border_width_left = 5
+				sb.border_width_right = 3
+				sb.border_width_top = 3
+				sb.border_width_bottom = 3
 			else:
 				sb.bg_color = Color(0.18, 0.22, 0.13)
 				sb.border_color = MapView.MORALE_COLORS[c.morale]
@@ -2931,7 +2938,7 @@ func _refresh_roster() -> void:
 					var wcp := "res://assets/counters/%s-f.png" % wcid
 					var wct := TextureRect.new()
 					wct.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					wct.custom_minimum_size = Vector2(48, 48)
+					wct.custom_minimum_size = Vector2(36, 36)
 					wct.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					wct.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(wcp):
@@ -2944,7 +2951,7 @@ func _refresh_roster() -> void:
 						else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
 					var wt := TextureRect.new()
 					wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					wt.custom_minimum_size = Vector2(48, 48)
+					wt.custom_minimum_size = Vector2(36, 36)
 					wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(wpath):
@@ -2961,7 +2968,7 @@ func _refresh_roster() -> void:
 					if not ammo_path.is_empty():
 						var at := TextureRect.new()
 						at.mouse_filter = Control.MOUSE_FILTER_IGNORE
-						at.custom_minimum_size = Vector2(48, 48)
+						at.custom_minimum_size = Vector2(36, 36)
 						at.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 						at.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 						if ResourceLoader.exists(ammo_path):
@@ -2972,7 +2979,7 @@ func _refresh_roster() -> void:
 				if not morale_path.is_empty():
 					var mt := TextureRect.new()
 					mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-					mt.custom_minimum_size = Vector2(48, 48)
+					mt.custom_minimum_size = Vector2(36, 36)
 					mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					if ResourceLoader.exists(morale_path):
@@ -3010,77 +3017,111 @@ func _refresh_enemy_roster() -> void:
 		return
 	for c in spotted:
 		var pc := PanelContainer.new()
-		pc.custom_minimum_size = Vector2(200, 42)
+		pc.custom_minimum_size = Vector2(210, 0)
+		pc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.22, 0.12, 0.12) if not c.is_dead() else Color(0.13, 0.13, 0.13)
-		sb.border_color = MapView.MORALE_COLORS[c.morale] if not c.is_dead() else Color(0.3, 0.3, 0.3)
+		if c.is_dead():
+			sb.bg_color = Color(0.12, 0.12, 0.12)
+			sb.border_color = Color(0.3, 0.3, 0.3)
+		elif map_view != null and c == map_view.selected:
+			sb.bg_color = Color(0.32, 0.14, 0.14)
+			sb.border_color = Color(0.95, 0.45, 0.45)
+			sb.border_width_left = 5
+			sb.border_width_right = 3
+			sb.border_width_top = 3
+			sb.border_width_bottom = 3
+		else:
+			sb.bg_color = Color(0.22, 0.12, 0.12)
+			sb.border_color = MapView.MORALE_COLORS[c.morale]
 		sb.border_width_left = 5
 		sb.border_width_right = 1
 		sb.border_width_top = 1
 		sb.border_width_bottom = 1
-		sb.set_corner_radius_all(3)
+		sb.set_corner_radius_all(4)
 		sb.set_content_margin_all(3)
+		sb.content_margin_left = 8
 		pc.add_theme_stylebox_override("panel", sb)
 		var hbox := HBoxContainer.new()
+		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.add_theme_constant_override("separation", 3)
 		pc.add_child(hbox)
-		# Thumbnail segnalino nemico
+		# Thumbnail (48x48)
 		var thumb := TextureRect.new()
-		thumb.custom_minimum_size = Vector2(28, 28)
+		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		thumb.custom_minimum_size = Vector2(48, 48)
 		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		var tex_path := "res://assets/counters/%s-f.png" % c.counter
 		if ResourceLoader.exists(tex_path):
 			thumb.texture = load(tex_path)
 		hbox.add_child(thumb)
-		# Nome
+		# Colonna destra
+		var col := VBoxContainer.new()
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 3)
+		hbox.add_child(col)
 		var name_lbl := Label.new()
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.add_theme_font_size_override("font_size", 13)
 		name_lbl.add_theme_color_override("font_color",
-			Color(0.95, 0.7, 0.7) if not c.is_dead() else Color(0.45, 0.45, 0.45))
+			Color(0.5, 0.5, 0.5) if c.is_dead() else Color(0.95, 0.7, 0.7))
 		name_lbl.text = c.display_name
-		hbox.add_child(name_lbl)
+		col.add_child(name_lbl)
 		if c.is_dead():
 			var dead_lbl := Label.new()
-			dead_lbl.text = "KIA" if c.is_killed() else "INCAP"
+			dead_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			dead_lbl.text = "KIA" if c.is_killed() else "INC"
 			dead_lbl.add_theme_font_size_override("font_size", 10)
-			dead_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
-			hbox.add_child(dead_lbl)
+			dead_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+			col.add_child(dead_lbl)
 		else:
-			# Segnalino arma
+			var markers_row := HBoxContainer.new()
+			markers_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			markers_row.add_theme_constant_override("separation", 2)
+			col.add_child(markers_row)
 			var ewcid := _weapon_counter_id(c)
 			if not ewcid.is_empty():
 				var ewcp := "res://assets/counters/%s-f.png" % ewcid
 				var ewct := TextureRect.new()
-				ewct.custom_minimum_size = Vector2(20, 20)
+				ewct.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				ewct.custom_minimum_size = Vector2(36, 36)
 				ewct.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				ewct.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				if ResourceLoader.exists(ewcp):
 					ewct.texture = load(ewcp)
-				hbox.add_child(ewct)
-			# Ferite
+				markers_row.add_child(ewct)
 			for wound_type in c.wounds:
 				var wpath := "res://assets/counters/GEN-BadWound-Marker-1-f.png" \
 					if wound_type == Domain.Wound.BAD \
 					else "res://assets/counters/GEN-LightWound-Marker-1-f.png"
 				var wt := TextureRect.new()
-				wt.custom_minimum_size = Vector2(20, 20)
+				wt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				wt.custom_minimum_size = Vector2(36, 36)
 				wt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				wt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				if ResourceLoader.exists(wpath):
 					wt.texture = load(wpath)
-				hbox.add_child(wt)
-			# Morale
-			var morale_path: String = MORALE_MARKERS.get(int(c.morale), "")
-			if not morale_path.is_empty():
+				markers_row.add_child(wt)
+			var morale_path2: String = MORALE_MARKERS.get(int(c.morale), "")
+			if not morale_path2.is_empty():
 				var mt := TextureRect.new()
-				mt.custom_minimum_size = Vector2(20, 20)
+				mt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				mt.custom_minimum_size = Vector2(36, 36)
 				mt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				mt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				if ResourceLoader.exists(morale_path):
-					mt.texture = load(morale_path)
-				hbox.add_child(mt)
+				if ResourceLoader.exists(morale_path2):
+					mt.texture = load(morale_path2)
+				markers_row.add_child(mt)
+		var ch: Character = c
+		pc.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				map_view.selected = ch
+				map_view.highlight_hex = ch.position
+				camera.position = map_view.hex_center(ch.position.x, ch.position.y)
+				map_view.queue_redraw()
+				_show_info(ch.position, ch))
 		enemy_roster_body.add_child(pc)
 
 

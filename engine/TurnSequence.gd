@@ -725,6 +725,7 @@ static func valid_throw_hexes(state: GameState, thrower: Character) -> Array[Vec
 # Lancio verso un hex (anche per la UI). Grenade Check: TQC; se fallisce
 # la granata scatta comunque ma con deviazione garantita.
 static func throw_grenade(state: GameState, thrower: Character, hex: Vector2i) -> void:
+	state.throw_arcs.append({"from": thrower.position, "to": hex})
 	var smoke := thrower.order == Domain.Order.SMOKE_GRENADE
 	state.audio_events.append({"type": "throw", "hex": thrower.position})
 	Replay.sfx(state, "throw")

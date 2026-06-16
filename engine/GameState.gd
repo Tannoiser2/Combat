@@ -136,6 +136,10 @@ var melee_events: Array = []
 # La UI la consuma e la azzera dopo ogni azione, come shots/booms.
 var audio_events: Array = []
 
+# Archi di lancio granata dell'impulse: {from: Vector2i, to: Vector2i}.
+# La UI li legge, li anima e li azzera come shots/booms.
+var throw_arcs: Array = []
+
 # Frame registrati per il replay (vedi Replay.gd).
 var replay: Array = []
 

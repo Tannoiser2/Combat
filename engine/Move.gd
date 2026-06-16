@@ -185,7 +185,7 @@ static func nearest_enemy(state: GameState, mover: Character) -> Character:
 	var best: Character = null
 	var best_d := 99999
 	for other in state.characters:
-		if other.side == mover.side or other.is_dead():
+		if other.side == mover.side or other.is_dead() or other.embarked:
 			continue
 		var d := Spotting.hex_distance(mover.position, other.position)
 		if d < best_d:
@@ -216,22 +216,43 @@ static func step_to(state: GameState, mover: Character, dest: Vector2i) -> bool:
 	return false
 
 
-# Un passo verso (o lontano da) target_pos. Ritorna true se si e' mosso.
+# Passo verso (o lontano da) target_pos con BFS a 3 livelli di lookahead.
+# Risolve i blocchi contro ostacoli che il vecchio greedy non superava.
 static func step(state: GameState, mover: Character, target_pos: Vector2i, away: bool) -> bool:
-	var cur := Spotting.hex_distance(mover.position, target_pos)
-	var best := Vector2i(-99, -99)
-	var best_score := 0
+	# BFS: per ogni hex raggiungibile in max 3 passi, traccia il primo passo.
+	var first_step: Dictionary = {}  # hex -> primo hex adiacente al mover
+	var frontier: Array[Vector2i] = []
 	for n in neighbors(state, mover.position):
-		if not can_enter(state, mover, n):
-			continue
-		var delta := cur - Spotting.hex_distance(n, target_pos)  # >0 = avvicina
-		var score := -delta if away else delta
+		if can_enter(state, mover, n):
+			first_step[n] = n
+			frontier.append(n)
+	if frontier.is_empty():
+		return false
+	for _depth in range(2):  # già fatto 1 livello; altri 2 = totale 3
+		var next_frontier: Array[Vector2i] = []
+		for pos in frontier:
+			for n in neighbors(state, pos):
+				if n == mover.position or first_step.has(n):
+					continue
+				if not can_enter(state, mover, n):
+					continue
+				first_step[n] = first_step[pos]
+				next_frontier.append(n)
+		if next_frontier.is_empty():
+			break
+		frontier = next_frontier
+	var best_first := Vector2i(-99, -99)
+	var best_score := -99999
+	var cur_dist := Spotting.hex_distance(mover.position, target_pos)
+	for hex: Vector2i in first_step:
+		var dist := Spotting.hex_distance(hex, target_pos)
+		var score: int = (cur_dist - dist) if not away else (dist - cur_dist)
 		if score > best_score:
 			best_score = score
-			best = n
-	if best.x <= -99:
+			best_first = first_step[hex]
+	if best_first.x <= -99 or best_score <= 0:
 		return false
-	_commit_step(state, mover, best)
+	_commit_step(state, mover, best_first)
 	return true
 
 
