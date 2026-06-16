@@ -2900,12 +2900,13 @@ func _refresh_roster() -> void:
 			hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hbox.add_theme_constant_override("separation", 3)
 			row.add_child(hbox)
-			# Thumbnail counter PNG (48x48)
+			# Thumbnail counter PNG (58x58, allineata in basso con i segnalini)
 			var thumb := TextureRect.new()
 			thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			thumb.custom_minimum_size = Vector2(48, 48)
+			thumb.custom_minimum_size = Vector2(58, 58)
 			thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			thumb.size_flags_vertical = Control.SIZE_SHRINK_END
 			var tex_path := "res://assets/counters/%s-f.png" % c.counter
 			if ResourceLoader.exists(tex_path):
 				thumb.texture = load(tex_path)
@@ -3051,12 +3052,13 @@ func _refresh_enemy_roster() -> void:
 		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.add_theme_constant_override("separation", 3)
 		pc.add_child(hbox)
-		# Thumbnail (48x48)
+		# Thumbnail (58x58, allineata in basso con i segnalini)
 		var thumb := TextureRect.new()
 		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		thumb.custom_minimum_size = Vector2(48, 48)
+		thumb.custom_minimum_size = Vector2(58, 58)
 		thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		thumb.size_flags_vertical = Control.SIZE_SHRINK_END
 		var tex_path := "res://assets/counters/%s-f.png" % c.counter
 		if ResourceLoader.exists(tex_path):
 			thumb.texture = load(tex_path)
