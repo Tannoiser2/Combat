@@ -711,6 +711,9 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 		ws += 1
 	if firer.is_vehicle and firer.emergency_stop:
 		ws -= 2
+	# Rule 31.9.4: il Commander dirige il fuoco (Direct Firing) -> +1 WS.
+	if firer.is_vehicle and firer.direct_firing:
+		ws += 1
 	# Rule 31.9.4: bonus al colpo secondo la faccia bersagliata (il fianco offre
 	# il profilo piu' ampio): +2 di lato, +1 frontale o posteriore.
 	var face := hit_face(vehicle, firer.position)

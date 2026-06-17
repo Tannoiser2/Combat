@@ -489,24 +489,72 @@ static func _vehicle_has_at_threat(state: GameState, vehicle: Character) -> bool
 	return false
 
 
+# Vehicle Order Matrix (Rule 31.11) - modificatore di morale del veicolo/crew.
+# Sposta il tiro d100 della matrice: morale basso -> Panic/Rally/ritirata; alto
+# -> avanza e spara con piu' aggressivita'. Rout = Bail Out (gestito a parte).
+const VEHICLE_MORALE_MOD := {
+	Domain.Morale.SHAKEN: -50, Domain.Morale.CAUTIOUS: -30,
+	Domain.Morale.NORMAL: 0, Domain.Morale.BOLD: 20,
+	Domain.Morale.AGGRESSIVE: 30, Domain.Morale.BERSERK: 30,
+}
+
+
+# AI dei veicoli nemici come adattamento fedele della Vehicle Order Matrix
+# (Rule 31.11): un tiro d100 + il modificatore di morale sceglie l'ordine per il
+# Driver (movimento) e il Gunner (fuoco); il Commander dirige il fuoco (+1 WS).
+# Le 5 velocita' della matrice (Crawl/Ahead Slow/Forward/Fast/Reverse) sono
+# mappate sugli ordini del motore (Sneak/Run&Gun/Sprint/Evade).
 static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 	c.had_first_order = true
 	var gunner := _crew_member(c, "Gunner")
 	var codriver := _crew_member(c, "Co-Driver")
+	var commander := _crew_member(c, "Commander")
+	var mod: int = int(VEHICLE_MORALE_MOD.get(c.morale, 0))
+	# Rout (matrice): tutto l'equipaggio abbandona il mezzo (Bail Out).
+	if c.morale == Domain.Morale.ROUT:
+		if gunner != null: gunner.clear_order()
+		if codriver != null: codriver.clear_order()
+		VehicleCombat.bail_out(state, c)
+		_set_enemy_order(state, c, Domain.Order.DUCK_BACK)
+		state.log_event("%s in Rotta: equipaggio abbandona il mezzo (Bail Out)" % c.display_name)
+		return
 	var target := Move.nearest_enemy(state, c)
 	if target == null:
-		_set_enemy_order(state, c, Domain.Order.SNEAK)
-		if gunner != null:
-			gunner.clear_order()
-		if codriver != null:
-			codriver.clear_order()
+		# Nessun bersaglio: avanza per cercare il contatto, velocita' per morale.
+		if gunner != null: gunner.clear_order()
+		if codriver != null: codriver.clear_order()
+		var adv := Domain.Order.SPRINT if mod >= 20 \
+			else (Domain.Order.RUN_AND_GUN if mod >= 0 else Domain.Order.SNEAK)
+		_set_enemy_order(state, c, adv)
 		return
 	var dist := Spotting.hex_distance(c.position, target.position)
 	var los := LOS.clear(state, c, target)
-	# Rule 31.9: il Gunner spara il cannone se c'e' LOS ed e' nel raggio
-	# dell'arma principale; cosi' puo' sparare anche mentre lo scafo avanza.
+	# Panic/Rally dalla matrice: il tiro d100 col morale finisce sotto zero.
+	var eff := state.rng.randi_range(1, 100) + mod
+	if eff <= -19:
+		if gunner != null: gunner.clear_order()
+		if codriver != null: codriver.clear_order()
+		_set_enemy_order(state, c, Domain.Order.DUCK_BACK)  # Panic
+		state.log_event("%s (veicolo) PANICO -> Duck Back" % c.display_name)
+		return
+	if eff <= 0:
+		if gunner != null: gunner.clear_order()
+		if codriver != null: codriver.clear_order()
+		_set_enemy_order(state, c, Domain.Order.RALLY)
+		state.log_event("%s (veicolo) si ricompone -> Rally" % c.display_name)
+		return
+	# Commander Direct Fire (+1 WS, Rule 31.9.4): se vivo e morale >= Normal.
+	c.direct_firing = commander != null and commander.morale <= Domain.Morale.NORMAL
+	# Rule 31.9: il Gunner spara il cannone se c'e' LOS ed e' nel raggio. La
+	# matrice sceglie il tipo: ravvicinato -> Rapid, vs fanteria -> Suppressive.
 	if gunner != null and los and dist <= 20:
-		gunner.set_order(Domain.Order.AIMED_FIRE)
+		var g := state.rng.randi_range(1, 100) + mod
+		var gorder := Domain.Order.AIMED_FIRE
+		if not target.is_vehicle and g >= 83:
+			gorder = Domain.Order.SUPPRESSIVE_FIRE
+		elif dist <= 6 and g >= 75:
+			gorder = Domain.Order.RAPID_FIRE
+		gunner.set_order(gorder)
 	elif gunner != null:
 		gunner.clear_order()
 	# Rule 31.9.4b: il Co-Driver serve la bow MG (gittata corta): spara se ha
@@ -525,22 +573,21 @@ static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 			state.log_event("%s: Emergency Stop! (minaccia AT in LOS)" % c.display_name)
 			_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
 			return
+	# Velocita' d'avvicinamento dalla matrice del Driver (Side B), per morale:
+	# Cautious -> Crawl/Ahead Slow (Sneak); Normal -> Forward (Run&Gun);
+	# Bold/Aggressive -> Fast (Sprint).
+	var advance := Domain.Order.SPRINT if mod >= 20 \
+		else (Domain.Order.RUN_AND_GUN if mod >= 0 else Domain.Order.SNEAK)
 	if los and dist <= 12:
-		# Buona gittata: il carro si ferma e spara col cannone.
+		# Buona gittata: il carro si ferma e spara col cannone (Spot & Halt).
 		_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
 		state.log_event("%s (veicolo) -> Aimed Fire su %s (dist %d)" % [
 			c.display_name, target.display_name, dist])
-	elif los and dist <= 20:
-		# In gittata ma lontano: avanza E spara (move-and-shoot).
-		_set_enemy_order(state, c, Domain.Order.SPRINT)
-		state.log_event("%s (veicolo) -> avanza e spara su %s (dist %d)" % [
-			c.display_name, target.display_name, dist])
-	elif dist <= 6:
-		_set_enemy_order(state, c, Domain.Order.RUN_AND_GUN)
-		state.log_event("%s (veicolo) -> Run&Gun verso %s" % [c.display_name, target.display_name])
 	else:
-		_set_enemy_order(state, c, Domain.Order.SPRINT)
-		state.log_event("%s (veicolo) -> Sprint verso %s" % [c.display_name, target.display_name])
+		# Avanza (move-and-shoot col Gunner se in gittata) alla velocita' del morale.
+		_set_enemy_order(state, c, advance)
+		state.log_event("%s (veicolo) -> avanza (%s) verso %s (dist %d)" % [
+			c.display_name, Domain.ORDER_NAMES[c.order], target.display_name, dist])
 
 
 static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> void:
@@ -1360,6 +1407,7 @@ static func end_phase(state: GameState) -> void:
 		c.clear_order()
 		if c.is_vehicle:
 			c.emergency_stop = false
+			c.direct_firing = false
 			for cm in c.crew:
 				cm.clear_order()
 				cm.fires_coax = false

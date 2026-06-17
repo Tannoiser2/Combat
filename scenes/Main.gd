@@ -3529,6 +3529,7 @@ func _test_rules() -> int:
 	fails += _test_reload_duckback()
 	fails += _test_smoke_cards_rng()
 	fails += _test_afv()
+	fails += _test_vehicle_ai()
 	return fails
 
 
@@ -3693,6 +3694,60 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Vehicle Order Matrix - AI dei veicoli nemici (Rule 31.11).
+func _test_vehicle_ai() -> int:
+	var fails := 0
+	var VC := VehicleCombat
+	# Modificatori di morale della matrice.
+	if int(TurnSequence.VEHICLE_MORALE_MOD[Domain.Morale.SHAKEN]) != -50 \
+			or int(TurnSequence.VEHICLE_MORALE_MOD[Domain.Morale.AGGRESSIVE]) != 30:
+		print("TEST AI veicoli: modificatori morale errati")
+		fails += 1
+	# Senza bersaglio: velocita' d'avvicinamento per morale (deterministico).
+	var st := GameState.new()
+	var pz := VC.make_vehicle("PzIVH", Domain.Side.ENEMY, "Red",
+		Vector2i(10, 10), 4, "KwK 7.5cm HE")
+	st.characters = [pz]  # nessun friendly -> nessun bersaglio
+	pz.morale = Domain.Morale.AGGRESSIVE
+	TurnSequence._assign_vehicle_order(st, pz)
+	if pz.order != Domain.Order.SPRINT:
+		print("TEST AI: aggressivo senza bersaglio non Sprint (%d)" % pz.order)
+		fails += 1
+	pz.morale = Domain.Morale.CAUTIOUS
+	TurnSequence._assign_vehicle_order(st, pz)
+	if pz.order != Domain.Order.SNEAK:
+		print("TEST AI: cauto senza bersaglio non Sneak (%d)" % pz.order)
+		fails += 1
+	pz.morale = Domain.Morale.NORMAL
+	TurnSequence._assign_vehicle_order(st, pz)
+	if pz.order != Domain.Order.RUN_AND_GUN:
+		print("TEST AI: normale senza bersaglio non Run&Gun (%d)" % pz.order)
+		fails += 1
+	# Rout -> equipaggio Bail Out + scafo Duck Back.
+	var st2 := GameState.new()
+	st2.rng.seed = 1
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			st2.map[GameState.hex_key(10 + dx, 10 + dy)] = \
+				GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var pz2 := VC.make_vehicle("PzIVH", Domain.Side.ENEMY, "Red",
+		Vector2i(10, 10), 4, "KwK 7.5cm HE")
+	pz2.morale = Domain.Morale.ROUT
+	st2.characters = [pz2]
+	TurnSequence._assign_vehicle_order(st2, pz2)
+	if pz2.order != Domain.Order.DUCK_BACK:
+		print("TEST AI: Rout, lo scafo non e' Duck Back (%d)" % pz2.order)
+		fails += 1
+	var still_aboard := false
+	for cm in pz2.crew:
+		if cm.embarked and not cm.is_dead():
+			still_aboard = true
+	if still_aboard:
+		print("TEST AI: Rout non fa il Bail Out dell'equipaggio")
 		fails += 1
 	return fails
 
@@ -5222,8 +5277,11 @@ func _test_vehicles() -> int:
 	cs.characters = [pzC, foeC]
 	TurnSequence._assign_vehicle_order(cs, pzC)
 	var gunC := TurnSequence._crew_member(pzC, "Gunner")
-	if gunC == null or not gunC.has_order or gunC.order != Domain.Order.AIMED_FIRE:
-		print("TEST equipaggio: il Gunner deve ricevere Aimed Fire col bersaglio in LOS")
+	# La matrice (Rule 31.11) puo' dare Aimed/Rapid/Suppressive a seconda del tiro;
+	# col bersaglio in LOS il Gunner deve comunque ricevere un ordine di FUOCO.
+	if gunC == null or not gunC.has_order or gunC.order not in [Domain.Order.AIMED_FIRE,
+			Domain.Order.RAPID_FIRE, Domain.Order.SUPPRESSIVE_FIRE]:
+		print("TEST equipaggio: il Gunner deve ricevere un ordine di fuoco col bersaglio in LOS")
 		fails += 1
 
 	# Rule 31.9: il Gunner spara anche se lo scafo non ha ordine (Driver fermo).
