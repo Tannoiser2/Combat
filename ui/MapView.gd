@@ -1013,16 +1013,35 @@ func _draw_hexsides(radius: float) -> void:
 
 
 # Tinte dell'overlay di verifica (tasto T), usate anche per la legenda.
+# Tinte di classificazione/editor: una tinta DISTINTA per ogni terreno, cosi'
+# nell'overlay editor e nei pulsanti della tavolozza i terreni non si
+# confondono (prima molti cadevano sul ripiego verde quasi identico).
 const OVERLAY_TINTS := {
-	D.Terrain.TREES: Color(0.0, 0.85, 0.1, 0.40),
-	D.Terrain.FIELD: Color(1.0, 0.85, 0.0, 0.40),
-	D.Terrain.ROCKS: Color(0.7, 0.7, 0.7, 0.45),
-	D.Terrain.BUILDING: Color(1.0, 0.1, 0.1, 0.50),
-	D.Terrain.STREAM: Color(0.1, 0.4, 1.0, 0.50),
-	D.Terrain.MARSH: Color(0.0, 0.9, 0.9, 0.45),
-	D.Terrain.LOGS: Color(0.55, 0.35, 0.1, 0.45),
-	D.Terrain.OPEN_LEVEL_1: Color(0.95, 0.95, 0.4, 0.35),
-	D.Terrain.OPEN_LEVEL_2: Color(1.0, 0.5, 0.0, 0.40),
+	D.Terrain.OPEN_LEVEL_0: Color(0.55, 0.70, 0.45, 0.25),  # verde tenue
+	D.Terrain.OPEN_LEVEL_1: Color(0.95, 0.92, 0.30, 0.40),  # giallo (quota 1)
+	D.Terrain.OPEN_LEVEL_2: Color(1.00, 0.60, 0.10, 0.45),  # arancio (quota 2)
+	D.Terrain.OPEN_LEVEL_3: Color(0.95, 0.30, 0.10, 0.50),  # rosso-arancio (quota 3)
+	D.Terrain.ROCKS: Color(0.65, 0.65, 0.68, 0.55),         # grigio
+	D.Terrain.BUILDING: Color(0.95, 0.15, 0.15, 0.55),      # rosso
+	D.Terrain.TREES: Color(0.10, 0.55, 0.12, 0.50),         # verde scuro
+	D.Terrain.MARSH: Color(0.20, 0.85, 0.80, 0.50),         # acquamarina
+	D.Terrain.HEDGEROW: Color(0.50, 0.70, 0.20, 0.50),      # verde oliva
+	D.Terrain.WALL: Color(0.70, 0.55, 0.35, 0.55),          # marrone chiaro
+	D.Terrain.LONG_GRASS: Color(0.75, 0.90, 0.30, 0.45),    # verde-giallo
+	D.Terrain.DEPRESSION: Color(0.35, 0.45, 0.65, 0.50),    # blu-grigio (infossato)
+	D.Terrain.STREAM: Color(0.15, 0.45, 1.00, 0.55),        # blu
+	D.Terrain.ORCHARD: Color(0.35, 0.75, 0.35, 0.50),       # verde medio
+	D.Terrain.LOGS: Color(0.60, 0.40, 0.15, 0.55),          # marrone
+	D.Terrain.FIELD: Color(0.95, 0.80, 0.10, 0.45),         # oro
+	D.Terrain.FOXHOLE: Color(0.40, 0.30, 0.20, 0.60),       # marrone scuro
+	D.Terrain.RUBBLE: Color(0.75, 0.70, 0.60, 0.55),        # grigio-sabbia
+	D.Terrain.CRATER: Color(0.45, 0.35, 0.25, 0.60),        # terra scura
+	D.Terrain.BOCAGE: Color(0.05, 0.35, 0.10, 0.55),        # verde molto scuro
+	D.Terrain.FOUNTAIN: Color(0.50, 0.85, 1.00, 0.55),      # azzurro chiaro
+	D.Terrain.FORTIFIED_BUILDING: Color(0.60, 0.05, 0.20, 0.60),  # rosso scuro
+	D.Terrain.TRENCH: Color(0.55, 0.40, 0.70, 0.50),        # viola-grigio (infossato)
+	D.Terrain.ABBEY_EXTERIOR: Color(0.90, 0.30, 0.80, 0.50),  # magenta
+	D.Terrain.ABBEY_INTERIOR: Color(0.95, 0.60, 0.90, 0.45),  # rosa chiaro
 }
 
 

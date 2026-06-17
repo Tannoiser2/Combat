@@ -75,6 +75,7 @@ var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
 var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
 var editor_level: int = -1        # >= 0 = elevazione da dipingere (indipendente dal terreno)
 var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
+var _palette_dragging := false       # tavolozza editor: trascinamento header in corso
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -1353,6 +1354,17 @@ func _make_theme() -> Theme:
 
 # --------------------------------------------------------- editor mappa
 
+# Trascinamento della tavolozza fluttuante via il suo header.
+func _on_palette_drag(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_palette_dragging = event.pressed
+	elif event is InputEventMouseMotion and _palette_dragging:
+		editor_panel.position += event.relative
+		var vp := get_viewport().get_visible_rect().size
+		editor_panel.position = editor_panel.position.clamp(
+			Vector2.ZERO, (vp - editor_panel.size).max(Vector2.ZERO))
+
+
 func _editor_act(local_pos: Vector2) -> void:
 	if editor_is_hexside:
 		var hs := _pick_hexside(local_pos)
@@ -1828,18 +1840,30 @@ func _build_hud() -> void:
 	order_desc.add_theme_font_size_override("normal_font_size", 15)
 	order_h.add_child(order_desc)
 
-	# Pannello editor mappa (tasto E): opacita' + palette terreni + export.
+	# Pannello editor mappa (tasto E): tavolozza FLUTTUANTE trascinabile per
+	# l'header (opacita' + palette terreni + elevazione + export).
 	editor_panel = PanelContainer.new()
-	editor_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	editor_panel.offset_right = 220
-	editor_panel.offset_top = 46
-	editor_panel.offset_bottom = -8
+	editor_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	editor_panel.position = Vector2(8, 50)
+	editor_panel.custom_minimum_size = Vector2(232, 470)
 	editor_panel.hide()
 	root.add_child(editor_panel)
 	var ep_box := VBoxContainer.new()
 	ep_box.add_theme_constant_override("separation", 4)
 	editor_panel.add_child(ep_box)
-	ep_box.add_child(_section_label("EDITOR MAPPA (E per uscire)"))
+	# Header trascinabile: clicca e trascina per spostare la tavolozza.
+	var ep_header := Panel.new()
+	ep_header.custom_minimum_size = Vector2(0, 28)
+	ep_header.gui_input.connect(_on_palette_drag)
+	var ep_htitle := Label.new()
+	ep_htitle.text = "  ☰  EDITOR MAPPA  (trascina · E esci)"
+	ep_htitle.add_theme_font_size_override("font_size", 12)
+	ep_htitle.add_theme_color_override("font_color", Color(0.85, 0.90, 0.70))
+	ep_htitle.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ep_htitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ep_htitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ep_header.add_child(ep_htitle)
+	ep_box.add_child(ep_header)
 	var op_label := Label.new()
 	op_label.text = "Opacita' mappa:"
 	op_label.add_theme_font_size_override("font_size", 12)
@@ -1914,49 +1938,6 @@ func _build_hud() -> void:
 					b.button_pressed = false)
 		all_brush_buttons.append(tb)
 		ep_list.add_child(tb)
-	# -- sezione HEXSIDE --
-	ep_list.add_child(HSeparator.new())
-	ep_list.add_child(_section_label("LATO (hexside)"))
-	var hexside_entries: Array = [
-		[Domain.Terrain.HEDGEROW, "Hedgerow",  MapView.HEXSIDE_COLORS[Domain.Terrain.HEDGEROW]],
-		[Domain.Terrain.BOCAGE,   "Bocage",    MapView.HEXSIDE_COLORS[Domain.Terrain.BOCAGE]],
-		[Domain.Terrain.WALL,     "Wall",      MapView.HEXSIDE_COLORS[Domain.Terrain.WALL]],
-	]
-	for entry in hexside_entries:
-		var ht: int = entry[0]
-		var hn: String = entry[1]
-		var hc: Color = entry[2]
-		var hb := Button.new()
-		hb.text = hn
-		hb.toggle_mode = true
-		hb.custom_minimum_size = Vector2(200, 26)
-		hb.add_theme_color_override("font_color", Color.WHITE)
-		hb.add_theme_stylebox_override("normal",  _colored_stylebox(Color(hc.r, hc.g, hc.b, 0.8)))
-		hb.add_theme_stylebox_override("pressed", _colored_stylebox(Color(hc.r, hc.g, hc.b, 1.0)))
-		var ht_val: int = ht
-		hb.pressed.connect(func():
-			editor_is_hexside = true
-			editor_hexside_brush = ht_val
-			editor_brush = -1
-			for b in all_brush_buttons:
-				if b != hb:
-					b.button_pressed = false)
-		all_brush_buttons.append(hb)
-		ep_list.add_child(hb)
-	var rem_btn := Button.new()
-	rem_btn.text = "Rimuovi lato"
-	rem_btn.toggle_mode = true
-	rem_btn.custom_minimum_size = Vector2(200, 26)
-	rem_btn.modulate = Color(1.0, 0.7, 0.7)
-	rem_btn.pressed.connect(func():
-		editor_is_hexside = true
-		editor_hexside_brush = -1
-		editor_brush = -1
-		for b in all_brush_buttons:
-			if b != rem_btn:
-				b.button_pressed = false)
-	all_brush_buttons.append(rem_btn)
-	ep_list.add_child(rem_btn)
 	# -- sezione ELEVAZIONE --
 	ep_list.add_child(HSeparator.new())
 	ep_list.add_child(_section_label("ELEVAZIONE (hex.level)"))

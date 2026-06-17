@@ -23,6 +23,10 @@ const LOW_ORDERS := [D.Order.SNEAK, D.Order.HIDE, D.Order.RALLY, D.Order.RELOAD]
 # Trincea trattata come Depression per la LOS (Rule 27.4 / 27.8).
 const DEPRESSION_LIKE := [D.Terrain.DEPRESSION, D.Terrain.TRENCH]
 
+# Terreni "infossati": il suolo sta mezzo livello sotto il nominale
+# (elevazione -1/2 = -1 in mezzi livelli). Depression/Stream/Trench.
+const SUNKEN_TERRAINS := [D.Terrain.DEPRESSION, D.Terrain.STREAM, D.Terrain.TRENCH]
+
 # Terreni bassi: altezza 1/2 solo con ordini "low" in gioco.
 const LOW_TERRAIN := [
 	D.Terrain.LONG_GRASS, D.Terrain.DEPRESSION, D.Terrain.LOGS,
@@ -94,16 +98,25 @@ static func _cube_round(fx: float, fy: float, fz: float) -> Vector3i:
 	return Vector3i(int(rx), int(ry), int(rz))
 
 
+# Livello del suolo di un hex (in mezzi livelli): nominale level*2, meno
+# 1/2 livello se il terreno e' infossato (Depression/Stream/Trench).
+static func _ground_level2(hex: GameState.MapHex) -> int:
+	if hex == null:
+		return 0
+	var lv := hex.level * 2
+	if hex.terrain in SUNKEN_TERRAINS:
+		lv -= 1
+	return lv
+
+
 # Livello del suolo di un personaggio, in mezzi livelli.
 static func _unit_level2(state: GameState, c: Character) -> int:
-	var hex := state.hex_at(c.position.x, c.position.y)
-	return (hex.level if hex != null else 0) * 2
+	return _ground_level2(state.hex_at(c.position.x, c.position.y))
 
 
 # Livello del suolo di un hex, in mezzi livelli.
 static func _hex_level2_at(state: GameState, pos: Vector2i) -> int:
-	var hex := state.hex_at(pos.x, pos.y)
-	return (hex.level if hex != null else 0) * 2
+	return _ground_level2(state.hex_at(pos.x, pos.y))
 
 
 # Altezza efficace di un hex interposto, in mezzi livelli.
@@ -111,9 +124,9 @@ static func _hex_height2(state: GameState, pos: Vector2i, low_active: bool, both
 	var hex := state.hex_at(pos.x, pos.y)
 	if hex == null:
 		return 0
-	var base := hex.level * 2
-	if hex.terrain in DEPRESSION_LIKE:
-		return base  # interposta: "exists at level 0"
+	var base := _ground_level2(hex)
+	if hex.terrain in SUNKEN_TERRAINS:
+		return base  # infossata: suolo gia' -1/2, nessun ostacolo sopra
 	# Abbazia (Rule 27.5): tra due hex d'abbazia la LOS non e' bloccata dai
 	# muri dell'abbazia (vale il -1/hex sul WS, non un blocco).
 	if both_abbey and Domain.is_abbey(hex.terrain):
