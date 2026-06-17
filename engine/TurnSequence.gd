@@ -131,7 +131,9 @@ static func enemy_order_phase(state: GameState) -> void:
 			state.log_event("Team %s pesca Enemy Card %d (init %d) [Grande Battaglia]" % [
 				team, serial, EnemyCards.initiative_of(serial)])
 			for c in state.characters_of_team(team):
-				if c.alerted and not c.is_dead() and not c.has_order:
+				if c.alerted and not c.is_dead() and not c.has_order and not c.is_prisoner:
+					if _unprepared_skips(state, c):
+						continue
 					_assign_enemy_order(state, c, serial)
 	else:
 		# Rule 9 standard: una carta per ogni personaggio nemico Alerted.
@@ -140,7 +142,9 @@ static func enemy_order_phase(state: GameState) -> void:
 			var team_serial := -1
 			var team_init := 999
 			for c in state.characters_of_team(team):
-				if not c.alerted or c.is_dead() or c.has_order:
+				if not c.alerted or c.is_dead() or c.has_order or c.is_prisoner:
+					continue
+				if _unprepared_skips(state, c):
 					continue
 				var serial := state.draw_enemy_card()
 				state.log_event("  %s pesca Enemy Card %d (init %d)" % [
@@ -159,6 +163,11 @@ static func enemy_order_phase(state: GameState) -> void:
 # Ordini di movimento (diversi da Sneak) limitati dal filo spinato (Rule 27.7).
 const WIRE_MOVEMENT := [Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
 	Domain.Order.EVADE, Domain.Order.CHARGE]
+
+# Rule 10.10: ordini di fuoco che un nemico con No Ammo non puo' eseguire e che
+# vengono convertiti in Reload.
+const FIRE_ORDERS_RELOAD := [Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE,
+	Domain.Order.SUPPRESSIVE_FIRE, Domain.Order.RUN_AND_GUN]
 
 
 # Filo spinato (Rule 27.7): in ogni hex con filo spinato e 2+ nemici vivi, il
@@ -216,6 +225,13 @@ static func _set_enemy_order(state: GameState, c: Character, order: int,
 	if final_order in WIRE_MOVEMENT and state.has_wire(c.position) \
 			and not Move.wire_hide_exempt(state, c):
 		final_order = Domain.Order.SNEAK
+	# Rule 10.10: un nemico con No Ammo a cui toccherebbe un ordine di fuoco
+	# (Aimed/Rapid/Suppressive/Run&Gun) riceve invece Reload (a fine turno
+	# rimuove il marker No Ammo, gia' gestito in activate_passive impulso 4).
+	if c.no_ammo and not c.is_vehicle and final_order in FIRE_ORDERS_RELOAD:
+		c.set_order(Domain.Order.RELOAD)
+		state.log_event("  %s e' a corto di munizioni -> Reload" % c.display_name)
+		return
 	c.set_order(final_order, move, grenade, charge)
 	if final_order != order:
 		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
@@ -533,6 +549,16 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	if c.is_medic:
 		_assign_medic_order(state, c)
 		return
+	# Mischia obbligata (Rule 15): se c'e' un avversario vivo nello stesso hex,
+	# l'unico ordine sensato e' MELEE (attacca agli impulsi 2 e 4).
+	for rival in state.characters:
+		if rival.side == c.side or rival.is_dead() or rival.is_vehicle:
+			continue
+		if rival.position == c.position:
+			_set_enemy_order(state, c, Domain.Order.MELEE)
+			state.log_event("%s (mischia obbligata con %s) -> Melee" % [
+				c.display_name, rival.display_name])
+			return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
@@ -572,17 +598,43 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	var in_cover := (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
 		or state.hex_has_hexside(c.position)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
-	_set_enemy_order(state, c, entry["order"], entry["move"], entry["grenade"], entry["charge"])
+	var order: int = entry["order"]
+	var move: String = entry["move"]
+	var grenade := false
+	var charge := false
+	# Rule 9.6 Charge/Grenade Checks: le lettere C/G sulla carta si applicano
+	# SOLO se c'e' un Friendly Spotted entro 4 hex (senza bisogno di LOS) e si
+	# supera un TQC; allora l'ordine diventa Charge (C) o Grenade (G), invece di
+	# quello stampato. Con entrambe le lettere si prova prima la C, poi la G.
+	if (entry["charge"] or entry["grenade"]) and _spotted_friendly_within(state, c, 4):
+		if entry["charge"] and Checks.troop_quality_check(c, state.rng)["passed"]:
+			order = Domain.Order.CHARGE
+			charge = true
+		elif entry["grenade"] and Checks.troop_quality_check(c, state.rng)["passed"]:
+			order = Domain.Order.GRENADE
+			grenade = true
+	_set_enemy_order(state, c, order, move, grenade, charge)
 	var extra := "" if c.order_move.is_empty() else " " + c.order_move
-	if entry["grenade"]:
+	if grenade:
 		extra += " +Grenade"
-	if entry["charge"]:
+	if charge:
 		extra += " +Charge"
 	state.log_event("%s (%s, %s) -> %s%s" % [
 		c.display_name, Domain.MORALE_NAMES[c.morale],
 		"In Cover" if in_cover else "In Open",
 		Domain.ORDER_NAMES[c.order], extra,
 	])
+
+
+# Rule 9.6: c'e' un Friendly individuato (Spotted) entro `r` hex dal nemico `c`?
+# Non serve LOS.
+static func _spotted_friendly_within(state: GameState, c: Character, r: int) -> bool:
+	for f in state.characters:
+		if f.side != Domain.Side.FRIENDLY or f.is_dead() or not f.spotted:
+			continue
+		if Spotting.hex_distance(c.position, f.position) <= r:
+			return true
+	return false
 
 
 # Step 4 - Action Phase: 4 impulsi (Rule 4.0 step 4)
@@ -594,8 +646,58 @@ static func action_phase(state: GameState) -> void:
 # Un singolo impulse, tutto automatico (modalita' headless/demo).
 static func run_impulse(state: GameState, imp: int) -> void:
 	state.impulse = imp
+	waiting_watch(state)
 	for c in impulse_order(state):
 		activate(state, c)
+
+
+# Rule 9.7: un nemico Non-Preparato che si e' allertato perde la PRIMA
+# attivazione (pesca l'Ordine solo dal turno successivo). Ritorna true se va
+# saltato in questa Order Phase; lo segna Preparato per il turno dopo.
+# Rule 9.8 cond.8: a fine turno l'allerta si propaga ai nemici in Attesa con un
+# compagno gia' allertato entro 3 hex. Un solo passaggio (i neo-allertati
+# pescheranno l'ordine, da Non-Preparati, il turno dopo).
+static func _alert_spread_end_turn(state: GameState) -> void:
+	var newly: Array[Character] = []
+	for w in state.characters:
+		if w.side != Domain.Side.ENEMY or w.is_dead() or w.alerted or w.is_vehicle:
+			continue
+		for a in state.characters:
+			if a.side != Domain.Side.ENEMY or a.is_dead() or not a.alerted:
+				continue
+			if Spotting.hex_distance(w.position, a.position) <= 3:
+				newly.append(w)
+				break
+	for w in newly:
+		w.alert()
+		state.log_event("%s si allerta (compagno allertato vicino, fine turno)" % w.display_name)
+
+
+static func _unprepared_skips(state: GameState, c: Character) -> bool:
+	if c.prepared:
+		return false
+	c.prepared = true
+	c.had_first_order = true
+	state.log_event("%s (Non-Preparato) perde la prima attivazione" % c.display_name)
+	return true
+
+
+# Ronda di vigilanza (Rule 9.7): i nemici in Attesa (non allertati) non sono
+# nell'Initiative Track e non si attivano, percio' non farebbero mai spotting.
+# Qui "vegliano": tentano lo spotting su ogni friendly e, se ne avvistano uno,
+# si allertano (Non-Preparati, via Spotting.attempt -> Character.alert).
+# Va chiamata a inizio di ogni impulse (headless e UI interattiva).
+static func waiting_watch(state: GameState) -> void:
+	for e in state.characters:
+		if e.side != Domain.Side.ENEMY or e.is_dead() or e.alerted or e.is_vehicle:
+			continue
+		for f in state.characters:
+			if f.side != Domain.Side.FRIENDLY or f.is_dead():
+				continue
+			Spotting.attempt(state, e, f)
+			if e.alerted:
+				state.log_event("%s era in agguato e si allerta (avvista il nemico)" % e.display_name)
+				break
 
 
 # Ordine di attivazione dell'impulse: i Team in ordine di iniziativa.
@@ -900,6 +1002,8 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		return
 	# Segnalino mischia: flash rosso sull'hex (visibile in MapView).
 	state.melee_events.append({"hex": attacker.position})
+	# Rule 9.8 cond.7: una mischia entro 3 hex allerta i nemici in Attesa.
+	Fire.alert_waiting_near(state, attacker.position, 3, "mischia vicina")
 	if rivals_in_hex > 1:
 		state.log_event("Mischia: %d avversari nell'hex — %s attacca %s" % [
 			rivals_in_hex, attacker.display_name, target.display_name])
@@ -917,6 +1021,8 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 	if attacker.morale == Domain.Morale.ROUT:
 		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
 		attacker.set_order(Domain.Order.GUARD)
+		if attacker.side == Domain.Side.ENEMY:
+			attacker.is_prisoner = true
 		return
 	# "Bayonet!": +2 TQ all'attaccante friendly (carta, uso interattivo).
 	var atk_bonus := 0
@@ -924,6 +1030,11 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
 				"%s carica alla baionetta (+2)" % attacker.display_name):
 		atk_bonus = 2
+	# Bersaglio con ordine passivo (Hide/Rally/Reload/Medical Aid/ecc.):
+	# +2 TQ all'attaccante (Rule 15 — il difensore e' scoperto).
+	if target.has_order and target.order in MELEE_PASSIVE:
+		atk_bonus += 2
+		state.log_event("  %s ha ordine passivo: +2 TQ all'attaccante" % target.display_name)
 	# TQ d'attacco: morale + Charge all'impulso 4 + Knife Expert (Rule 24).
 	var atk_tq := _melee_attack_tq(state, attacker) + atk_bonus
 	var roll := Checks.roll_d10(state.rng)
@@ -951,6 +1062,13 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 				continue
 			vok.append(o)
 		return vok
+	# Mischia obbligata (Rule 15): se c'e' un avversario vivo nello stesso hex,
+	# l'unico ordine possibile e' MELEE.
+	for rival in state.characters:
+		if rival.side == c.side or rival.is_dead() or rival.is_vehicle:
+			continue
+		if rival.position == c.position:
+			return [Domain.Order.MELEE]
 	var restrict: String = state.turn_fx.get("restrict", "")
 	var near_enemy := false
 	for e in state.characters:
@@ -1054,6 +1172,48 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 			how = "in direzione %s (bussola)" % c.order_move
 		state.log_event("%s si sposta %s: %02d.%02d -> %02d.%02d" % [
 			c.display_name, how, from.x, from.y, c.position.x, c.position.y])
+		# Rule 9.4: un nemico che entra in terreno coperto con LOS a un Friendly
+		# Spotted puo' buttarsi al riparo (Duck Back).
+		_enter_terrain_duck_back(state, c)
+
+
+# Terreni "Aperti" (Rule 11): non innescano il Duck Back d'ingresso (Rule 9.4).
+const OPEN_TERRAINS := [Domain.Terrain.OPEN_LEVEL_0, Domain.Terrain.OPEN_LEVEL_1,
+	Domain.Terrain.OPEN_LEVEL_2, Domain.Terrain.OPEN_LEVEL_3]
+# Ordini esenti dal Duck Back d'ingresso (Rule 9.4): R&G, Granata, Carica.
+const DUCKBACK_EXEMPT_ORDERS := [Domain.Order.RUN_AND_GUN, Domain.Order.GRENADE,
+	Domain.Order.RIFLE_GRENADE, Domain.Order.SMOKE_GRENADE, Domain.Order.CHARGE]
+
+
+# Rule 9.4: quando un nemico ENTRA in terreno non-Aperto e ha LOS a un Friendly
+# individuato, fa un TQC NON modificato da ferite e morale; se passa, a fine
+# Impulse cambia ordine in Duck Back (si butta al riparo). Esente con ordini
+# R&G/Granata/Carica o morale Berserk.
+static func _enter_terrain_duck_back(state: GameState, c: Character) -> void:
+	if c.side != Domain.Side.ENEMY or c.is_vehicle or c.is_dead():
+		return
+	if c.morale == Domain.Morale.BERSERK:
+		return
+	if not c.has_order or c.order in DUCKBACK_EXEMPT_ORDERS:
+		return
+	var hex := state.hex_at(c.position.x, c.position.y)
+	if hex == null or hex.terrain in OPEN_TERRAINS:
+		return
+	var sees := false
+	for f in state.characters:
+		if f.side != Domain.Side.FRIENDLY or f.is_dead() or not f.spotted:
+			continue
+		if LOS.clear(state, c, f):
+			sees = true
+			break
+	if not sees:
+		return
+	# TQC non modificato da ferite/morale: confronto sul TQ base.
+	var roll := Checks.roll_d10(state.rng)
+	if roll <= c.troop_quality:
+		c.set_order(Domain.Order.DUCK_BACK)
+		state.log_event("%s entra al riparo e si butta giu' (Duck Back, TQC %d<=%d)" % [
+			c.display_name, roll, c.troop_quality])
 
 
 # Bersagli che il tiratore puo' ingaggiare ora (visti, in gittata, LOS).
@@ -1171,6 +1331,9 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 static func end_phase(state: GameState) -> void:
 	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
 	Area.end_phase(state)
+	# Rule 9.8 cond.8: a fine turno, un nemico in Attesa con un nemico ALLERTATO
+	# entro 3 hex passa anch'esso in Allerta (l'allerta si propaga nel gruppo).
+	_alert_spread_end_turn(state)
 	# Pioggia battente: puo' trasformare il terreno in fango (Rule 28.1).
 	Weather.maybe_make_mud(state)
 	# Obiettivi di ricognizione raggiunti in questo turno.

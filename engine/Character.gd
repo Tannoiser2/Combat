@@ -49,7 +49,12 @@ var wounds: Array[int] = []     # Domain.Wound
 # Stato di conoscenza/allerta
 var spotted: bool = false       # Friendly: visto dal nemico
 var known: bool = false         # Enemy: identificato dal giocatore
-var alerted: bool = false       # Enemy: ha sentito qualcosa
+var alerted: bool = false       # Enemy: ha sentito qualcosa (Rule 9.7)
+# Preparato (Rule 9.7): proprieta' di scenario. Un nemico Preparato pesca un
+# Ordine appena entra in Allerta; un Non-Preparato perde la prima attivazione
+# (pesca l'Ordine solo dal turno successivo). Impostato allo schieramento.
+var prepared: bool = true
+var is_prisoner: bool = false   # Enemy in Rout che si e' arreso in mischia
 
 # Marker
 var low_ammo: bool = false
@@ -116,6 +121,14 @@ func _init(p_id: String, p_name: String, p_side: int, p_team: String) -> void:
 # Possiede una skill speciale (Rule 24)?
 func has_skill(skill: String) -> bool:
 	return skill in skills
+
+
+# Allerta a meta' partita per una delle condizioni della Rule 9.8 (colpo udito,
+# avvistamento, esplosione, mischia...). NON tocca `prepared`: Preparato/Non
+# Preparato e' una proprieta' di scenario fissata allo schieramento (Rule 9.7).
+# Idempotente.
+func alert() -> void:
+	alerted = true
 
 
 # Membro di equipaggio (Rule 31), dentro o fuori dal mezzo.

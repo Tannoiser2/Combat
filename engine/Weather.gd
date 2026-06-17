@@ -45,13 +45,23 @@ const FORBIDDEN := {
 }
 
 
+# Visibilita' minima della Foschia (Mist = 1D6+4 -> minimo 5 hex). La Nebbia,
+# piu' densa, non puo' mai dare visibilita' pari o superiore (Rule 28.1).
+const MIST_MIN_LOS := 1 + 4
+
+
 # Limite di visibilita' (max LOS) del meteo, tirato a inizio scenario.
 # 0 = nessun limite. Rule 28.1.
 static func roll_max_los(weather: int, rng: RandomNumberGenerator) -> int:
 	match weather:
 		Type.HEAVY_RAIN: return rng.randi_range(1, 6) + rng.randi_range(1, 6)
 		Type.MIST: return rng.randi_range(1, 6) + 4
-		Type.FOG: return rng.randi_range(1, 6)
+		Type.FOG:
+			# La Nebbia (1D6) non puo' mai essere piu' rada della Foschia: se il
+			# tiro raggiunge la visibilita' minima della Foschia, la nebbia
+			# resta sotto (sempre piu' densa). Rule 28.1.
+			var v := rng.randi_range(1, 6)
+			return mini(v, MIST_MIN_LOS - 1)
 		_: return 0
 
 
@@ -63,12 +73,12 @@ static func ws_modifier(state: GameState, firer: Character, target: Character, d
 	var mod: int = WS_BEYOND_2.get(state.weather, 0)
 	if mod == 0:
 		return 0
-	if _both_in_building(state, firer, target):
+	if both_in_building(state, firer, target):
 		return 0
 	return mod
 
 
-static func _both_in_building(state: GameState, a: Character, b: Character) -> bool:
+static func both_in_building(state: GameState, a: Character, b: Character) -> bool:
 	var ha := state.hex_at(a.position.x, a.position.y)
 	var hb := state.hex_at(b.position.x, b.position.y)
 	return ha != null and hb != null \

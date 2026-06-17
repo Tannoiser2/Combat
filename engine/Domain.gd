@@ -142,14 +142,15 @@ const TERRAIN_NAMES := {
 	Terrain.ABBEY_INTERIOR: "Abbey (interior)",
 }
 
-# Terreni che contano come "In Cover" per le tabelle delle Enemy Card.
-# PROVVISORIO: classificazione di buon senso (protezione fisica si',
-# semplice occultamento no). Da verificare contro il regolamento (Rule 9/11).
+# Terreni che contano come "In Cover" per le tabelle delle Enemy Card (Rule 9/11).
+# Un terreno e' "In Cover" se fornisce protezione fisica significativa
+# (WS_MOD gruppo 2 <= -1 nella Fire Resolution Chart): Marsh -2, Orchard -1.
 const COVER_TERRAINS := [
-	Terrain.ROCKS, Terrain.BUILDING, Terrain.TREES, Terrain.HEDGEROW,
-	Terrain.WALL, Terrain.DEPRESSION, Terrain.STREAM, Terrain.LOGS,
-	Terrain.FOXHOLE, Terrain.RUBBLE, Terrain.CRATER, Terrain.BOCAGE,
-	Terrain.FOUNTAIN, Terrain.FORTIFIED_BUILDING, Terrain.TRENCH,
+	Terrain.ROCKS, Terrain.BUILDING, Terrain.TREES, Terrain.MARSH,
+	Terrain.HEDGEROW, Terrain.WALL, Terrain.DEPRESSION, Terrain.STREAM,
+	Terrain.ORCHARD, Terrain.LOGS, Terrain.FOXHOLE, Terrain.RUBBLE,
+	Terrain.CRATER, Terrain.BOCAGE, Terrain.FOUNTAIN,
+	Terrain.FORTIFIED_BUILDING, Terrain.TRENCH,
 	Terrain.ABBEY_EXTERIOR, Terrain.ABBEY_INTERIOR,
 ]
 

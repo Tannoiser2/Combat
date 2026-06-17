@@ -142,6 +142,10 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	if success:
 		if target.side == D.Side.ENEMY:
 			target.known = true
+			target.alert()  # individuato dal giocatore -> si allerta (Non-Preparato)
 		else:
 			target.spotted = true
+			# Rule 9.7: un nemico in Attesa che AVVISTA un amico si allerta.
+			if spotter.side == D.Side.ENEMY and not spotter.alerted:
+				spotter.alert()
 	return {"roll": roll, "threshold": threshold, "dist": dist, "success": success}

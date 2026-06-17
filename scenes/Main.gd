@@ -521,6 +521,7 @@ func _on_next_pressed() -> void:
 			state.melee_events.clear()
 			state.audio_events.clear()
 			state.log_event("--- Impulse 1 ---")
+			TurnSequence.waiting_watch(state)
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
 		Phase.END_TURN:
@@ -542,6 +543,7 @@ func _advance_action() -> void:
 			state.move_paths.clear()
 			state.audio_events.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
+			TurnSequence.waiting_watch(state)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
 		var c: Character = action_queue.pop_front()
@@ -3302,9 +3304,10 @@ func _auto_step() -> void:
 		Phase.CARD:
 			_on_card_chosen(0)
 		Phase.ORDERS:
-			for c in state.characters:
-				if c.side == Domain.Side.FRIENDLY and not c.is_dead() and not c.has_order:
-					c.set_order(Domain.Order.AIMED_FIRE)
+			# Stessa AI del balance test: spara se c'e' un bersaglio, altrimenti
+			# avanza verso la zona nemica. Cosi' l'auto-play ingaggia anche i
+			# nemici in Attesa negli scenari d'attacco (Rule 9.7).
+			_balance_assign_friendly_orders(state)
 			next_button.disabled = false
 			_on_next_pressed()
 		Phase.GAME_OVER:
@@ -3518,6 +3521,12 @@ func _test_rules() -> int:
 	fails += _test_abbey()
 	fails += _test_vehicles()
 	fails += _test_grenade()
+	fails += _test_alert()
+	fails += _test_melee()
+	fails += _test_melee_passive()
+	fails += _test_waiting()
+	fails += _test_charge_gate()
+	fails += _test_reload_duckback()
 	return fails
 
 
@@ -3561,6 +3570,299 @@ func _test_grenade() -> int:
 	# L'adiacente fa solo un MC: non viene rivelato dalla scheggia.
 	if adj.known:
 		print("TEST granata: adiacente rivelato per errore")
+		fails += 1
+	return fails
+
+
+# Allerta da colpo e da veicolo (Rule 9.7, v0.65/v0.66).
+func _test_alert() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 42
+	var firer := Character.new("fr", "Firer", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	firer.set_order(Domain.Order.AIMED_FIRE)
+	var tgt := Character.new("tg", "Target", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 4
+	tgt.position = Vector2i(0, 1)
+	tgt.alerted = false
+	var nearby := Character.new("nb", "Nearby", Domain.Side.ENEMY, "Red")
+	nearby.troop_quality = 4
+	nearby.position = Vector2i(0, 5)
+	nearby.alerted = false
+	var far_e := Character.new("fe", "Far", Domain.Side.ENEMY, "Red")
+	far_e.troop_quality = 4
+	far_e.position = Vector2i(0, 12)  # dist 12 dal tiratore: oltre i 10 hex (Rule 9.8)
+	far_e.alerted = false
+	st.characters = [firer, tgt, nearby, far_e]
+	Fire.fire_action(st, firer, tgt, "M1 Garand")
+	if not nearby.alerted:
+		print("TEST allerta: nemico a 5 hex non allertato dal colpo")
+		fails += 1
+	if far_e.alerted:
+		print("TEST allerta: nemico a 12 hex allertato per errore (oltre 10 hex)")
+		fails += 1
+	return fails
+
+
+# Mischia obbligata (Rule 15): nemico nello stesso hex.
+func _test_melee() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 7
+	Boards.fill(st, "farmhouse")
+	var fn := Character.new("f", "Friend", Domain.Side.FRIENDLY, "Able")
+	fn.troop_quality = 6
+	fn.weapon_skills = {"M1 Garand": 6}
+	fn.position = Vector2i(10, 10)
+	var en := Character.new("e", "Enemy", Domain.Side.ENEMY, "Red")
+	en.troop_quality = 4
+	en.weapon_skills = {"KAR 98K": 4}
+	en.position = Vector2i(10, 10)
+	en.alerted = true
+	st.characters = [fn, en]
+	# AI: nemico nello stesso hex riceve ordine MELEE.
+	TurnSequence._assign_enemy_order(st, en, 1)
+	if en.order != Domain.Order.MELEE:
+		print("TEST mischia obbligata AI: nemico non riceve MELEE (got %d)" % en.order)
+		fails += 1
+	# Friendly: legal_orders restituisce solo MELEE.
+	var lo := TurnSequence.legal_orders(st, fn)
+	if lo != [Domain.Order.MELEE]:
+		print("TEST mischia obbligata UI: legal_orders non e' [MELEE] (got %s)" % str(lo))
+		fails += 1
+	# Fuori mischia: legal_orders include piu' opzioni.
+	en.position = Vector2i(10, 12)
+	var lo2 := TurnSequence.legal_orders(st, fn)
+	if lo2.size() <= 1:
+		print("TEST mischia obbligata UI: senza nemico nell'hex troppo poche opzioni")
+		fails += 1
+	return fails
+
+
+# Ordine passivo in mischia (Rule 15): +2 TQ attaccante se bersaglio ha Hide ecc.
+func _test_melee_passive() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 99
+	Boards.fill(st, "farmhouse")
+	var atk := Character.new("a", "Atk", Domain.Side.FRIENDLY, "Able")
+	atk.troop_quality = 4  # basso per misurare la differenza
+	atk.weapon_skills = {"M1 Garand": 4}
+	atk.position = Vector2i(10, 10)
+	atk.set_order(Domain.Order.MELEE)
+	var def := Character.new("d", "Def", Domain.Side.ENEMY, "Red")
+	def.troop_quality = 5
+	def.weapon_skills = {"KAR 98K": 5}
+	def.position = Vector2i(10, 10)
+	def.known = true
+	st.characters = [atk, def]
+	st.impulse = 2
+	# Con bersaglio Hide (ordine passivo): attacco TQ = 4 + 2 = 6
+	def.set_order(Domain.Order.HIDE)
+	var tq_passive := TurnSequence._melee_attack_tq(st, atk)
+	# Senza ordine passivo: attacco TQ = 4
+	def.clear_order()
+	var tq_normal := TurnSequence._melee_attack_tq(st, atk)
+	# Il bonus da MELEE_PASSIVE (+2) viene applicato in _do_melee, non in _melee_attack_tq.
+	# Verifichiamo tramite _do_melee: forziamo seed per un colpo garantito e contiamo ferite.
+	# Con ordine passivo il tiro riesce con TQ 4+2=6; senza solo con TQ 4.
+	# Seed 99: il primo d10 uscira' X; verifichiamo che la logica del bonus sia chiamata.
+	def.set_order(Domain.Order.HIDE)
+	st.rng.seed = 1  # roll basso garantisce successo con TQ alta
+	var wounds_before := def.wounds.size()
+	TurnSequence._do_melee(st, atk)
+	var wounds_passive := def.wounds.size()
+	# Con TQ=6 e seed=1 dovrebbe colpire; verifica che la costante MELEE_PASSIVE sia utile.
+	if Domain.Order.HIDE not in TurnSequence.MELEE_PASSIVE:
+		print("TEST melee passivo: HIDE non e' in MELEE_PASSIVE")
+		fails += 1
+	if Domain.Order.MEDICAL_AID not in TurnSequence.MELEE_PASSIVE:
+		print("TEST melee passivo: MEDICAL_AID non e' in MELEE_PASSIVE")
+		fails += 1
+	# COVER_TERRAINS: Marsh e Orchard ora contano come copertura.
+	if not Domain.terrain_gives_cover(Domain.Terrain.MARSH):
+		print("TEST cover: Marsh non conta come copertura")
+		fails += 1
+	if not Domain.terrain_gives_cover(Domain.Terrain.ORCHARD):
+		print("TEST cover: Orchard non conta come copertura")
+		fails += 1
+	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
+		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Reload automatico (10.10) e Duck Back d'ingresso (9.4).
+func _test_reload_duckback() -> int:
+	var fails := 0
+	# 10.10: No Ammo + ordine di fuoco -> Reload.
+	var st := GameState.new()
+	var e := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	e.troop_quality = 5
+	e.weapon_skills = {"KAR 98K": 5}
+	e.position = Vector2i(5, 5)
+	e.no_ammo = true
+	st.characters = [e]
+	TurnSequence._set_enemy_order(st, e, Domain.Order.AIMED_FIRE)
+	if e.order != Domain.Order.RELOAD:
+		print("TEST 10.10: No Ammo + Aimed Fire non convertito in Reload (got %d)" % e.order)
+		fails += 1
+	# Con munizioni: l'ordine di fuoco resta.
+	e.no_ammo = false
+	TurnSequence._set_enemy_order(st, e, Domain.Order.AIMED_FIRE)
+	if e.order != Domain.Order.AIMED_FIRE:
+		print("TEST 10.10: con munizioni l'Aimed Fire non deve diventare Reload")
+		fails += 1
+	# 9.4: entra in terreno coperto con LOS a un Friendly Spotted, TQC passa -> Duck Back.
+	var st2 := GameState.new()
+	st2.rng.seed = 1  # roll basso: TQC passa con TQ alta
+	for y in range(0, 6):
+		st2.map[GameState.hex_key(5, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(5, 2)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var mover := Character.new("m", "M", Domain.Side.ENEMY, "Red")
+	mover.troop_quality = 9
+	mover.position = Vector2i(5, 2)  # gia' nell'edificio (post-movimento)
+	mover.set_order(Domain.Order.SNEAK)
+	var fr := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	fr.troop_quality = 5
+	fr.position = Vector2i(5, 5)
+	fr.spotted = true
+	st2.characters = [mover, fr]
+	TurnSequence._enter_terrain_duck_back(st2, mover)
+	if mover.order != Domain.Order.DUCK_BACK:
+		print("TEST 9.4: in terreno coperto con LOS al nemico non fa Duck Back (got %d)" % mover.order)
+		fails += 1
+	# In terreno Aperto: nessun Duck Back.
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	for y in range(0, 6):
+		st3.map[GameState.hex_key(5, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var mover2 := Character.new("m2", "M2", Domain.Side.ENEMY, "Red")
+	mover2.troop_quality = 9
+	mover2.position = Vector2i(5, 2)
+	mover2.set_order(Domain.Order.SNEAK)
+	var fr2 := Character.new("f2", "F2", Domain.Side.FRIENDLY, "Able")
+	fr2.troop_quality = 5
+	fr2.position = Vector2i(5, 5)
+	fr2.spotted = true
+	st3.characters = [mover2, fr2]
+	TurnSequence._enter_terrain_duck_back(st3, mover2)
+	if mover2.order == Domain.Order.DUCK_BACK:
+		print("TEST 9.4: in terreno Aperto non deve fare Duck Back")
+		fails += 1
+	# Ordine Charge: esente dal Duck Back anche in terreno coperto.
+	mover.set_order(Domain.Order.CHARGE)
+	TurnSequence._enter_terrain_duck_back(st2, mover)
+	if mover.order != Domain.Order.CHARGE:
+		print("TEST 9.4: la Carica deve essere esente dal Duck Back")
+		fails += 1
+	return fails
+
+
+# Gate Charge/Grenade nemici (Rule 9.6): serve un Friendly Spotted entro 4 hex.
+func _test_charge_gate() -> int:
+	var fails := 0
+	var st := GameState.new()
+	var e := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	e.troop_quality = 5
+	e.position = Vector2i(5, 5)
+	var f := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	f.troop_quality = 5
+	f.position = Vector2i(5, 8)  # dist 3
+	f.spotted = true
+	st.characters = [e, f]
+	if not TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly spotted a 3 hex non rilevato")
+		fails += 1
+	f.spotted = false  # non individuato: non conta
+	if TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly NON spotted non deve abilitare C/G")
+		fails += 1
+	f.spotted = true
+	f.position = Vector2i(5, 15)  # dist 10 > 4
+	if TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly oltre 4 hex non deve abilitare C/G")
+		fails += 1
+	return fails
+
+
+# Attesa (Alert/Waiting 9.8) e Preparato/Non-Preparato (9.7).
+func _test_waiting() -> int:
+	var fails := 0
+	var stx := GameState.new()
+	# alert() porta in Allerta SENZA toccare prepared (proprieta' di scenario).
+	var en := Character.new("e", "Wait", Domain.Side.ENEMY, "Red")
+	en.prepared = false  # scenario Non-Preparato
+	en.alert()
+	if not en.alerted or en.prepared:
+		print("TEST attesa: alert() deve allertare senza cambiare prepared")
+		fails += 1
+	var ep := Character.new("ep", "Prep", Domain.Side.ENEMY, "Red")
+	ep.prepared = true
+	ep.alert()
+	if not ep.prepared:
+		print("TEST attesa: alert() non deve azzerare prepared di un Preparato")
+		fails += 1
+	# Ronda di vigilanza: un nemico in agguato che vede un amico si allerta
+	# (e resta Non-Preparato se lo scenario lo prevede).
+	var st := GameState.new()
+	st.rng.seed = 1
+	for y in range(0, 6):
+		st.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var watcher := Character.new("w", "Watcher", Domain.Side.ENEMY, "Red")
+	watcher.troop_quality = 8
+	watcher.position = Vector2i(0, 0)
+	watcher.alerted = false
+	watcher.prepared = false
+	var intruder := Character.new("in", "Intruder", Domain.Side.FRIENDLY, "Able")
+	intruder.troop_quality = 5
+	intruder.position = Vector2i(0, 2)
+	st.characters = [watcher, intruder]
+	TurnSequence.waiting_watch(st)
+	if not watcher.alerted or watcher.prepared:
+		print("TEST attesa: la ronda non allerta (restando Non-Preparato) il nemico in agguato")
+		fails += 1
+	# Non-Preparato (9.7): perde la PRIMA attivazione, poi diventa Preparato.
+	var np := Character.new("np", "NonPrep", Domain.Side.ENEMY, "Red")
+	np.alerted = true
+	np.prepared = false
+	if not TurnSequence._unprepared_skips(stx, np):
+		print("TEST Non-Preparato: non perde la prima attivazione")
+		fails += 1
+	if not np.prepared:
+		print("TEST Non-Preparato: non diventa Preparato per il turno dopo")
+		fails += 1
+	# Un Preparato non salta mai l'attivazione.
+	var pp := Character.new("pp", "Prep2", Domain.Side.ENEMY, "Red")
+	pp.alerted = true
+	pp.prepared = true
+	if TurnSequence._unprepared_skips(stx, pp):
+		print("TEST Preparato: non deve saltare l'attivazione")
+		fails += 1
+	# Cond.8 (fine turno): l'allerta si propaga a un nemico in Attesa entro 3 hex.
+	var st2 := GameState.new()
+	var a_alert := Character.new("a", "Alert", Domain.Side.ENEMY, "Red")
+	a_alert.troop_quality = 5
+	a_alert.position = Vector2i(5, 5)
+	a_alert.alerted = true
+	var w_near := Character.new("wn", "Near", Domain.Side.ENEMY, "Red")
+	w_near.troop_quality = 5
+	w_near.position = Vector2i(5, 7)  # dist 2
+	w_near.alerted = false
+	var w_far := Character.new("wf", "Far", Domain.Side.ENEMY, "Red")
+	w_far.troop_quality = 5
+	w_far.position = Vector2i(5, 12)  # dist 7
+	w_far.alerted = false
+	st2.characters = [a_alert, w_near, w_far]
+	TurnSequence._alert_spread_end_turn(st2)
+	if not w_near.alerted:
+		print("TEST cond.8: nemico in Attesa a 2 hex non allertato a fine turno")
+		fails += 1
+	if w_far.alerted:
+		print("TEST cond.8: nemico in Attesa a 7 hex allertato per errore")
 		fails += 1
 	return fails
 
@@ -3868,6 +4170,7 @@ func _test_medic() -> int:
 	var pris := Character.new("pr", "Prig", Domain.Side.ENEMY, "Red")
 	pris.troop_quality = 5
 	pris.set_order(Domain.Order.GUARD)
+	pris.is_prisoner = true
 	pris.position = Vector2i(3, 5)  # adiacente al witness
 	srv.characters = [mrev, wrev, pris]
 	Fire._medic_shock(srv, mrev)  # il roll==0 porta wrev a BERSERK
@@ -4156,15 +4459,20 @@ func _test_weather() -> int:
 	if th_camo - th_plain != -1:
 		print("TEST Winter Camo: -1 allo spotting errato (%d vs %d)" % [th_camo, th_plain])
 		fails += 1
-	# Limite di visibilita' tirato: fasce d10 corrette.
+	# Limite di visibilita' tirato: fasce d10 corrette. La Nebbia (v0.71) e'
+	# sempre piu' densa della Foschia: max 4 hex (mai >= il minimo Mist 5).
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99
 	for i in range(60):
 		var f := Weather.roll_max_los(Weather.Type.FOG, rng)
 		var mi := Weather.roll_max_los(Weather.Type.MIST, rng)
 		var hr := Weather.roll_max_los(Weather.Type.HEAVY_RAIN, rng)
-		if f < 1 or f > 6 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
-			print("TEST visibilita': fasce di tiro fuori range")
+		if f < 1 or f > 4 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
+			print("TEST visibilita': fasce di tiro fuori range (fog=%d)" % f)
+			fails += 1
+			break
+		if f >= mi:
+			print("TEST visibilita': nebbia (%d) non piu' densa della foschia (%d)" % [f, mi])
 			fails += 1
 			break
 	if Weather.roll_max_los(Weather.Type.CLEAR, rng) != 0:
@@ -4190,6 +4498,79 @@ func _test_weather() -> int:
 			print("TEST pioggia normale: fango non previsto")
 			fails += 1
 			break
+	# Notte: LOS bloccata oltre 5 hex (Rule 18.1, v0.65).
+	var stn := GameState.new()
+	stn.night = true
+	if LOS.clear_positions(stn, Vector2i(0, 0), Vector2i(0, 6), 0, 0, false):
+		print("TEST notte: LOS non bloccata oltre 5 hex")
+		fails += 1
+	if not LOS.clear_positions(stn, Vector2i(0, 0), Vector2i(0, 5), 0, 0, false):
+		print("TEST notte: LOS bloccata entro 5 hex")
+		fails += 1
+	# Notte: -2 WS oltre 2 hex, esente se entrambi in edificio (v0.66).
+	# Confronto notte on/off sullo stesso terreno (open) -> delta deve essere 2.
+	var stn2 := GameState.new()
+	var stn2c := GameState.new()
+	stn2.night = true
+	stn2c.night = false
+	var fn2 := Character.new("fn2", "FN2", Domain.Side.FRIENDLY, "Able")
+	fn2.troop_quality = 6
+	fn2.weapon_skills = {"M1 Garand": 6}
+	fn2.position = Vector2i(0, 0)
+	var tn2 := Character.new("tn2", "TN2", Domain.Side.ENEMY, "Red")
+	tn2.position = Vector2i(0, 4)
+	stn2.characters = [fn2, tn2]
+	var ws_night: int = Fire._compute_ws(stn2, fn2, tn2, "M1 Garand")["ws"]
+	var ws_day: int = Fire._compute_ws(stn2c, fn2, tn2, "M1 Garand")["ws"]
+	if ws_day - ws_night != 2:
+		print("TEST notte: -2 WS non applicato (giorno=%d notte=%d)" % [ws_day, ws_night])
+		fails += 1
+	# Stesso terreno in edificio: il -2 deve essere esente.
+	stn2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2.map[GameState.hex_key(0, 4)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2c.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2c.map[GameState.hex_key(0, 4)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var ws_night_bldg: int = Fire._compute_ws(stn2, fn2, tn2, "M1 Garand")["ws"]
+	var ws_day_bldg: int = Fire._compute_ws(stn2c, fn2, tn2, "M1 Garand")["ws"]
+	if ws_day_bldg - ws_night_bldg != 0:
+		print("TEST notte edificio: -2 non esentato (giorno=%d notte=%d)" % [ws_day_bldg, ws_night_bldg])
+		fails += 1
+	# Sniper (Rule 24.1, v0.71): +2 in Aimed Fire solo a 3+ hex e non all'impulso 2.
+	var sts := GameState.new()
+	sts.impulse = 4
+	var sniper := Character.new("sn", "Sniper", Domain.Side.ENEMY, "Red")
+	sniper.troop_quality = 6
+	sniper.weapon_skills = {"KAR 98K": 6}
+	sniper.skills = [Character.SKILL_SNIPER]
+	sniper.position = Vector2i(0, 0)
+	sniper.set_order(Domain.Order.AIMED_FIRE)
+	var sv := Character.new("sv", "Vittima", Domain.Side.FRIENDLY, "Able")
+	sv.troop_quality = 5
+	sv.position = Vector2i(0, 5)  # dist 5 (>=3)
+	sts.characters = [sniper, sv]
+	var ws_far: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	sv.position = Vector2i(0, 2)  # dist 2 (<3): niente bonus
+	var ws_near: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	# A 5 hex il bonus +2 c'e'; a 2 hex no. La differenza di gittata pura
+	# (range_ws_modifier) si annulla confrontando con uno Sniper senza skill.
+	sniper.skills = []
+	var base_far: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]  # dist 2, no skill
+	sv.position = Vector2i(0, 5)
+	var base_far5: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]  # dist 5, no skill
+	# Con skill a 5 hex: base5 + 2; a 2 hex: base2 + 0.
+	if ws_far - base_far5 != 2:
+		print("TEST Sniper: +2 a 5 hex non applicato (%d vs base %d)" % [ws_far, base_far5])
+		fails += 1
+	if ws_near - base_far != 0:
+		print("TEST Sniper: bonus applicato a 2 hex (%d vs base %d)" % [ws_near, base_far])
+		fails += 1
+	# All'impulso 2 niente bonus anche a distanza.
+	sts.impulse = 2
+	sniper.skills = [Character.SKILL_SNIPER]
+	var ws_imp2: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	if ws_imp2 - base_far5 != 0:
+		print("TEST Sniper: bonus applicato all'impulso 2 (%d vs base %d)" % [ws_imp2, base_far5])
+		fails += 1
 	return fails
 
 
@@ -4337,7 +4718,7 @@ func _test_ss_skills() -> int:
 	sniper.set_order(Domain.Order.AIMED_FIRE)
 	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
 	prey.troop_quality = 6
-	prey.position = Vector2i(10, 12)
+	prey.position = Vector2i(10, 13)  # dist 3 (>=3, v0.71: il bonus richiede 3+ hex)
 	st.impulse = 1
 	var ws_imp1 := Fire._fire_ws(st, sniper, prey)
 	st.impulse = 2

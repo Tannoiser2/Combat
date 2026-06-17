@@ -146,6 +146,7 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		else:
 			# Armi leggere: colpiscono l'equipaggio esposto (Rule 31.10).
 			_fire_at_exposed_crew(state, firer, target, weapon)
+		_alert_from_shot(state, firer)
 		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var rof := Weapons.rof_at(weapon, dist)
@@ -190,6 +191,24 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	Replay.shot(state, state.shots.back())
 	state.audio_events.append({"type": "shot", "weapon": weapon,
 		"outcome": outcome, "hex": firer.position})
+	_alert_from_shot(state, firer)
+
+
+# Rule 9.8: porta in Allerta i nemici in Attesa entro `radius` hex da `center`.
+# Usata da tutte le condizioni di attivazione (colpo, ferita, esplosione,
+# mischia, fine turno). I veicoli non hanno stato di Attesa.
+static func alert_waiting_near(state: GameState, center: Vector2i, radius: int, reason: String) -> void:
+	for e in state.characters:
+		if e.side != D.Side.ENEMY or e.is_dead() or e.alerted or e.is_vehicle:
+			continue
+		if Spotting.hex_distance(e.position, center) <= radius:
+			e.alert()
+			state.log_event("  %s si allerta (%s)" % [e.display_name, reason])
+
+
+# Rule 9.8 cond.1: un'arma sparata entro 10 hex allerta i nemici in Attesa.
+static func _alert_from_shot(state: GameState, shooter: Character) -> void:
+	alert_waiting_near(state, shooter.position, 10, "colpo udito")
 
 
 # Rule 31.10: fuoco di armi leggere contro l'equipaggio esposto di un veicolo.
@@ -352,9 +371,14 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		elif target.has_skill(Character.SKILL_DODGE):
 			bits.append("-1 Dodge (Evade)")
 			ws -= 1
+	# Sniper (Rule 24.1): +2 in Aimed Fire (non all'impulso 2) solo su un
+	# bersaglio individuato a 3+ hex. Il bersaglio del fuoco e' sempre
+	# Spotted/Known (filtro in valid_fire_targets), resta il vincolo di gittata:
+	# a distanza ravvicinata la skill non da' vantaggio.
 	if firer.has_skill(Character.SKILL_SNIPER) and firer.has_order \
-			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2:
-		bits.append("+2 Sniper (Aimed)")
+			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2 \
+			and dist >= 3:
+		bits.append("+2 Sniper (Aimed >=3)")
 		ws += 2
 	# Mirino (Rule 26, es. M1903 Springfield): +1 in Aimed Fire oltre i 3 hex.
 	if "scoped" in Weapons.info(weapon)["flags"] and firer.has_order \
@@ -375,7 +399,8 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 	# Ambiente: eventi/scenario, fumo lungo il tiro, notte, meteo (Rule 28).
 	m = int(state.turn_fx.get("fire_env_mod", 0))
 	m += _smoke_modifier(state, firer.position, target.position)
-	if state.night and dist > 2 and not Area.illuminated(state, target.position):
+	if state.night and dist > 2 and not Area.illuminated(state, target.position) \
+			and not Weather.both_in_building(state, firer, target):
 		m += -2
 	m += Weather.ws_modifier(state, firer, target, dist)
 	if m != 0:
@@ -461,6 +486,8 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
+	# Rule 9.8 cond.3: un compagno colpito entro 3 hex allerta i nemici in Attesa.
+	alert_waiting_near(state, target.position, 3, "compagno colpito vicino")
 	return {"hit": true, "nine": false}
 
 
@@ -533,7 +560,7 @@ static func _revenge_on_prisoners(state: GameState, berserks: Array[Character]) 
 	for prisoner in state.characters:
 		if prisoner.side != D.Side.ENEMY or prisoner.is_dead():
 			continue
-		if prisoner.order != D.Order.GUARD:
+		if not prisoner.is_prisoner:
 			continue
 		for b in berserks:
 			if Spotting.hex_distance(b.position, prisoner.position) <= 1:
@@ -607,6 +634,7 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			target.clear_order()
 			state.audio_events.append({"type": "scream", "hex": target.position})
 			Replay.sfx(state, "scream")
+			_mg_transfer_if_operator(state, target)
 			_medic_shock(state, target)
 			return true
 		_:
@@ -618,9 +646,11 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			if target.is_dead():
 				_log(state, "  le ferite uccidono %s" % target.display_name)
 				target.clear_order()
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 				return true
 			if w == D.Wound.BAD:
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 			# In mischia non si riceve Duck Back, ma MC e WMC come al solito.
 			var mc := Checks.morale_check(target, state.rng)

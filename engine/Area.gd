@@ -278,6 +278,10 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 	state.booms.append({"hex": hex, "type": m["type"]})
 	Replay.boom(state, hex, m["type"])
 	state.audio_events.append({"type": "boom", "area_type": m["type"], "hex": hex})
+	# Rule 9.8 cond.5: granata/artiglieria che esplode entro 5 hex allerta i
+	# nemici in Attesa (il fumogeno non fa rumore d'esplosione).
+	if m["type"] != Type.SMOKE:
+		Fire.alert_waiting_near(state, hex, 5, "esplosione vicina")
 	# Cannoni (intro3/s9): la C4 nell'hex di un pezzo lo distrugge.
 	if m["type"] == Type.C4 and not state.scenario_id.is_empty():
 		var key := "%d,%d" % [hex.x, hex.y]

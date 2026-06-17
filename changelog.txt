@@ -1,3 +1,118 @@
+v0.75 — 2026-06-17
+- Reload automatico nemici (Rule 10.10): un nemico con marker No Ammo a cui
+  toccherebbe un ordine di fuoco (Aimed/Rapid/Suppressive/Run&Gun) riceve
+  invece Reload, e a fine turno rimuove il No Ammo. Prima restava col fuoco e
+  non ricaricava mai da solo.
+- Duck Back all'ingresso in terreno coperto (Rule 9.4): un nemico che entra in
+  un esagono non-Aperto avendo LOS a un Friendly individuato fa un TQC (non
+  modificato da ferite/morale); se passa si butta al riparo (Duck Back). Esente
+  con ordini Run&Gun/Granata/Carica o morale Berserk. Test 9.4 e 10.10.
+
+v0.74 — 2026-06-17
+- Charge/Grenade Checks dei nemici (Rule 9.6): le lettere C/G sulle Enemy Card
+  ora si applicano fedelmente. Prima di assegnare l'ordine, se c'è un Friendly
+  individuato (Spotted) entro 4 hex (senza bisogno di LOS) si tira un TQC: se
+  passa, l'ordine diventa Charge (C) o Grenade (G) invece di quello stampato.
+  Con entrambe le lettere si prova prima la C, poi la G. Prima la "C" non aveva
+  effetto e la "G" lanciava senza il TQC né il controllo dei 4 hex. Test 9.6.
+
+v0.73 — 2026-06-17
+- Attesa/Preparato resi fedeli allo Scenario Book e alle regole 9.7-9.8
+  (lette dal regolamento ufficiale). Correzioni rispetto alla v0.72:
+  - Alert/Waiting (9.8) e Prepared/Unprepared (9.7) sono ora DUE flag di
+    scenario distinti: "enemy_alerted_start" e "enemy_prepared" (default:
+    Preparato segue l'Alert Level).
+  - Classificazione Vol.1 corretta dal booklet: intro1 = Alert+Prepared,
+    s3 = Alert+Prepared (erano in Attesa per errore), s8 = Waiting+Prepared.
+    Confermati Waiting+Unprepared: intro2/3, s1, s4, s6, s9; Alert+Prepared:
+    intro4, s2, s5, s7, s10.
+  - Non-Preparato (9.7): ora PERDE la prima attivazione (pesca l'ordine solo
+    dal turno successivo), invece del vecchio "solo Aimed Fire/Hide". È una
+    proprietà di scenario, non una conseguenza dell'allertarsi a metà partita.
+  - Raggio del colpo udito 8 -> 10 hex (cond.1, era errato).
+  - Nuove condizioni di attivazione (9.8): compagno colpito entro 3 hex
+    (cond.3), esplosione granata/artiglieria entro 5 hex (cond.5), mischia
+    entro 3 hex (cond.7), propagazione a fine turno a un nemico in Attesa con
+    un allertato entro 3 hex (cond.8). Più colpo (1) e avvistamento (2/9) già
+    presenti. Helper unico Fire.alert_waiting_near.
+  - I rinforzi restano sempre Allertati e Preparati.
+
+v0.72 — 2026-06-17
+- Stato "Attesa" e "Non-Preparato" (Rule 9.7-9.8): i nemici a piedi ora
+  partono IN ATTESA (non allertati, non visibili) negli scenari d'attacco/
+  infiltrazione. Il giocatore deve avvicinarsi e individuarli: torna
+  l'avvicinamento furtivo e la sorpresa.
+  - Condizioni di attivazione: colpo udito entro 8 hex (già v0.65), nemico
+    individuato dal giocatore (già v0.65), e ORA un nemico in agguato che
+    AVVISTA un amico si allerta da solo (Spotting + ronda di vigilanza
+    waiting_watch a ogni impulse, perché i nemici in Attesa non sono
+    nell'Initiative Track).
+  - Non-Preparato (9.8): chi si allerta a metà partita nel primo turno può
+    solo orientarsi/Aimed Fire o restare in agguato (Hide); niente carica o
+    movimento aggressivo. Dal turno dopo agisce normalmente (Character.prepared).
+  - Override per scenario "enemy_alerted_start": gli scenari difensivi (il
+    nemico attacca) partono già allertati e Preparati: intro4, s2, s5, s7,
+    s10, s12, s14, s15, s22. I rinforzi entrano sempre allertati.
+  - Classificazione di prima passata (attacco=Attesa, difesa=Allertato),
+    rifinibile con il playtest/bilanciamento.
+
+v0.71 — 2026-06-17
+- Nebbia vs Foschia (Rule 28.1): la Nebbia (1D6) non può più dare visibilità
+  pari o superiore alla Foschia (1D6+4, minimo 5 hex). Ora la nebbia è sempre
+  più densa (max 4 hex). Prima un tiro di 5-6 rendeva la nebbia più rada della
+  foschia minima — incoerente.
+- Sniper SS (Rule 24.1): il +2 in Aimed Fire ora richiede un bersaglio a 3+ hex
+  (oltre al vincolo "non all'impulso 2"). A distanza ravvicinata la skill non
+  dà più vantaggio. Il bersaglio è già sempre Spotted (filtro valid_fire_targets).
+  NOTA: il TQC di abilitazione citato nell'audit non è applicato — _compute_ws
+  è deterministica (usata anche per l'anteprima UI), un tiro lì consumerebbe RNG.
+
+v0.70 — 2026-06-17
+- Mischia (Rule 15): ordine passivo del bersaglio ora applicato. MELEE_PASSIVE
+  (Hide/Rally/Reload/Medical Aid/Carry-Drag/Plan) era definita ma non usata:
+  il bersaglio con ordine passivo ora dà +2 TQ all'attaccante in mischia.
+- COVER_TERRAINS: Marsh e Orchard aggiunti (entrambi hanno WS_MOD ≤ -1 per
+  gli ordini offensivi nel Fire Resolution Chart). L'AI usava la colonna
+  "In Open" della Enemy Card per unità in Marsh/Orchard — errato. Rimosso il
+  commento "PROVVISORIO": la classificazione è ora verificata contro i chart.
+
+v0.69 — 2026-06-17
+- Mischia obbligata (Rule 15): quando un avversario vivo è nello stesso hex,
+  sia il nemico (AI) sia il friendly (UI) ricevono/vedono solo MELEE come ordine.
+  Prima l'AI assegnava l'ordine dalla Enemy Card (Aimed Fire, Evade ecc.) e il
+  giocatore vedeva tutti gli ordini: le due pedine rimanevano nello stesso hex
+  senza mai combattere dopo il turno 1 di carica. Fix in `_assign_enemy_order`
+  (controllo stesso-hex prima di tutto) e in `legal_orders` (ritorna [MELEE]
+  se c'è un avversario nell'hex). Test _test_melee.
+
+v0.68 — 2026-06-17
+- MG transfer in mischia (Rule 14.3): `_mg_transfer_if_operator` ora viene
+  chiamata anche in `_resolve_wound_melee` (KIA e Bad Wound). Prima, se
+  l'operatore dell'MG cadeva in mischia, l'arma non passava al compagno
+  nell'hex — solo il fuoco normale trasferiva l'MG.
+
+v0.67 — 2026-06-17
+- Allerta da fuoco AT/veicolo: `_alert_from_shot` ora viene chiamata anche
+  quando il bersaglio è un veicolo (il colpo di carro/bazooka era l'unico
+  tipo di fuoco che non allertava i nemici vicini). Aggiunto test _test_alert.
+
+v0.66 — 2026-06-17
+- Notte: -2 WS oltre 2 hex esente se tiratore e bersaglio sono nello stesso
+  edificio (era già così per il meteo; ora coerente con Rule 18/28).
+- Prigioniero nemico (Rule 15/17.3): aggiunto Character.is_prisoner.
+  L'enemy in Rout che si arrende in mischia non pesca più carte nella
+  Order Phase successiva; viene trovato correttamente dalla logica revenge
+  (Rule 30) anche dopo che end_phase azzera gli ordini.
+
+v0.65 — 2026-06-17
+- Notte come limite LOS (Rule 18.1): visibilità notturna massima 5 hex;
+  chi si trova sotto illuminazione (flare/traccianti) ignora il limite.
+  La notte era già un malus WS oltre 2 hex; ora è anche una vera barriera LOS.
+- Allerta per spotting (Rule 9.7): un nemico che viene individuato (known=true)
+  diventa subito alerted e pesca carte nella Order Phase.
+- Allerta per colpo (Rule 9.7): ogni sparo sveglia i nemici non-allertati
+  entro 8 hex dallo sparatore; messaggi di log per ogni unità allertata.
+
 v0.64 — 2026-06-17
 - Audit regolamento Vol.1+Vol.2: corretti 8 scostamenti dal regolamento.
   - Fuoco: 0-naturale premia sempre il tiratore (+1 morale), con o senza ferita
