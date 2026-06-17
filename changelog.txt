@@ -1,3 +1,11 @@
+v0.66 — 2026-06-17
+- Notte: -2 WS oltre 2 hex esente se tiratore e bersaglio sono nello stesso
+  edificio (era già così per il meteo; ora coerente con Rule 18/28).
+- Prigioniero nemico (Rule 15/17.3): aggiunto Character.is_prisoner.
+  L'enemy in Rout che si arrende in mischia non pesca più carte nella
+  Order Phase successiva; viene trovato correttamente dalla logica revenge
+  (Rule 30) anche dopo che end_phase azzera gli ordini.
+
 v0.65 — 2026-06-17
 - Notte come limite LOS (Rule 18.1): visibilità notturna massima 5 hex;
   chi si trova sotto illuminazione (flare/traccianti) ignora il limite.

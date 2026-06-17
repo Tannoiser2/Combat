@@ -63,12 +63,12 @@ static func ws_modifier(state: GameState, firer: Character, target: Character, d
 	var mod: int = WS_BEYOND_2.get(state.weather, 0)
 	if mod == 0:
 		return 0
-	if _both_in_building(state, firer, target):
+	if both_in_building(state, firer, target):
 		return 0
 	return mod
 
 
-static func _both_in_building(state: GameState, a: Character, b: Character) -> bool:
+static func both_in_building(state: GameState, a: Character, b: Character) -> bool:
 	var ha := state.hex_at(a.position.x, a.position.y)
 	var hb := state.hex_at(b.position.x, b.position.y)
 	return ha != null and hb != null \

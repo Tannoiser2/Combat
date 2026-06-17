@@ -131,7 +131,7 @@ static func enemy_order_phase(state: GameState) -> void:
 			state.log_event("Team %s pesca Enemy Card %d (init %d) [Grande Battaglia]" % [
 				team, serial, EnemyCards.initiative_of(serial)])
 			for c in state.characters_of_team(team):
-				if c.alerted and not c.is_dead() and not c.has_order:
+				if c.alerted and not c.is_dead() and not c.has_order and not c.is_prisoner:
 					_assign_enemy_order(state, c, serial)
 	else:
 		# Rule 9 standard: una carta per ogni personaggio nemico Alerted.
@@ -140,7 +140,7 @@ static func enemy_order_phase(state: GameState) -> void:
 			var team_serial := -1
 			var team_init := 999
 			for c in state.characters_of_team(team):
-				if not c.alerted or c.is_dead() or c.has_order:
+				if not c.alerted or c.is_dead() or c.has_order or c.is_prisoner:
 					continue
 				var serial := state.draw_enemy_card()
 				state.log_event("  %s pesca Enemy Card %d (init %d)" % [
@@ -917,6 +917,8 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 	if attacker.morale == Domain.Morale.ROUT:
 		state.log_event("%s e' in Rotta: si arrende (Guard)" % attacker.display_name)
 		attacker.set_order(Domain.Order.GUARD)
+		if attacker.side == Domain.Side.ENEMY:
+			attacker.is_prisoner = true
 		return
 	# "Bayonet!": +2 TQ all'attaccante friendly (carta, uso interattivo).
 	var atk_bonus := 0

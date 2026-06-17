@@ -386,7 +386,8 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 	# Ambiente: eventi/scenario, fumo lungo il tiro, notte, meteo (Rule 28).
 	m = int(state.turn_fx.get("fire_env_mod", 0))
 	m += _smoke_modifier(state, firer.position, target.position)
-	if state.night and dist > 2 and not Area.illuminated(state, target.position):
+	if state.night and dist > 2 and not Area.illuminated(state, target.position) \
+			and not Weather.both_in_building(state, firer, target):
 		m += -2
 	m += Weather.ws_modifier(state, firer, target, dist)
 	if m != 0:
@@ -544,7 +545,7 @@ static func _revenge_on_prisoners(state: GameState, berserks: Array[Character]) 
 	for prisoner in state.characters:
 		if prisoner.side != D.Side.ENEMY or prisoner.is_dead():
 			continue
-		if prisoner.order != D.Order.GUARD:
+		if not prisoner.is_prisoner:
 			continue
 		for b in berserks:
 			if Spotting.hex_distance(b.position, prisoner.position) <= 1:

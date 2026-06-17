@@ -3868,6 +3868,7 @@ func _test_medic() -> int:
 	var pris := Character.new("pr", "Prig", Domain.Side.ENEMY, "Red")
 	pris.troop_quality = 5
 	pris.set_order(Domain.Order.GUARD)
+	pris.is_prisoner = true
 	pris.position = Vector2i(3, 5)  # adiacente al witness
 	srv.characters = [mrev, wrev, pris]
 	Fire._medic_shock(srv, mrev)  # il roll==0 porta wrev a BERSERK
@@ -4190,6 +4191,43 @@ func _test_weather() -> int:
 			print("TEST pioggia normale: fango non previsto")
 			fails += 1
 			break
+	# Notte: LOS bloccata oltre 5 hex (Rule 18.1, v0.65).
+	var stn := GameState.new()
+	stn.night = true
+	if LOS.clear_positions(stn, Vector2i(0, 0), Vector2i(0, 6), 0, 0, false):
+		print("TEST notte: LOS non bloccata oltre 5 hex")
+		fails += 1
+	if not LOS.clear_positions(stn, Vector2i(0, 0), Vector2i(0, 5), 0, 0, false):
+		print("TEST notte: LOS bloccata entro 5 hex")
+		fails += 1
+	# Notte: -2 WS oltre 2 hex, esente se entrambi in edificio (v0.66).
+	# Confronto notte on/off sullo stesso terreno (open) -> delta deve essere 2.
+	var stn2 := GameState.new()
+	var stn2c := GameState.new()
+	stn2.night = true
+	stn2c.night = false
+	var fn2 := Character.new("fn2", "FN2", Domain.Side.FRIENDLY, "Able")
+	fn2.troop_quality = 6
+	fn2.weapon_skills = {"M1 Garand": 6}
+	fn2.position = Vector2i(0, 0)
+	var tn2 := Character.new("tn2", "TN2", Domain.Side.ENEMY, "Red")
+	tn2.position = Vector2i(0, 4)
+	stn2.characters = [fn2, tn2]
+	var ws_night: int = Fire._compute_ws(stn2, fn2, tn2, "M1 Garand")["ws"]
+	var ws_day: int = Fire._compute_ws(stn2c, fn2, tn2, "M1 Garand")["ws"]
+	if ws_day - ws_night != 2:
+		print("TEST notte: -2 WS non applicato (giorno=%d notte=%d)" % [ws_day, ws_night])
+		fails += 1
+	# Stesso terreno in edificio: il -2 deve essere esente.
+	stn2.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2.map[GameState.hex_key(0, 4)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2c.map[GameState.hex_key(0, 0)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	stn2c.map[GameState.hex_key(0, 4)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var ws_night_bldg: int = Fire._compute_ws(stn2, fn2, tn2, "M1 Garand")["ws"]
+	var ws_day_bldg: int = Fire._compute_ws(stn2c, fn2, tn2, "M1 Garand")["ws"]
+	if ws_day_bldg - ws_night_bldg != 0:
+		print("TEST notte edificio: -2 non esentato (giorno=%d notte=%d)" % [ws_day_bldg, ws_night_bldg])
+		fails += 1
 	return fails
 
 

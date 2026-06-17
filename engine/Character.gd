@@ -50,6 +50,7 @@ var wounds: Array[int] = []     # Domain.Wound
 var spotted: bool = false       # Friendly: visto dal nemico
 var known: bool = false         # Enemy: identificato dal giocatore
 var alerted: bool = false       # Enemy: ha sentito qualcosa
+var is_prisoner: bool = false   # Enemy in Rout che si e' arreso in mischia
 
 # Marker
 var low_ammo: bool = false
