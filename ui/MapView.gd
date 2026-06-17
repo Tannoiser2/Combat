@@ -473,16 +473,30 @@ func _draw() -> void:
 			Area.Type.ILLUM:
 				_draw_marker(_named_tex("marker-ILLUM"), ac, radius, 0.70)
 			Area.Type.FIRE:
-				draw_circle(ac, radius * 0.55, Color(0.95, 0.45, 0.1, 0.8))
-				draw_circle(ac, radius * 0.30, Color(1.0, 0.85, 0.2, 0.9))
+				var ftex := _named_tex("GEN-Fire-Marker-f")
+				if ftex != null:
+					_draw_marker(ftex, ac, radius)
+				else:
+					draw_circle(ac, radius * 0.55, Color(0.95, 0.45, 0.1, 0.8))
+					draw_circle(ac, radius * 0.30, Color(1.0, 0.85, 0.2, 0.9))
 			Area.Type.RAGING_FIRE:
-				draw_circle(ac, radius * 0.85, Color(0.9, 0.25, 0.05, 0.85))
-				draw_circle(ac, radius * 0.5, Color(1.0, 0.6, 0.1, 0.95))
-				draw_circle(ac, radius * 0.22, Color(1.0, 0.95, 0.5, 1.0))
+				var rtex := _named_tex("GEN-Raging-Marker-f")
+				if rtex != null:
+					_draw_marker(rtex, ac, radius)
+				else:
+					draw_circle(ac, radius * 0.85, Color(0.9, 0.25, 0.05, 0.85))
+					draw_circle(ac, radius * 0.5, Color(1.0, 0.6, 0.1, 0.95))
+					draw_circle(ac, radius * 0.22, Color(1.0, 0.95, 0.5, 1.0))
+			Area.Type.MORTAR_60:
+				var mtex := _named_tex("US-60mmMortar-Marker-1-f")
+				_draw_marker(mtex if mtex != null else _named_tex("marker-TARGET"), ac, radius)
+			Area.Type.MORTAR_81:
+				var mtex := _named_tex("US-81mmMortar-Marker-1-f")
+				_draw_marker(mtex if mtex != null else _named_tex("marker-TARGET"), ac, radius)
 			Area.Type.C4:
 				_draw_marker(_named_tex("marker-C4"), ac, radius)
 			_:
-				# ordigni in attesa di esplodere: marker Target
+				# ordigni in attesa di esplodere (granate, artiglieria): marker Target
 				_draw_marker(_named_tex("marker-TARGET"), ac, radius)
 	# Filo spinato: marker su tutti gli hex con MapHex.wire = true.
 	var wire_tex := _named_tex("GEN-Wire-Marker-f")

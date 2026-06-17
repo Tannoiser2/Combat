@@ -60,6 +60,8 @@ var _initiative_card_pending: bool = false  # carta Initiative giocata: attende 
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
 var los_button: Button
 var editor_button: Button
+var replay_speed_button: Button
+var replay_speed: float = 1.0
 var los_mode := false
 # Touch input (mobile/iPad): traccia le dita attive per pan e pinch-zoom.
 var _touch_points: Dictionary = {}
@@ -794,7 +796,7 @@ func _replay_apply(f: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
-	replay_t += delta
+	replay_t += delta * replay_speed
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
 	var has_fx: bool = not replay_events.is_empty()
@@ -1518,6 +1520,20 @@ func _build_hud() -> void:
 	replay_button.disabled = true
 	replay_button.pressed.connect(_on_replay_turn)
 	top_box.add_child(replay_button)
+	replay_speed_button = Button.new()
+	replay_speed_button.text = "1x"
+	replay_speed_button.tooltip_text = "Velocità replay: cicla tra 1x, ½x, ¼x."
+	replay_speed_button.custom_minimum_size = Vector2(50, 40)
+	replay_speed_button.pressed.connect(func() -> void:
+		if replay_speed >= 1.0:
+			replay_speed = 0.5
+		elif replay_speed >= 0.5:
+			replay_speed = 0.25
+		else:
+			replay_speed = 1.0
+		replay_speed_button.text = "1x" if replay_speed >= 1.0 else ("½x" if replay_speed >= 0.5 else "¼x")
+	)
+	top_box.add_child(replay_speed_button)
 	next_button = Button.new()
 	next_button.text = "Avanti"
 	next_button.custom_minimum_size = Vector2(180, 40)
