@@ -363,6 +363,32 @@ static func _embarked_alive(vehicle: Character) -> Array:
 	return out
 
 
+# Il membro d'equipaggio vivo e imbarcato con un dato ruolo (o null).
+static func crew_with_role(vehicle: Character, role: String) -> Character:
+	for cm in vehicle.crew:
+		if cm.crew_role == role and cm.embarked and not cm.is_dead():
+			return cm
+	return null
+
+
+# Rule 31.9.4: TQ effettiva usata dal cannone principale = quella del Gunner
+# (ferite + morale del Gunner); ripiego sulla TQ del mezzo se non c'e' Gunner.
+static func main_gun_tq(vehicle: Character) -> int:
+	var g := crew_with_role(vehicle, "Gunner")
+	if g == null:
+		return vehicle.troop_quality
+	return Checks.effective_tq(g) + int(Fire.MORALE_WS_MOD.get(g.morale, 0))
+
+
+# Rule 31.9.4 ii: leadership del Commander applicata al fuoco HE vs fanteria
+# (se il Commander e' vivo, a bordo e morale >= Normal; 0 altrimenti).
+static func commander_leadership(vehicle: Character) -> int:
+	var cm := crew_with_role(vehicle, "Commander")
+	if cm == null or cm.morale > D.Morale.NORMAL:
+		return 0
+	return cm.leadership
+
+
 # Uccide un Character (crew) accumulando ferite gravi finche' e' fuori gioco.
 static func _kill(victim: Character) -> void:
 	victim.wounds.append(D.Wound.BAD)
@@ -706,7 +732,8 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	# Light AT di fanteria (Bazooka/Panzerfaust, Rule 32): usa la TQ dell'Operatore
 	# (non un WS), modificata da gittata, morale, ferite e ambiente (notte/meteo/
 	# fumo). Il cannone principale e l'AT pesante restano sul WS dell'arma.
-	var infantry_at: bool = ("at" in flags) and not ("main_gun" in flags)
+	var is_main_gun: bool = "main_gun" in flags
+	var infantry_at: bool = ("at" in flags) and not is_main_gun
 	var ws: int
 	if infantry_at:
 		ws = Checks.effective_tq(firer) + int(rmod)
@@ -715,6 +742,9 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 		if state.night and dist > 2 and not Area.illuminated(state, vehicle.position):
 			ws += -2
 		ws += Weather.ws_modifier(state, firer, vehicle, dist)
+	elif is_main_gun and firer.is_vehicle:
+		# Rule 31.9.4: il cannone principale colpisce con la TQ del Gunner.
+		ws = main_gun_tq(firer) + int(rmod)
 	else:
 		ws = firer.weapon_skills.get(weapon, firer.troop_quality - 2) + int(rmod)
 		ws += firer.wound_tq_modifier()
@@ -798,7 +828,16 @@ static func he_fire(state: GameState, firer: Character, target_pos: Vector2i, we
 	if rmod == null:
 		state.log_event("%s: HE fuori gittata (%s)" % [firer.display_name, weapon])
 		return
-	var ws: int = firer.weapon_skills.get(weapon, firer.troop_quality) + int(rmod)
+	# Rule 31.9.4 ii: il fuoco HE vs fanteria usa la TQ del Gunner, +1 col
+	# Commander in Direct Firing e + la leadership del Commander.
+	var ws: int
+	if firer.is_vehicle:
+		ws = main_gun_tq(firer) + int(rmod)
+		if firer.direct_firing:
+			ws += 1
+		ws += commander_leadership(firer)
+	else:
+		ws = firer.weapon_skills.get(weapon, firer.troop_quality) + int(rmod)
 	var roll: int = Checks.roll_d10(state.rng)
 	var hit: bool = (roll == 0 or roll <= ws) and roll != 9
 	state.log_event("%s spara HE su %02d.%02d con %s (WS %d, d10 %d): %s" % [
