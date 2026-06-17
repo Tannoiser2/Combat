@@ -3510,6 +3510,34 @@ func _test_rules() -> int:
 	if st.replay.is_empty() or st.replay[0]["moves"].values()[0].size() != 3:
 		print("TEST replay: passi non registrati")
 		fails += 1
+	# legal_orders: niente ordini di fuoco mirato a chi e' disarmato o senza munizioni.
+	var st_no := GameState.new()
+	var armed := Character.new("a", "Armed", Domain.Side.FRIENDLY, "Able")
+	armed.troop_quality = 6
+	armed.weapon_skills = {"M1 Garand": 6}
+	armed.position = Vector2i(5, 5)
+	st_no.characters = [armed]
+	if Domain.Order.AIMED_FIRE not in TurnSequence.legal_orders(st_no, armed):
+		print("TEST disarmato: un soldato armato deve poter sparare")
+		fails += 1
+	# A corto di munizioni: niente Aimed/Rapid/Suppressive, ma Reload c'e'.
+	armed.no_ammo = true
+	var lo_noammo := TurnSequence.legal_orders(st_no, armed)
+	if Domain.Order.AIMED_FIRE in lo_noammo or Domain.Order.RAPID_FIRE in lo_noammo \
+			or Domain.Order.SUPPRESSIVE_FIRE in lo_noammo:
+		print("TEST munizioni: chi e' No Ammo non deve avere ordini di fuoco")
+		fails += 1
+	if Domain.Order.RELOAD not in lo_noammo:
+		print("TEST munizioni: deve restare Reload")
+		fails += 1
+	# Disarmato (weapon_skills vuoto, non medico): niente fuoco mirato.
+	var unarmed := Character.new("u", "Unarmed", Domain.Side.FRIENDLY, "Able")
+	unarmed.troop_quality = 6
+	unarmed.position = Vector2i(5, 5)
+	st_no.characters = [unarmed]
+	if Domain.Order.AIMED_FIRE in TurnSequence.legal_orders(st_no, unarmed):
+		print("TEST disarmato: chi non ha armi non deve avere Aimed Fire")
+		fails += 1
 	fails += _test_ss_skills()
 	fails += _test_weapons()
 	fails += _test_weather()

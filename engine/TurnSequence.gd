@@ -172,6 +172,11 @@ const WIRE_MOVEMENT := [Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
 const FIRE_ORDERS_RELOAD := [Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE,
 	Domain.Order.SUPPRESSIVE_FIRE, Domain.Order.RUN_AND_GUN]
 
+# Ordini di fuoco MIRATO che richiedono un'arma da fuoco con munizioni: vanno
+# nascosti dal menu a chi e' disarmato o a corto di munizioni (No Ammo).
+const FIREARM_FIRE_ORDERS := [Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE,
+	Domain.Order.SUPPRESSIVE_FIRE]
+
 
 # Filo spinato (Rule 27.7): in ogni hex con filo spinato e 2+ nemici vivi, il
 # personaggio col TQ piu' basso riceve un Hide automatico (il primo trovato a
@@ -1166,6 +1171,11 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 			continue
 		# Medico addestrato (Rule 30): niente fuoco/granate/carica/mischia.
 		if c.is_medic and o in MEDIC_FORBIDDEN:
+			continue
+		# Senza arma da fuoco (disarmato) o a corto di munizioni (No Ammo): niente
+		# ordini di fuoco mirato (Aimed/Rapid/Suppressive). Resta Reload per chi e'
+		# scarico. Granate, carica e mischia non richiedono l'arma da fuoco.
+		if o in FIREARM_FIRE_ORDERS and (c.weapon_skills.is_empty() or c.no_ammo):
 			continue
 		# Filo spinato (Rule 27.7): per muoversi fuori si usa solo Sneak.
 		if o in WIRE_MOVEMENT and state.has_wire(c.position) \

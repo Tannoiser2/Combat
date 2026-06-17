@@ -1,3 +1,10 @@
+v0.85 — 2026-06-17
+- UI ordini: gli ordini di fuoco mirato (Aimed/Rapid/Suppressive Fire) non
+  compaiono piu' nel menu per chi e' disarmato (nessun'arma da fuoco) o a corto
+  di munizioni (No Ammo); chi e' scarico mantiene comunque Reload. Granate,
+  carica e mischia non richiedono l'arma da fuoco e restano disponibili. Filtro
+  in TurnSequence.legal_orders (FIREARM_FIRE_ORDERS).
+
 v0.84 — 2026-06-17
 - Light AT, ultimi tasselli (Rule 32.2/32.3) - settima fetta veicoli, completa
   la Rule 32:
