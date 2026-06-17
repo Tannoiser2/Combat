@@ -60,6 +60,8 @@ var _initiative_card_pending: bool = false  # carta Initiative giocata: attende 
 # di vista tra hex qualsiasi (verde libera / rossa bloccata).
 var los_button: Button
 var editor_button: Button
+var replay_speed_button: Button
+var replay_speed: float = 1.0
 var los_mode := false
 # Touch input (mobile/iPad): traccia le dita attive per pan e pinch-zoom.
 var _touch_points: Dictionary = {}
@@ -71,7 +73,9 @@ var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
 var editor_panel: PanelContainer
 var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
 var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
+var editor_level: int = -1        # >= 0 = elevazione da dipingere (indipendente dal terreno)
 var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
+var _palette_dragging := false       # tavolozza editor: trascinamento header in corso
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
 # di una scelta del giocatore (fuoco/movimento).
@@ -794,7 +798,7 @@ func _replay_apply(f: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if replay_idx < 0:
 		return
-	replay_t += delta
+	replay_t += delta * replay_speed
 	var f: Dictionary = replay_frames[replay_idx]
 	var has_moves: bool = not f["moves"].is_empty()
 	var has_fx: bool = not replay_events.is_empty()
@@ -1350,6 +1354,17 @@ func _make_theme() -> Theme:
 
 # --------------------------------------------------------- editor mappa
 
+# Trascinamento della tavolozza fluttuante via il suo header.
+func _on_palette_drag(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_palette_dragging = event.pressed
+	elif event is InputEventMouseMotion and _palette_dragging:
+		editor_panel.position += event.relative
+		var vp := get_viewport().get_visible_rect().size
+		editor_panel.position = editor_panel.position.clamp(
+			Vector2.ZERO, (vp - editor_panel.size).max(Vector2.ZERO))
+
+
 func _editor_act(local_pos: Vector2) -> void:
 	if editor_is_hexside:
 		var hs := _pick_hexside(local_pos)
@@ -1360,14 +1375,17 @@ func _editor_act(local_pos: Vector2) -> void:
 		else:
 			state.hexsides[hs] = editor_hexside_brush
 		map_view.queue_redraw()
-	elif editor_brush >= 0:
+	elif editor_brush >= 0 or editor_level >= 0:
 		var hex := map_view.pick_hex(local_pos)
 		if hex.x <= -99:
 			return
 		var key := GameState.hex_key(hex.x, hex.y)
 		if not state.map.has(key):
 			return
-		state.map[key].terrain = editor_brush
+		if editor_brush >= 0:
+			state.map[key].terrain = editor_brush
+		if editor_level >= 0:
+			state.map[key].level = editor_level
 		map_view.queue_redraw()
 	else:
 		hint_label.text = "Editor: scegli un terreno o un lato dal pannello a sinistra"
@@ -1433,15 +1451,33 @@ func _export_map_data() -> void:
 			lines.append(e + ",")
 		lines.append("],")
 	var text := "\n".join(lines)
-	var path := "/tmp/map_export_%s.txt" % map_name
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(text)
-		f.close()
-		hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [
-			path, by_terrain.size(), state.hexsides.size()]
+	var fname := "map_export_%s.txt" % map_name
+	var n_hex := by_terrain.size()
+	var n_hs := state.hexsides.size()
+	if OS.get_name() == "Web":
+		# Su web non si puo' scrivere su path arbitrari: scarica il file tramite
+		# il browser (Blob API), che apre la finestra "Salva come..." del sistema.
+		var js_content: String = JSON.stringify(text)
+		JavaScriptBridge.eval("""
+(function() {
+	var blob = new Blob([%s], {type: 'text/plain'});
+	var url = URL.createObjectURL(blob);
+	var a = document.createElement('a');
+	a.href = url; a.download = '%s';
+	document.body.appendChild(a); a.click(); document.body.removeChild(a);
+	setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+})();
+""" % [js_content, fname])
+		hint_label.text = "Download: %s (%d terreni, %d hexside)" % [fname, n_hex, n_hs]
 	else:
-		hint_label.text = "Errore scrittura %s" % path
+		var path := "/tmp/%s" % fname
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f != null:
+			f.store_string(text)
+			f.close()
+			hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [path, n_hex, n_hs]
+		else:
+			hint_label.text = "Errore scrittura %s" % path
 
 
 func _build_hud() -> void:
@@ -1500,6 +1536,20 @@ func _build_hud() -> void:
 	replay_button.disabled = true
 	replay_button.pressed.connect(_on_replay_turn)
 	top_box.add_child(replay_button)
+	replay_speed_button = Button.new()
+	replay_speed_button.text = "1x"
+	replay_speed_button.tooltip_text = "Velocità replay: cicla tra 1x, ½x, ¼x."
+	replay_speed_button.custom_minimum_size = Vector2(50, 40)
+	replay_speed_button.pressed.connect(func() -> void:
+		if replay_speed >= 1.0:
+			replay_speed = 0.5
+		elif replay_speed >= 0.5:
+			replay_speed = 0.25
+		else:
+			replay_speed = 1.0
+		replay_speed_button.text = "1x" if replay_speed >= 1.0 else ("½x" if replay_speed >= 0.5 else "¼x")
+	)
+	top_box.add_child(replay_speed_button)
 	next_button = Button.new()
 	next_button.text = "Avanti"
 	next_button.custom_minimum_size = Vector2(180, 40)
@@ -1790,18 +1840,30 @@ func _build_hud() -> void:
 	order_desc.add_theme_font_size_override("normal_font_size", 15)
 	order_h.add_child(order_desc)
 
-	# Pannello editor mappa (tasto E): opacita' + palette terreni + export.
+	# Pannello editor mappa (tasto E): tavolozza FLUTTUANTE trascinabile per
+	# l'header (opacita' + palette terreni + elevazione + export).
 	editor_panel = PanelContainer.new()
-	editor_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	editor_panel.offset_right = 220
-	editor_panel.offset_top = 46
-	editor_panel.offset_bottom = -8
+	editor_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	editor_panel.position = Vector2(8, 50)
+	editor_panel.custom_minimum_size = Vector2(232, 470)
 	editor_panel.hide()
 	root.add_child(editor_panel)
 	var ep_box := VBoxContainer.new()
 	ep_box.add_theme_constant_override("separation", 4)
 	editor_panel.add_child(ep_box)
-	ep_box.add_child(_section_label("EDITOR MAPPA (E per uscire)"))
+	# Header trascinabile: clicca e trascina per spostare la tavolozza.
+	var ep_header := Panel.new()
+	ep_header.custom_minimum_size = Vector2(0, 28)
+	ep_header.gui_input.connect(_on_palette_drag)
+	var ep_htitle := Label.new()
+	ep_htitle.text = "  ☰  EDITOR MAPPA  (trascina · E esci)"
+	ep_htitle.add_theme_font_size_override("font_size", 12)
+	ep_htitle.add_theme_color_override("font_color", Color(0.85, 0.90, 0.70))
+	ep_htitle.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ep_htitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ep_htitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ep_header.add_child(ep_htitle)
+	ep_box.add_child(ep_header)
 	var op_label := Label.new()
 	op_label.text = "Opacita' mappa:"
 	op_label.add_theme_font_size_override("font_size", 12)
@@ -1876,49 +1938,39 @@ func _build_hud() -> void:
 					b.button_pressed = false)
 		all_brush_buttons.append(tb)
 		ep_list.add_child(tb)
-	# -- sezione HEXSIDE --
+	# -- sezione ELEVAZIONE --
 	ep_list.add_child(HSeparator.new())
-	ep_list.add_child(_section_label("LATO (hexside)"))
-	var hexside_entries: Array = [
-		[Domain.Terrain.HEDGEROW, "Hedgerow",  MapView.HEXSIDE_COLORS[Domain.Terrain.HEDGEROW]],
-		[Domain.Terrain.BOCAGE,   "Bocage",    MapView.HEXSIDE_COLORS[Domain.Terrain.BOCAGE]],
-		[Domain.Terrain.WALL,     "Wall",      MapView.HEXSIDE_COLORS[Domain.Terrain.WALL]],
-	]
-	for entry in hexside_entries:
-		var ht: int = entry[0]
-		var hn: String = entry[1]
-		var hc: Color = entry[2]
-		var hb := Button.new()
-		hb.text = hn
-		hb.toggle_mode = true
-		hb.custom_minimum_size = Vector2(200, 26)
-		hb.add_theme_color_override("font_color", Color.WHITE)
-		hb.add_theme_stylebox_override("normal",  _colored_stylebox(Color(hc.r, hc.g, hc.b, 0.8)))
-		hb.add_theme_stylebox_override("pressed", _colored_stylebox(Color(hc.r, hc.g, hc.b, 1.0)))
-		var ht_val: int = ht
-		hb.pressed.connect(func():
-			editor_is_hexside = true
-			editor_hexside_brush = ht_val
-			editor_brush = -1
-			for b in all_brush_buttons:
-				if b != hb:
-					b.button_pressed = false)
-		all_brush_buttons.append(hb)
-		ep_list.add_child(hb)
-	var rem_btn := Button.new()
-	rem_btn.text = "Rimuovi lato"
-	rem_btn.toggle_mode = true
-	rem_btn.custom_minimum_size = Vector2(200, 26)
-	rem_btn.modulate = Color(1.0, 0.7, 0.7)
-	rem_btn.pressed.connect(func():
-		editor_is_hexside = true
-		editor_hexside_brush = -1
-		editor_brush = -1
-		for b in all_brush_buttons:
-			if b != rem_btn:
+	ep_list.add_child(_section_label("ELEVAZIONE (hex.level)"))
+	var lev_row := HBoxContainer.new()
+	lev_row.add_theme_constant_override("separation", 3)
+	ep_list.add_child(lev_row)
+	var lev_buttons: Array = []
+	var lev_none := Button.new()
+	lev_none.text = "—"
+	lev_none.tooltip_text = "Non modificare l'elevazione"
+	lev_none.toggle_mode = true
+	lev_none.button_pressed = true
+	lev_none.custom_minimum_size = Vector2(38, 28)
+	lev_none.pressed.connect(func():
+		editor_level = -1
+		for b in lev_buttons:
+			if b != lev_none:
 				b.button_pressed = false)
-	all_brush_buttons.append(rem_btn)
-	ep_list.add_child(rem_btn)
+	lev_buttons.append(lev_none)
+	lev_row.add_child(lev_none)
+	for lv: int in [0, 1, 2, 3]:
+		var lb := Button.new()
+		lb.text = str(lv)
+		lb.toggle_mode = true
+		lb.custom_minimum_size = Vector2(38, 28)
+		var lv_val: int = lv
+		lb.pressed.connect(func():
+			editor_level = lv_val
+			for b in lev_buttons:
+				if b != lb:
+					b.button_pressed = false)
+		lev_buttons.append(lb)
+		lev_row.add_child(lb)
 	ep_box.add_child(HSeparator.new())
 	var export_btn := Button.new()
 	export_btn.text = "Esporta dati mappa"
