@@ -936,6 +936,11 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 			and FriendlyCards.use_from_hand(state, FriendlyCards.BAYONET,
 				"%s carica alla baionetta (+2)" % attacker.display_name):
 		atk_bonus = 2
+	# Bersaglio con ordine passivo (Hide/Rally/Reload/Medical Aid/ecc.):
+	# +2 TQ all'attaccante (Rule 15 — il difensore e' scoperto).
+	if target.has_order and target.order in MELEE_PASSIVE:
+		atk_bonus += 2
+		state.log_event("  %s ha ordine passivo: +2 TQ all'attaccante" % target.display_name)
 	# TQ d'attacco: morale + Charge all'impulso 4 + Knife Expert (Rule 24).
 	var atk_tq := _melee_attack_tq(state, attacker) + atk_bonus
 	var roll := Checks.roll_d10(state.rng)

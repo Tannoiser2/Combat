@@ -1,3 +1,12 @@
+v0.70 — 2026-06-17
+- Mischia (Rule 15): ordine passivo del bersaglio ora applicato. MELEE_PASSIVE
+  (Hide/Rally/Reload/Medical Aid/Carry-Drag/Plan) era definita ma non usata:
+  il bersaglio con ordine passivo ora dà +2 TQ all'attaccante in mischia.
+- COVER_TERRAINS: Marsh e Orchard aggiunti (entrambi hanno WS_MOD ≤ -1 per
+  gli ordini offensivi nel Fire Resolution Chart). L'AI usava la colonna
+  "In Open" della Enemy Card per unità in Marsh/Orchard — errato. Rimosso il
+  commento "PROVVISORIO": la classificazione è ora verificata contro i chart.
+
 v0.69 — 2026-06-17
 - Mischia obbligata (Rule 15): quando un avversario vivo è nello stesso hex,
   sia il nemico (AI) sia il friendly (UI) ricevono/vedono solo MELEE come ordine.
