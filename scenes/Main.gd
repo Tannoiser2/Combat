@@ -73,6 +73,7 @@ var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
 var editor_panel: PanelContainer
 var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
 var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
+var editor_level: int = -1        # >= 0 = elevazione da dipingere (indipendente dal terreno)
 var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
@@ -1362,14 +1363,17 @@ func _editor_act(local_pos: Vector2) -> void:
 		else:
 			state.hexsides[hs] = editor_hexside_brush
 		map_view.queue_redraw()
-	elif editor_brush >= 0:
+	elif editor_brush >= 0 or editor_level >= 0:
 		var hex := map_view.pick_hex(local_pos)
 		if hex.x <= -99:
 			return
 		var key := GameState.hex_key(hex.x, hex.y)
 		if not state.map.has(key):
 			return
-		state.map[key].terrain = editor_brush
+		if editor_brush >= 0:
+			state.map[key].terrain = editor_brush
+		if editor_level >= 0:
+			state.map[key].level = editor_level
 		map_view.queue_redraw()
 	else:
 		hint_label.text = "Editor: scegli un terreno o un lato dal pannello a sinistra"
@@ -1953,6 +1957,39 @@ func _build_hud() -> void:
 				b.button_pressed = false)
 	all_brush_buttons.append(rem_btn)
 	ep_list.add_child(rem_btn)
+	# -- sezione ELEVAZIONE --
+	ep_list.add_child(HSeparator.new())
+	ep_list.add_child(_section_label("ELEVAZIONE (hex.level)"))
+	var lev_row := HBoxContainer.new()
+	lev_row.add_theme_constant_override("separation", 3)
+	ep_list.add_child(lev_row)
+	var lev_buttons: Array = []
+	var lev_none := Button.new()
+	lev_none.text = "—"
+	lev_none.tooltip_text = "Non modificare l'elevazione"
+	lev_none.toggle_mode = true
+	lev_none.button_pressed = true
+	lev_none.custom_minimum_size = Vector2(38, 28)
+	lev_none.pressed.connect(func():
+		editor_level = -1
+		for b in lev_buttons:
+			if b != lev_none:
+				b.button_pressed = false)
+	lev_buttons.append(lev_none)
+	lev_row.add_child(lev_none)
+	for lv: int in [0, 1, 2, 3]:
+		var lb := Button.new()
+		lb.text = str(lv)
+		lb.toggle_mode = true
+		lb.custom_minimum_size = Vector2(38, 28)
+		var lv_val: int = lv
+		lb.pressed.connect(func():
+			editor_level = lv_val
+			for b in lev_buttons:
+				if b != lb:
+					b.button_pressed = false)
+		lev_buttons.append(lb)
+		lev_row.add_child(lb)
 	ep_box.add_child(HSeparator.new())
 	var export_btn := Button.new()
 	export_btn.text = "Esporta dati mappa"
