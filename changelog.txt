@@ -1,3 +1,11 @@
+v0.74 — 2026-06-17
+- Charge/Grenade Checks dei nemici (Rule 9.6): le lettere C/G sulle Enemy Card
+  ora si applicano fedelmente. Prima di assegnare l'ordine, se c'è un Friendly
+  individuato (Spotted) entro 4 hex (senza bisogno di LOS) si tira un TQC: se
+  passa, l'ordine diventa Charge (C) o Grenade (G) invece di quello stampato.
+  Con entrambe le lettere si prova prima la C, poi la G. Prima la "C" non aveva
+  effetto e la "G" lanciava senza il TQC né il controllo dei 4 hex. Test 9.6.
+
 v0.73 — 2026-06-17
 - Attesa/Preparato resi fedeli allo Scenario Book e alle regole 9.7-9.8
   (lette dal regolamento ufficiale). Correzioni rispetto alla v0.72:

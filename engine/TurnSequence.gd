@@ -586,17 +586,43 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	var in_cover := (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
 		or state.hex_has_hexside(c.position)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
-	_set_enemy_order(state, c, entry["order"], entry["move"], entry["grenade"], entry["charge"])
+	var order: int = entry["order"]
+	var move: String = entry["move"]
+	var grenade := false
+	var charge := false
+	# Rule 9.6 Charge/Grenade Checks: le lettere C/G sulla carta si applicano
+	# SOLO se c'e' un Friendly Spotted entro 4 hex (senza bisogno di LOS) e si
+	# supera un TQC; allora l'ordine diventa Charge (C) o Grenade (G), invece di
+	# quello stampato. Con entrambe le lettere si prova prima la C, poi la G.
+	if (entry["charge"] or entry["grenade"]) and _spotted_friendly_within(state, c, 4):
+		if entry["charge"] and Checks.troop_quality_check(c, state.rng)["passed"]:
+			order = Domain.Order.CHARGE
+			charge = true
+		elif entry["grenade"] and Checks.troop_quality_check(c, state.rng)["passed"]:
+			order = Domain.Order.GRENADE
+			grenade = true
+	_set_enemy_order(state, c, order, move, grenade, charge)
 	var extra := "" if c.order_move.is_empty() else " " + c.order_move
-	if entry["grenade"]:
+	if grenade:
 		extra += " +Grenade"
-	if entry["charge"]:
+	if charge:
 		extra += " +Charge"
 	state.log_event("%s (%s, %s) -> %s%s" % [
 		c.display_name, Domain.MORALE_NAMES[c.morale],
 		"In Cover" if in_cover else "In Open",
 		Domain.ORDER_NAMES[c.order], extra,
 	])
+
+
+# Rule 9.6: c'e' un Friendly individuato (Spotted) entro `r` hex dal nemico `c`?
+# Non serve LOS.
+static func _spotted_friendly_within(state: GameState, c: Character, r: int) -> bool:
+	for f in state.characters:
+		if f.side != Domain.Side.FRIENDLY or f.is_dead() or not f.spotted:
+			continue
+		if Spotting.hex_distance(c.position, f.position) <= r:
+			return true
+	return false
 
 
 # Step 4 - Action Phase: 4 impulsi (Rule 4.0 step 4)

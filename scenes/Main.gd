@@ -3525,6 +3525,7 @@ func _test_rules() -> int:
 	fails += _test_melee()
 	fails += _test_melee_passive()
 	fails += _test_waiting()
+	fails += _test_charge_gate()
 	return fails
 
 
@@ -3689,6 +3690,33 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Gate Charge/Grenade nemici (Rule 9.6): serve un Friendly Spotted entro 4 hex.
+func _test_charge_gate() -> int:
+	var fails := 0
+	var st := GameState.new()
+	var e := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	e.troop_quality = 5
+	e.position = Vector2i(5, 5)
+	var f := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	f.troop_quality = 5
+	f.position = Vector2i(5, 8)  # dist 3
+	f.spotted = true
+	st.characters = [e, f]
+	if not TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly spotted a 3 hex non rilevato")
+		fails += 1
+	f.spotted = false  # non individuato: non conta
+	if TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly NON spotted non deve abilitare C/G")
+		fails += 1
+	f.spotted = true
+	f.position = Vector2i(5, 15)  # dist 10 > 4
+	if TurnSequence._spotted_friendly_within(st, e, 4):
+		print("TEST 9.6: friendly oltre 4 hex non deve abilitare C/G")
 		fails += 1
 	return fails
 
