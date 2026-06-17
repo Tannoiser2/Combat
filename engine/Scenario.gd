@@ -460,6 +460,7 @@ const SCENARIOS := {
 		"name": "Here They Come!",
 		"map": "hill",
 		"turns": 7,
+		"enemy_alerted_start": true,
 		"hand_limit": 3,
 		"compass": ["11,2", "11,3"],
 		"deploy": {"cols": [19, 23], "rows": [2, 10]},
@@ -538,6 +539,7 @@ const SCENARIOS := {
 	"s2": {
 		"name": "2. Defend the Farmhouse",
 		"map": "farmhouse", "turns": 12, "hand_limit": 2, "event_table": "defending",
+		"enemy_alerted_start": true,
 		"deploy": {"cols": [18, 30], "rows": [0, 19]},
 		"desc": "Prenderla e' stato facile, tenerla no:\nil nemico torna a riprendersi la 'sua' fattoria.",
 		"squad_full": true,
@@ -636,6 +638,7 @@ const SCENARIOS := {
 	"s5": {
 		"name": "5. Village Defense",
 		"map": "village", "turns": 12, "hand_limit": 3, "event_table": "defending",
+		"enemy_alerted_start": true,
 		"large_battle": true,
 		"deploy": {"cols": [14, 30], "rows": [0, 19]},
 		"desc": "Vengono dritti su di noi: o teniamo il paese\no il plotone a sud resta tagliato fuori.",
@@ -701,6 +704,7 @@ const SCENARIOS := {
 	"s7": {
 		"name": "7. Hold the Hill",
 		"map": "hill", "turns": 15, "hand_limit": 3, "event_table": "defending",
+		"enemy_alerted_start": true,
 		"deploy": {"cols": [20, 30], "rows": [0, 19]},
 		"desc": "La collina va tenuta a ogni costo.\nLoro arriveranno a ondate. Noi terremo.",
 		"squad_full": true,
@@ -790,6 +794,7 @@ const SCENARIOS := {
 	"s10": {
 		"name": "10. Hold until Relieved!",
 		"map": "farmhouse", "turns": 15, "hand_limit": 3, "event_table": "s10",
+		"enemy_alerted_start": true,
 		"compass": ["2,3", "2,4"],
 		# Libro: "within 3 hexes of a building hex" (centro fattoria).
 		"deploy": {"cols": [11, 25], "rows": [0, 19]},
@@ -864,6 +869,7 @@ const SCENARIOS := {
 	"s12": {
 		"name": "12. Overrun",
 		"map": "woods", "turns": 10, "hand_limit": 3,
+		"enemy_alerted_start": true,
 		"compass": ["34,5", "33,5"],
 		"deploy": {"cols": [20, 28], "rows": [0, 19]},
 		"desc": "Ci hanno circondato nel bosco. Reggete finché la\nriserva non arriva: ogni uomo è vitale.",
@@ -916,6 +922,7 @@ const SCENARIOS := {
 	"s14": {
 		"name": "14. Defend the CP",
 		"map": "hamlet", "turns": 15, "hand_limit": 3,
+		"enemy_alerted_start": true,
 		"compass": ["34,10", "35,10"],
 		"deploy": {"cols": [12, 20], "rows": [0, 19]},
 		"desc": "Il posto di comando è nel casolare. I tedeschi vengono\ndalle colline. Tenete la posizione a ogni costo.",
@@ -943,6 +950,7 @@ const SCENARIOS := {
 	"s15": {
 		"name": "15. They're Falling Back",
 		"map": "town", "turns": 12, "hand_limit": 3,
+		"enemy_alerted_start": true,
 		"compass": ["34,5", "33,5"],
 		"deploy": {"cols": [1, 4], "rows": [0, 19]},
 		"desc": "I tedeschi si ritirano nel paese. Non lasciateli\nriorganizzarsi: inseguiteli e sgombrate le strade.",
@@ -1124,6 +1132,7 @@ const SCENARIOS := {
 	"s22": {
 		"name": "22. Outflanked",
 		"map": "ridge", "turns": 12, "hand_limit": 3,
+		"enemy_alerted_start": true,
 		"compass": ["34,10", "35,10"],
 		"deploy": {"cols": [14, 22], "rows": [0, 19]},
 		"desc": "Ci hanno aggirato su entrambi i fianchi sulla cresta.\nReggetevi finché l'artiglieria alleata non parla.",
@@ -1306,12 +1315,15 @@ static func build(state: GameState, scenario_id: String) -> void:
 		state.friendly_hand.append(state.draw_friendly_card())
 
 
-# Piazza un personaggio nemico (coperto = alerted, non known) a un hex.
+# Piazza un personaggio nemico a un hex. Per default i nemici partono in Attesa
+# (non allertati, non noti: il giocatore deve avvicinarsi e individuarli, Rule
+# 9.7). Negli scenari "in ingaggio/difesa" (enemy_alerted_start) partono gia'
+# allertati e Preparati (l'assalto e' in corso).
 static func _place_enemy(state: GameState, entry: Dictionary, hexkey: String) -> Character:
 	var e := _make(entry, D.Side.ENEMY)
 	var p: PackedStringArray = String(hexkey).split(",")
 	e.position = Vector2i(int(p[0]), int(p[1]))
-	e.alerted = true
+	e.alerted = bool(SCENARIOS[state.scenario_id].get("enemy_alerted_start", false))
 	e.morale = int(SCENARIOS[state.scenario_id].get("enemy_morale", D.Morale.NORMAL))
 	state.characters.append(e)
 	return e
@@ -1348,6 +1360,10 @@ static func run_waves(state: GameState) -> void:
 			if state.enemy_reserve.is_empty():
 				break
 			var e := _place_enemy(state, state.enemy_reserve.pop_front(), hexkey)
+			# I rinforzi entrano in combattimento: sempre allertati e Preparati,
+			# anche negli scenari in cui i difensori partono in Attesa.
+			e.alerted = true
+			e.prepared = true
 			arrived = true
 			if wave.has("forced"):
 				var parts: PackedStringArray = String(wave["forced"]).split(" ")

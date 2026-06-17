@@ -521,6 +521,7 @@ func _on_next_pressed() -> void:
 			state.melee_events.clear()
 			state.audio_events.clear()
 			state.log_event("--- Impulse 1 ---")
+			TurnSequence.waiting_watch(state)
 			action_queue = TurnSequence.impulse_order(state)
 			_advance_action()
 		Phase.END_TURN:
@@ -542,6 +543,7 @@ func _advance_action() -> void:
 			state.move_paths.clear()
 			state.audio_events.clear()
 			state.log_event("--- Impulse %d ---" % impulse_next)
+			TurnSequence.waiting_watch(state)
 			action_queue = TurnSequence.impulse_order(state)
 			continue
 		var c: Character = action_queue.pop_front()
@@ -3302,9 +3304,10 @@ func _auto_step() -> void:
 		Phase.CARD:
 			_on_card_chosen(0)
 		Phase.ORDERS:
-			for c in state.characters:
-				if c.side == Domain.Side.FRIENDLY and not c.is_dead() and not c.has_order:
-					c.set_order(Domain.Order.AIMED_FIRE)
+			# Stessa AI del balance test: spara se c'e' un bersaglio, altrimenti
+			# avanza verso la zona nemica. Cosi' l'auto-play ingaggia anche i
+			# nemici in Attesa negli scenari d'attacco (Rule 9.7).
+			_balance_assign_friendly_orders(state)
 			next_button.disabled = false
 			_on_next_pressed()
 		Phase.GAME_OVER:
@@ -3521,6 +3524,7 @@ func _test_rules() -> int:
 	fails += _test_alert()
 	fails += _test_melee()
 	fails += _test_melee_passive()
+	fails += _test_waiting()
 	return fails
 
 
@@ -3685,6 +3689,81 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Attesa e Non-Preparato (Rule 9.7-9.8, v0.72).
+func _test_waiting() -> int:
+	var fails := 0
+	# Character.alert(): allerta + Non-Preparato, idempotente.
+	var en := Character.new("e", "Wait", Domain.Side.ENEMY, "Red")
+	if en.alerted or not en.prepared:
+		print("TEST attesa: stato iniziale errato (alerted=%s prepared=%s)" % [en.alerted, en.prepared])
+		fails += 1
+	en.alert()
+	if not en.alerted or en.prepared:
+		print("TEST attesa: alert() non imposta Non-Preparato")
+		fails += 1
+	en.prepared = true  # finto "preparato dal turno dopo"
+	en.alert()          # gia' allertato: non deve ri-azzerare prepared
+	if not en.prepared:
+		print("TEST attesa: alert() ha ri-azzerato prepared su un gia' allertato")
+		fails += 1
+	# Ronda di vigilanza: un nemico in agguato che vede un amico si allerta.
+	var st := GameState.new()
+	st.rng.seed = 1
+	for y in range(0, 6):
+		st.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var watcher := Character.new("w", "Watcher", Domain.Side.ENEMY, "Red")
+	watcher.troop_quality = 8
+	watcher.position = Vector2i(0, 0)
+	watcher.alerted = false
+	var intruder := Character.new("in", "Intruder", Domain.Side.FRIENDLY, "Able")
+	intruder.troop_quality = 5
+	intruder.position = Vector2i(0, 2)
+	st.characters = [watcher, intruder]
+	TurnSequence.waiting_watch(st)
+	if not watcher.alerted or watcher.prepared:
+		print("TEST attesa: la ronda non allerta (Non-Preparato) il nemico in agguato")
+		fails += 1
+	# Non-Preparato: primo ordine = Aimed Fire con bersaglio, poi diventa Preparato.
+	var st2 := GameState.new()
+	st2.rng.seed = 1
+	for y in range(8, 16):
+		st2.map[GameState.hex_key(10, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var np := Character.new("np", "NonPrep", Domain.Side.ENEMY, "Red")
+	np.troop_quality = 6
+	np.weapon_skills = {"KAR 98K": 6}
+	np.position = Vector2i(10, 10)
+	np.alerted = true
+	np.prepared = false
+	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
+	prey.troop_quality = 5
+	prey.weapon_skills = {"M1 Garand": 5}
+	prey.position = Vector2i(10, 13)
+	prey.spotted = true
+	st2.characters = [np, prey]
+	TurnSequence._assign_enemy_order(st2, np, 1)
+	if np.order != Domain.Order.AIMED_FIRE:
+		print("TEST Non-Preparato: con bersaglio in vista non si orienta (got %d)" % np.order)
+		fails += 1
+	if not np.prepared:
+		print("TEST Non-Preparato: non diventa Preparato dopo il primo ordine")
+		fails += 1
+	# Senza bersaglio: il Non-Preparato resta in agguato (Hide).
+	var st3 := GameState.new()
+	var np2 := Character.new("np2", "NonPrep2", Domain.Side.ENEMY, "Red")
+	np2.troop_quality = 6
+	np2.weapon_skills = {"KAR 98K": 6}
+	np2.position = Vector2i(5, 5)
+	np2.alerted = true
+	np2.prepared = false
+	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st3.characters = [np2]
+	TurnSequence._assign_enemy_order(st3, np2, 1)
+	if np2.order != Domain.Order.HIDE:
+		print("TEST Non-Preparato: senza bersaglio non resta in agguato (got %d)" % np2.order)
 		fails += 1
 	return fails
 

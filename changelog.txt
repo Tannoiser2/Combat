@@ -1,3 +1,22 @@
+v0.72 — 2026-06-17
+- Stato "Attesa" e "Non-Preparato" (Rule 9.7-9.8): i nemici a piedi ora
+  partono IN ATTESA (non allertati, non visibili) negli scenari d'attacco/
+  infiltrazione. Il giocatore deve avvicinarsi e individuarli: torna
+  l'avvicinamento furtivo e la sorpresa.
+  - Condizioni di attivazione: colpo udito entro 8 hex (già v0.65), nemico
+    individuato dal giocatore (già v0.65), e ORA un nemico in agguato che
+    AVVISTA un amico si allerta da solo (Spotting + ronda di vigilanza
+    waiting_watch a ogni impulse, perché i nemici in Attesa non sono
+    nell'Initiative Track).
+  - Non-Preparato (9.8): chi si allerta a metà partita nel primo turno può
+    solo orientarsi/Aimed Fire o restare in agguato (Hide); niente carica o
+    movimento aggressivo. Dal turno dopo agisce normalmente (Character.prepared).
+  - Override per scenario "enemy_alerted_start": gli scenari difensivi (il
+    nemico attacca) partono già allertati e Preparati: intro4, s2, s5, s7,
+    s10, s12, s14, s15, s22. I rinforzi entrano sempre allertati.
+  - Classificazione di prima passata (attacco=Attesa, difesa=Allertato),
+    rifinibile con il playtest/bilanciamento.
+
 v0.71 — 2026-06-17
 - Nebbia vs Foschia (Rule 28.1): la Nebbia (1D6) non può più dare visibilità
   pari o superiore alla Foschia (1D6+4, minimo 5 hex). Ora la nebbia è sempre

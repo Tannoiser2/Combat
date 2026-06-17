@@ -543,6 +543,20 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 			state.log_event("%s (mischia obbligata con %s) -> Melee" % [
 				c.display_name, rival.display_name])
 			return
+	# Non-Preparato (Rule 9.8): un nemico che si e' allertato a meta' partita
+	# (era in Attesa) nel suo PRIMO turno da allertato puo' solo orientarsi e
+	# sparare mirato, oppure restare fermo. Niente carica/movimento aggressivo.
+	# Dal turno successivo (prepared=true) agisce normalmente.
+	if not c.prepared:
+		c.had_first_order = true
+		c.prepared = true
+		if not valid_fire_targets(state, c).is_empty():
+			_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
+			state.log_event("%s (Non-Preparato) si orienta -> Aimed Fire" % c.display_name)
+		else:
+			_set_enemy_order(state, c, Domain.Order.HIDE)
+			state.log_event("%s (Non-Preparato) resta in agguato -> Hide" % c.display_name)
+		return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
@@ -604,8 +618,27 @@ static func action_phase(state: GameState) -> void:
 # Un singolo impulse, tutto automatico (modalita' headless/demo).
 static func run_impulse(state: GameState, imp: int) -> void:
 	state.impulse = imp
+	waiting_watch(state)
 	for c in impulse_order(state):
 		activate(state, c)
+
+
+# Ronda di vigilanza (Rule 9.7): i nemici in Attesa (non allertati) non sono
+# nell'Initiative Track e non si attivano, percio' non farebbero mai spotting.
+# Qui "vegliano": tentano lo spotting su ogni friendly e, se ne avvistano uno,
+# si allertano (Non-Preparati, via Spotting.attempt -> Character.alert).
+# Va chiamata a inizio di ogni impulse (headless e UI interattiva).
+static func waiting_watch(state: GameState) -> void:
+	for e in state.characters:
+		if e.side != Domain.Side.ENEMY or e.is_dead() or e.alerted or e.is_vehicle:
+			continue
+		for f in state.characters:
+			if f.side != Domain.Side.FRIENDLY or f.is_dead():
+				continue
+			Spotting.attempt(state, e, f)
+			if e.alerted:
+				state.log_event("%s era in agguato e si allerta (avvista il nemico)" % e.display_name)
+				break
 
 
 # Ordine di attivazione dell'impulse: i Team in ordine di iniziativa.

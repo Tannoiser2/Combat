@@ -200,7 +200,7 @@ static func _alert_from_shot(state: GameState, shooter: Character) -> void:
 		if e.side == shooter.side or e.is_dead() or e.alerted:
 			continue
 		if Spotting.hex_distance(e.position, shooter.position) <= 8:
-			e.alerted = true
+			e.alert()
 			state.log_event("  %s si allerta (colpo udito)" % e.display_name)
 
 

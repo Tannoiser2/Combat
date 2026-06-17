@@ -307,6 +307,8 @@ static func _enemy_reinforce_with_order(state: GameState, hexes: Array,
 		if state.enemy_reserve.is_empty():
 			break
 		var e := Scenario._place_enemy(state, state.enemy_reserve.pop_front(), hexkey)
+		e.alerted = true   # rinforzi: entrano gia' in combattimento
+		e.prepared = true
 		e.set_order(D.Order.EVADE, move)
 		e.had_first_order = true
 		placed += 1
