@@ -74,6 +74,7 @@ var editor_panel: PanelContainer
 var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
 var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
 var editor_level: int = -1        # >= 0 = elevazione da dipingere (indipendente dal terreno)
+var editor_wire: int = -1         # -1 nessuno, 1 posa filo spinato, 0 rimuovi
 var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
 var _palette_dragging := false       # tavolozza editor: trascinamento header in corso
 
@@ -1375,7 +1376,7 @@ func _editor_act(local_pos: Vector2) -> void:
 		else:
 			state.hexsides[hs] = editor_hexside_brush
 		map_view.queue_redraw()
-	elif editor_brush >= 0 or editor_level >= 0:
+	elif editor_brush >= 0 or editor_level >= 0 or editor_wire >= 0:
 		var hex := map_view.pick_hex(local_pos)
 		if hex.x <= -99:
 			return
@@ -1386,9 +1387,11 @@ func _editor_act(local_pos: Vector2) -> void:
 			state.map[key].terrain = editor_brush
 		if editor_level >= 0:
 			state.map[key].level = editor_level
+		if editor_wire >= 0:
+			state.map[key].wire = editor_wire == 1
 		map_view.queue_redraw()
 	else:
-		hint_label.text = "Editor: scegli un terreno o un lato dal pannello a sinistra"
+		hint_label.text = "Editor: scegli una tessera dalla tavolozza"
 
 
 func _pick_hexside(local_pos: Vector2) -> String:
@@ -1845,7 +1848,7 @@ func _build_hud() -> void:
 	editor_panel = PanelContainer.new()
 	editor_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	editor_panel.position = Vector2(8, 50)
-	editor_panel.custom_minimum_size = Vector2(232, 470)
+	editor_panel.custom_minimum_size = Vector2(360, 0)
 	editor_panel.hide()
 	root.add_child(editor_panel)
 	var ep_box := VBoxContainer.new()
@@ -1894,99 +1897,34 @@ func _build_hud() -> void:
 		map_view.queue_redraw())
 	ep_box.add_child(ov_slider)
 	ep_box.add_child(HSeparator.new())
-	ep_box.add_child(_section_label("Terreno da dipingere:"))
-	var ep_scroll := ScrollContainer.new()
-	ep_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	ep_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	ep_box.add_child(ep_scroll)
-	var ep_list := VBoxContainer.new()
-	ep_list.add_theme_constant_override("separation", 2)
-	ep_scroll.add_child(ep_list)
-	# Lista unificata di tutti i pulsanti (hex + hexside) per la deselezione.
-	var all_brush_buttons: Array = []
-	# -- sezione HEX --
-	ep_list.add_child(_section_label("HEX (terreno interno)"))
-	var none_btn := Button.new()
-	none_btn.text = "— Nessuno —"
-	none_btn.toggle_mode = true
-	none_btn.custom_minimum_size = Vector2(200, 26)
-	none_btn.pressed.connect(func():
-		editor_brush = -1
+	ep_box.add_child(_section_label("Tavolozza — clicca una tessera:"))
+	# Tavolozza grafica: immagine con sopra le tessere cliccabili (terreno,
+	# segnalini, elevazione, filo spinato). Larghezza fissa, aspetto nativo.
+	var pal := TerrainPalette.new()
+	var pal_w := 340.0
+	pal.custom_minimum_size = Vector2(pal_w, pal_w * TerrainPalette.NATIVE.y / TerrainPalette.NATIVE.x)
+	pal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	pal.terrain_picked.connect(func(t: int):
+		editor_brush = t
 		editor_is_hexside = false)
-	ep_list.add_child(none_btn)
-	all_brush_buttons.append(none_btn)
-	for t in Domain.TERRAIN_NAMES:
-		var tname: String = Domain.TERRAIN_NAMES[t]
-		var tb := Button.new()
-		tb.text = tname
-		tb.toggle_mode = true
-		tb.custom_minimum_size = Vector2(200, 26)
-		var tint: Color = MapView.OVERLAY_TINTS.get(t,
-			Color(MapView.BASE_COLORS.get(t, Color.MAGENTA)))
-		tb.add_theme_color_override("font_color",
-			Color.WHITE if tint.get_luminance() < 0.5 else Color.BLACK)
-		tb.add_theme_stylebox_override("normal",
-			_colored_stylebox(Color(tint.r, tint.g, tint.b, 0.7)))
-		tb.add_theme_stylebox_override("pressed",
-			_colored_stylebox(Color(tint.r, tint.g, tint.b, 1.0)))
-		var t_val: int = t
-		tb.pressed.connect(func():
-			editor_brush = t_val
-			editor_is_hexside = false
-			for b in all_brush_buttons:
-				if b != tb:
-					b.button_pressed = false)
-		all_brush_buttons.append(tb)
-		ep_list.add_child(tb)
-	# -- sezione ELEVAZIONE --
-	ep_list.add_child(HSeparator.new())
-	ep_list.add_child(_section_label("ELEVAZIONE (hex.level)"))
-	var lev_row := HBoxContainer.new()
-	lev_row.add_theme_constant_override("separation", 3)
-	ep_list.add_child(lev_row)
-	var lev_buttons: Array = []
-	var lev_none := Button.new()
-	lev_none.text = "—"
-	lev_none.tooltip_text = "Non modificare l'elevazione"
-	lev_none.toggle_mode = true
-	lev_none.button_pressed = true
-	lev_none.custom_minimum_size = Vector2(38, 28)
-	lev_none.pressed.connect(func():
-		editor_level = -1
-		for b in lev_buttons:
-			if b != lev_none:
-				b.button_pressed = false)
-	lev_buttons.append(lev_none)
-	lev_row.add_child(lev_none)
-	for lv: int in [0, 1, 2, 3]:
-		var lb := Button.new()
-		lb.text = str(lv)
-		lb.toggle_mode = true
-		lb.custom_minimum_size = Vector2(38, 28)
-		var lv_val: int = lv
-		lb.pressed.connect(func():
-			editor_level = lv_val
-			for b in lev_buttons:
-				if b != lb:
-					b.button_pressed = false)
-		lev_buttons.append(lb)
-		lev_row.add_child(lb)
+	pal.level_picked.connect(func(lv: int):
+		editor_level = lv)
+	pal.wire_picked.connect(func(m: int):
+		editor_wire = m)
+	ep_box.add_child(pal)
+	var pal_hint := Label.new()
+	pal_hint.text = "Terreno=ciano · Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
+	pal_hint.add_theme_font_size_override("font_size", 10)
+	pal_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pal_hint.custom_minimum_size = Vector2(pal_w, 0)
+	pal_hint.add_theme_color_override("font_color", Color(0.65, 0.72, 0.50))
+	ep_box.add_child(pal_hint)
 	ep_box.add_child(HSeparator.new())
 	var export_btn := Button.new()
 	export_btn.text = "Esporta dati mappa"
 	export_btn.custom_minimum_size = Vector2(200, 36)
 	export_btn.pressed.connect(_export_map_data)
 	ep_box.add_child(export_btn)
-
-
-func _colored_stylebox(col: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.corner_radius_top_left = 4
-	sb.corner_radius_top_right = 4
-	sb.corner_radius_bottom_left = 4
-	sb.corner_radius_bottom_right = 4
-	return sb
 
 
 func _section_label(text: String) -> Label:
