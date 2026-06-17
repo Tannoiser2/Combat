@@ -4856,6 +4856,16 @@ func _test_vehicles() -> int:
 	if face_rear != VehicleCombat.Face.REAR:
 		print("TEST veicoli: hit_face posteriore errato (%d)" % face_rear)
 		fails += 1
+	# Rule 31.9.4: lato a est/ovest -> SIDE; bonus al colpo +2 di lato, +1 fronte/retro.
+	var face_side := VehicleCombat.hit_face(pz, Vector2i(7, 8))  # arco laterale
+	if face_side != VehicleCombat.Face.SIDE:
+		print("TEST veicoli: hit_face laterale errato (%d)" % face_side)
+		fails += 1
+	if VehicleCombat.face_to_hit_bonus(VehicleCombat.Face.SIDE) != 2 \
+			or VehicleCombat.face_to_hit_bonus(VehicleCombat.Face.FRONT) != 1 \
+			or VehicleCombat.face_to_hit_bonus(VehicleCombat.Face.REAR) != 1:
+		print("TEST veicoli: bonus al colpo per faccia errato (31.9.4)")
+		fails += 1
 
 	# can_fire: arma normale non puo' colpire veicolo.
 	var bazooka_man := Character.new("bz", "Bazooka", Domain.Side.FRIENDLY, "Able")

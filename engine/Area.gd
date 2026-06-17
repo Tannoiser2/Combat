@@ -77,8 +77,9 @@ const POWER := {
 # Granata a mano (Rule 14.2): WS del lanciatore per il controllo Near/Far,
 # numero di dadi di frammentazione e relativa Frag (colpo se d10 <= Frag,
 # modificata dalla Order/Terrain Chart del bersaglio). Near = 3 dadi (Frag 4),
-# Far = 1 dado (Frag 2). WS standard del lanciatore = 4 (segnalino "Granate").
-const GRENADE_WS := 4
+# Far = 1 dado (Frag 2). La Grenade WS del fante regolare e' 2 (esempio del
+# regolamento: Near con d10 <= 2, poi modificata dalla copertura del bersaglio).
+const GRENADE_WS := 2
 const GRENADE_NEAR := {"dice": 3, "frag": 4}
 const GRENADE_FAR := {"dice": 1, "frag": 2}
 

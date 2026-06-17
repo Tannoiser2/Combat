@@ -379,6 +379,12 @@ static func hit_face(vehicle: Character, firer_pos: Vector2i) -> int:
 	return Face.SIDE
 
 
+# Rule 31.9.4: bonus al colpo (TQ/WS) per la faccia bersagliata. Il fianco
+# offre il profilo piu' ampio (+2); fronte e retro +1.
+static func face_to_hit_bonus(face: int) -> int:
+	return 2 if face == Face.SIDE else 1
+
+
 # Penetrazione: pen_base + 1d{pen_die} (dalla Weapons.DATA).
 static func roll_pen(rng: RandomNumberGenerator, weapon: String) -> int:
 	var w := Weapons.info(weapon)
@@ -407,6 +413,10 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 		ws += 1
 	if firer.is_vehicle and firer.emergency_stop:
 		ws -= 2
+	# Rule 31.9.4: bonus al colpo secondo la faccia bersagliata (il fianco offre
+	# il profilo piu' ampio): +2 di lato, +1 frontale o posteriore.
+	var face := hit_face(vehicle, firer.position)
+	ws += face_to_hit_bonus(face)
 	var roll: int = Checks.roll_d10(state.rng)
 	var hit: bool = (roll == 0 or roll <= ws) and roll != 9
 	state.log_event("%s -> %s con %s (WS %d, d10: %d): %s" % [
@@ -421,8 +431,7 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	if not hit:
 		return {"hit": false, "result": "mancato"}
 
-	# 2. Faccia e penetrazione.
-	var face := hit_face(vehicle, firer.position)
+	# 2. Penetrazione sulla faccia gia' determinata per il bonus al colpo.
 	var pen  := roll_pen(state.rng, weapon)
 	var vd: Dictionary = VEHICLE_DATA.get(vehicle.vehicle_type, {})
 	var armor_n := int((vd.get("armor", [0,0,0]) as Array)[face])

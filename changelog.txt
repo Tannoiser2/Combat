@@ -1,3 +1,14 @@
+v0.77 — 2026-06-17
+- Granate (Rule 14.2): la Grenade WS del fante regolare per il check Near/Far
+  scende da 4 a 2 (valore dell'esempio del regolamento): i lanci risultavano
+  "Near" (più letali) il doppio del dovuto. La copertura del bersaglio resta
+  applicata sopra. I valori di Frag (4 Near/2 Far, 3/1 dadi) erano già corretti.
+- Veicoli, bonus al colpo per faccia (Rule 31.9.4): il fuoco AT/cannone contro
+  un veicolo ora ha +2 al colpo se bersaglia il fianco, +1 se fronte/retro
+  (prima nessun bonus di faccia). Helper VehicleCombat.face_to_hit_bonus.
+  NOTA: il modello completo di hit-location/penetrazione con le tabelle ufficiali
+  (AFV/Jeep/Truck Hit-Damage Tables) è il prossimo passo.
+
 v0.76 — 2026-06-17
 - Economia delle carte fedele al regolamento (Rule 5.0): NON si rabbocca più la
   mano a 5 ogni turno. Si pesca UNA sola carta e solo a mano vuota (SOP 1a);
