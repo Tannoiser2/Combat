@@ -874,11 +874,16 @@ static func _melee_attack_tq(state: GameState, attacker: Character) -> int:
 		bonus += 1
 	if attacker.has_skill(Character.SKILL_KNIFE_EXPERT):
 		bonus += 1
+	# Attaccante non individuato: +2 TQ (Rule 15).
+	var is_hidden := not attacker.known if attacker.side == Domain.Side.ENEMY \
+		else not attacker.spotted
+	if is_hidden:
+		bonus += 2
 	return _melee_tq(attacker) + bonus
 
 
 # Mischia (Rule 15): solo l'attaccante tira un TQC (modificato da ferite e morale).
-# Successo = pesca carta ferita (senza Duck Back). Fallimento = nessun effetto.
+# Successo = pesca carta ferita sul difensore + attaccante va in Duck Back.
 # La mischia avviene solo nello STESSO esagono. Charge all'impulso 4: +1 TQ.
 static func _do_melee(state: GameState, attacker: Character) -> void:
 	# Bersaglio nello stesso hex (non adiacente).
@@ -930,6 +935,7 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		state.audio_events.append({"type": "melee", "hex": attacker.position})
 		Replay.sfx(state, "melee")
 		Fire._resolve_wound_melee(state, attacker, target)
+		attacker.set_order(Domain.Order.DUCK_BACK)
 	else:
 		state.log_event("  nessun effetto")
 
@@ -952,10 +958,36 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 				and Spotting.hex_distance(c.position, e.position) <= 3:
 			near_enemy = true
 			break
+	# Armi pesanti/lente (Rule 26): calcola i flag prima del loop sugli ordini.
+	var _has_heavy := false
+	var _has_very_heavy := false
+	var _has_slow := false
+	for _w in c.weapon_skills.keys():
+		var _wf: Array = Weapons.info(_w)["flags"]
+		if "very_heavy" in _wf:
+			_has_very_heavy = true
+		elif "heavy" in _wf:
+			_has_heavy = true
+		if "slow" in _wf:
+			_has_slow = true
 	var allowed: Array[int] = []
 	for o in Domain.Order.values():
 		# Condizione del terreno (Rule 28.2): ordini di movimento vietati.
 		if Weather.order_forbidden(state.ground, o):
+			continue
+		# Ferite (Rule 13): Light Wound -> no Sprint; Bad Wound -> no Sprint/R&G/Evade.
+		if not c.wounds.is_empty() and o == Domain.Order.SPRINT:
+			continue
+		if Domain.Wound.BAD in c.wounds \
+				and o in [Domain.Order.RUN_AND_GUN, Domain.Order.EVADE]:
+			continue
+		# Armi pesanti (Rule 26): Heavy -> no Sprint; Very Heavy -> no Sprint/R&G;
+		# Slow -> no Suppressive Fire.
+		if (_has_heavy or _has_very_heavy) and o == Domain.Order.SPRINT:
+			continue
+		if _has_very_heavy and o == Domain.Order.RUN_AND_GUN:
+			continue
+		if _has_slow and o == Domain.Order.SUPPRESSIVE_FIRE:
 			continue
 		# Medico addestrato (Rule 30): niente fuoco/granate/carica/mischia.
 		if c.is_medic and o in MEDIC_FORBIDDEN:

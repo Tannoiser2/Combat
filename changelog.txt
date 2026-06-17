@@ -1,3 +1,17 @@
+v0.64 — 2026-06-17
+- Audit regolamento Vol.1+Vol.2: corretti 8 scostamenti dal regolamento.
+  - Fuoco: 0-naturale premia sempre il tiratore (+1 morale), con o senza ferita
+  - Fumo: Area.smoke_penalty ora penalizza anche lo spotting (Rule 18.0)
+  - Incendi: tabella FIRE_SPREAD corretta (Building/Hedge/Bocage/Long Grass/Logs)
+  - Ferite: Light Wound vieta Sprint; Bad Wound vieta Sprint, Run&Gun e Evade
+  - Mischia: l'attaccante non individuato ottiene +2 TQ (Rule 15, attacco nascosto)
+  - Mischia: il vincitore va in Duck Back dopo una mischia riuscita (Rule 15)
+  - Armi pesanti (Rule 26): Heavy vieta Sprint; Very Heavy vieta Sprint e R&G;
+    Slow (KAR 98K, Springfield, Bazooka) vieta Suppressive Fire
+  - Scatter mortai/artiglieria: ora 1D6 direzione + 1D6 distanza per tipo
+    (60mm: 0-4 hex, 81mm: 0-5 hex, 105mm: 1-6 hex); granate/fumo invariate
+- Changelog: testo dello splash screen ingrandito (12 -> 15pt)
+
 v0.63 — 2026-06-16
 - Fix roster: highlight (sfondo colorato) si aggiorna ora su ogni clic sulla
   mappa, sul roster amici e sul roster nemici, e all'inizio di ogni azione.

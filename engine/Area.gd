@@ -43,8 +43,8 @@ const FIRE_GROWTH := {
 	D.Terrain.BOCAGE: 3, D.Terrain.LONG_GRASS: 4, D.Terrain.ORCHARD: 3, D.Terrain.LOGS: 2,
 }
 const FIRE_SPREAD := {
-	D.Terrain.TREES: 2, D.Terrain.BUILDING: 1, D.Terrain.HEDGEROW: 2,
-	D.Terrain.BOCAGE: 2, D.Terrain.LONG_GRASS: 3, D.Terrain.ORCHARD: 3, D.Terrain.LOGS: 1,
+	D.Terrain.TREES: 2, D.Terrain.BUILDING: 2, D.Terrain.HEDGEROW: 3,
+	D.Terrain.BOCAGE: 3, D.Terrain.LONG_GRASS: 4, D.Terrain.ORCHARD: 3, D.Terrain.LOGS: 2,
 }
 
 
@@ -91,16 +91,32 @@ static func place_c4(state: GameState, hex: Vector2i) -> void:
 	})
 
 
-# Piazza un marker con scatter 1D6: 1-2 resta, altrimenti devia di 1 hex
-# in direzione casuale.
+# Sottrattore scatter per tipo (dal valore 1D6): GRENADE/SMOKE = 99 (nessuno
+# scatter aggiuntivo, gestito dal check del lanciatore in throw_grenade).
+# Mortai e artiglieria: 1D6 - sub hex di distanza, 1D6 direzione.
+const SCATTER_SUB := {
+	Type.MORTAR_60: 2,     # 1D6-2 = 0..4 hex
+	Type.MORTAR_81: 1,     # 1D6-1 = 0..5 hex
+	Type.ARTILLERY_105: 0, # 1D6   = 1..6 hex
+}
+
+# Piazza un marker con scatter: direzione 1D6 + distanza max(0, 1D6-sub).
+# Granate/Fumo hanno sub=99 (nessuna distanza aggiuntiva).
 static func place_with_scatter(state: GameState, type: int, hex: Vector2i) -> Vector2i:
+	var sub: int = SCATTER_SUB.get(type, 99)
+	var dist := maxi(0, state.rng.randi_range(1, 6) - sub)
 	var final := hex
-	if state.rng.randi_range(1, 6) > 2:
-		var dirs := Move.CUBE_DIRS
-		var dir: Vector3i = dirs[state.rng.randi_range(0, 5)]
-		var dev := Move.from_cube(Move.to_cube(hex) + dir)
-		if state.map.has(GameState.hex_key(dev.x, dev.y)):
-			final = dev
+	if dist > 0:
+		var cube := Move.to_cube(hex)
+		var dir: Vector3i = Move.CUBE_DIRS[state.rng.randi_range(0, 5)]
+		for _i in dist:
+			var nc := cube + dir
+			var nv := Move.from_cube(nc)
+			if state.map.has(GameState.hex_key(nv.x, nv.y)):
+				cube = nc
+			else:
+				break
+		final = Move.from_cube(cube)
 	state.area_markers.append({
 		"type": type, "hex": final, "placed_turn": state.turn,
 		"turns_left": 2 if type == Type.SMOKE else 1,

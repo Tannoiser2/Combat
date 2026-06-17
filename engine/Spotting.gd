@@ -4,7 +4,7 @@
 ## + modificatore del bersaglio (terreno x gruppo di ordini, dal chart)
 ## + modificatore di gittata. Se riesce: un Enemy diventa Known, un
 ## Friendly diventa Spotted.
-## TODO: Line of Sight non ancora implementata (si assume visuale libera).
+## La LOS e' implementata in LOS.gd (clear_positions).
 class_name Spotting
 extends RefCounted
 
@@ -136,6 +136,7 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	if target.has_skill(Character.SKILL_WINTER_CAMO) \
 			and state.ground in [Weather.Ground.SNOW, Weather.Ground.DEEP_SNOW]:
 		threshold -= 1
+	threshold += Fire._smoke_modifier(state, spotter.position, target.position)
 	var roll := Checks.roll_d10(state.rng)
 	var success := roll <= threshold
 	if success:

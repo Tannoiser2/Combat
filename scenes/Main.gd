@@ -348,7 +348,7 @@ func _show_scenario_menu() -> void:
 		var clog := RichTextLabel.new()
 		clog.text = FileAccess.get_file_as_string("res://changelog.txt").strip_edges()
 		clog.custom_minimum_size = Vector2(0, 170)
-		clog.add_theme_font_size_override("normal_font_size", 12)
+		clog.add_theme_font_size_override("normal_font_size", 15)
 		clog.modulate = Color(0.65, 0.65, 0.58)
 		clog.scroll_active = true
 		left.add_child(clog)
@@ -4346,10 +4346,11 @@ func _test_ss_skills() -> int:
 		print("TEST Sniper: +2 WS in Aimed Fire (non imp.2) errato")
 		fails += 1
 
-	# Knife Expert: +1 TQ in mischia.
+	# Knife Expert: +1 TQ in mischia (ke.known=true per isolare dal bonus nascosto).
 	var ke := Character.new("ke", "Knife", Domain.Side.ENEMY, "Red")
 	ke.troop_quality = 5
 	ke.skills = [Character.SKILL_KNIFE_EXPERT]
+	ke.known = true
 	if TurnSequence._melee_attack_tq(st, ke) - (TurnSequence._melee_tq(ke)) != 1:
 		print("TEST Knife Expert: +1 TQ in mischia errato")
 		fails += 1

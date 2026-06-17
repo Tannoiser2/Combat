@@ -456,8 +456,8 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		wounded_or_killed = true
 	else:
 		wounded_or_killed = _resolve_wound(state, firer, target)
-	# 0 naturale: il tiratore si esalta se ha fatto danno (mai Berserk).
-	if roll == 0 and wounded_or_killed:
+	# 0 naturale: il tiratore si esalta sempre, con o senza danno (mai Berserk).
+	if roll == 0:
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
