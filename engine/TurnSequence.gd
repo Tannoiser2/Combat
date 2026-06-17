@@ -533,6 +533,16 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 	if c.is_medic:
 		_assign_medic_order(state, c)
 		return
+	# Mischia obbligata (Rule 15): se c'e' un avversario vivo nello stesso hex,
+	# l'unico ordine sensato e' MELEE (attacca agli impulsi 2 e 4).
+	for rival in state.characters:
+		if rival.side == c.side or rival.is_dead() or rival.is_vehicle:
+			continue
+		if rival.position == c.position:
+			_set_enemy_order(state, c, Domain.Order.MELEE)
+			state.log_event("%s (mischia obbligata con %s) -> Melee" % [
+				c.display_name, rival.display_name])
+			return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
@@ -953,6 +963,13 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 				continue
 			vok.append(o)
 		return vok
+	# Mischia obbligata (Rule 15): se c'e' un avversario vivo nello stesso hex,
+	# l'unico ordine possibile e' MELEE.
+	for rival in state.characters:
+		if rival.side == c.side or rival.is_dead() or rival.is_vehicle:
+			continue
+		if rival.position == c.position:
+			return [Domain.Order.MELEE]
 	var restrict: String = state.turn_fx.get("restrict", "")
 	var near_enemy := false
 	for e in state.characters:

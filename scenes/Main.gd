@@ -3519,6 +3519,7 @@ func _test_rules() -> int:
 	fails += _test_vehicles()
 	fails += _test_grenade()
 	fails += _test_alert()
+	fails += _test_melee()
 	return fails
 
 
@@ -3595,6 +3596,41 @@ func _test_alert() -> int:
 		fails += 1
 	if far_e.alerted:
 		print("TEST allerta: nemico a 9 hex allertato per errore (oltre 8 hex)")
+		fails += 1
+	return fails
+
+
+# Mischia obbligata (Rule 15): nemico nello stesso hex.
+func _test_melee() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 7
+	Boards.fill(st, "farmhouse")
+	var fn := Character.new("f", "Friend", Domain.Side.FRIENDLY, "Able")
+	fn.troop_quality = 6
+	fn.weapon_skills = {"M1 Garand": 6}
+	fn.position = Vector2i(10, 10)
+	var en := Character.new("e", "Enemy", Domain.Side.ENEMY, "Red")
+	en.troop_quality = 4
+	en.weapon_skills = {"KAR 98K": 4}
+	en.position = Vector2i(10, 10)
+	en.alerted = true
+	st.characters = [fn, en]
+	# AI: nemico nello stesso hex riceve ordine MELEE.
+	TurnSequence._assign_enemy_order(st, en, 1)
+	if en.order != Domain.Order.MELEE:
+		print("TEST mischia obbligata AI: nemico non riceve MELEE (got %d)" % en.order)
+		fails += 1
+	# Friendly: legal_orders restituisce solo MELEE.
+	var lo := TurnSequence.legal_orders(st, fn)
+	if lo != [Domain.Order.MELEE]:
+		print("TEST mischia obbligata UI: legal_orders non e' [MELEE] (got %s)" % str(lo))
+		fails += 1
+	# Fuori mischia: legal_orders include piu' opzioni.
+	en.position = Vector2i(10, 12)
+	var lo2 := TurnSequence.legal_orders(st, fn)
+	if lo2.size() <= 1:
+		print("TEST mischia obbligata UI: senza nemico nell'hex troppo poche opzioni")
 		fails += 1
 	return fails
 

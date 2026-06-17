@@ -1,3 +1,12 @@
+v0.69 — 2026-06-17
+- Mischia obbligata (Rule 15): quando un avversario vivo è nello stesso hex,
+  sia il nemico (AI) sia il friendly (UI) ricevono/vedono solo MELEE come ordine.
+  Prima l'AI assegnava l'ordine dalla Enemy Card (Aimed Fire, Evade ecc.) e il
+  giocatore vedeva tutti gli ordini: le due pedine rimanevano nello stesso hex
+  senza mai combattere dopo il turno 1 di carica. Fix in `_assign_enemy_order`
+  (controllo stesso-hex prima di tutto) e in `legal_orders` (ritorna [MELEE]
+  se c'è un avversario nell'hex). Test _test_melee.
+
 v0.68 — 2026-06-17
 - MG transfer in mischia (Rule 14.3): `_mg_transfer_if_operator` ora viene
   chiamata anche in `_resolve_wound_melee` (KIA e Bad Wound). Prima, se
