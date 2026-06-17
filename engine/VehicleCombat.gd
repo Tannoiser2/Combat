@@ -697,14 +697,27 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	assert("at" in flags or "main_gun" in flags,
 		"at_fire: arma non AT/main_gun: " + weapon)
 
-	# 1. WS check (semplificato: ws base + gittata + ordine + ferite).
+	# 1. Calcolo del numero da colpire.
 	var dist := Spotting.hex_distance(firer.position, vehicle.position)
 	var rmod = Weapons.range_ws_modifier(weapon, dist)
 	if rmod == null:
 		state.log_event("%s: %s fuori gittata" % [firer.display_name, weapon])
 		return {"hit": false, "result": "fuori_gittata"}
-	var ws: int = firer.weapon_skills.get(weapon, firer.troop_quality - 2) + int(rmod)
-	ws += firer.wound_tq_modifier()
+	# Light AT di fanteria (Bazooka/Panzerfaust, Rule 32): usa la TQ dell'Operatore
+	# (non un WS), modificata da gittata, morale, ferite e ambiente (notte/meteo/
+	# fumo). Il cannone principale e l'AT pesante restano sul WS dell'arma.
+	var infantry_at: bool = ("at" in flags) and not ("main_gun" in flags)
+	var ws: int
+	if infantry_at:
+		ws = Checks.effective_tq(firer) + int(rmod)
+		ws += int(Fire.MORALE_WS_MOD.get(firer.morale, 0))
+		ws += Fire._smoke_modifier(state, firer.position, vehicle.position)
+		if state.night and dist > 2 and not Area.illuminated(state, vehicle.position):
+			ws += -2
+		ws += Weather.ws_modifier(state, firer, vehicle, dist)
+	else:
+		ws = firer.weapon_skills.get(weapon, firer.troop_quality - 2) + int(rmod)
+		ws += firer.wound_tq_modifier()
 	ws += int(Orders.FIRE_WS_MOD.get(firer.order if firer.has_order else -1, 0))
 	# Rule 31.6 Emergency Stop: +1 WS per chi spara al carro fermo, -2 al carro stesso.
 	if vehicle.emergency_stop:
@@ -730,14 +743,29 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	state.audio_events.append({"type": "shot", "weapon": weapon,
 		"outcome": "Colpito!" if hit else "Mancato", "hex": firer.position})
 	if not hit:
+		_consume_single_use(state, firer, weapon, flags)
 		return {"hit": false, "result": "mancato"}
 
 	# 2. Risoluzione fedele del danno (Rule 31.10): gli AFV usano la hit-location
 	# table con penetrazione per-zona; i mezzi leggeri (Jeep/Truck/Half-Track)
 	# le loro tabelle danno (col gate di penetrazione per il Half-Track).
+	var result: String
 	if AFV_ARMOR.has(vehicle.vehicle_type):
-		return {"hit": true, "result": _resolve_afv_hit(state, firer, vehicle, weapon, face)}
-	return {"hit": true, "result": _resolve_soft_hit(state, firer, vehicle, weapon, face)}
+		result = _resolve_afv_hit(state, firer, vehicle, weapon, face)
+	else:
+		result = _resolve_soft_hit(state, firer, vehicle, weapon, face)
+	_consume_single_use(state, firer, weapon, flags)
+	return {"hit": true, "result": result}
+
+
+# Rule 32.3: un'arma monouso (Panzerfaust) sparata viene rimossa e il tiratore
+# va in Duck Back.
+static func _consume_single_use(state: GameState, firer: Character, weapon: String, flags: Array) -> void:
+	if "single_use" in flags:
+		firer.weapon_skills.erase(weapon)
+		firer.set_order(D.Order.DUCK_BACK)
+		state.log_event("  %s ha usato il %s (monouso) -> Duck Back" % [
+			firer.display_name, weapon])
 
 
 # MC individuali dei crew a bordo (colpo di striscio). Il morale del veicolo
