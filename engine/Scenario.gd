@@ -1405,6 +1405,9 @@ static func _make(entry: Dictionary, side: int) -> Character:
 	var ws: int = entry.get("ws", prof["ws"])
 	if not weapon.is_empty():
 		c.weapon_skills = {weapon: ws}
+		# Bazooka (Rule 32.1): l'operatore parte con 3 razzi e l'arma scarica.
+		if Weapons.is_loadable_at(weapon):
+			c.at_ammo = 3
 	# Skill SS (Rule 24): dal profilo del ruolo e/o dalla voce di scenario.
 	for s in prof.get("skills", []):
 		c.skills.append(s)

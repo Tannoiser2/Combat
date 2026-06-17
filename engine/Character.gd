@@ -59,6 +59,13 @@ var is_prisoner: bool = false   # Enemy in Rout che si e' arreso in mischia
 # Marker
 var low_ammo: bool = false
 var no_ammo: bool = false
+# Light AT / Bazooka (Rule 32.1): razzi rimasti (3 all'inizio), stato di carica
+# e flag "ha sparato in questo turno" (un operatore solo ricarica nel turno
+# vuoto, quindi spara a turni alterni; con un assistente nell'hex carica e spara
+# nello stesso turno).
+var at_ammo: int = 0
+var at_loaded: bool = false
+var at_fired_this_turn: bool = false
 
 # Ruolo dello scenario ("Recruit", "NCO", "Officer"...): serve ai VP.
 var role: String = ""

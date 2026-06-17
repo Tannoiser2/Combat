@@ -84,6 +84,13 @@ const MORALE_WS_MOD := {
 static func can_fire(state: GameState, firer: Character, target: Character, weapon: String) -> bool:
 	if firer.no_ammo:
 		return false
+	# Bazooka (Rule 32.1): serve almeno un razzo e l'arma carica. Con un
+	# assistente nell'hex si carica al volo (load+fire nello stesso turno).
+	if Weapons.is_loadable_at(weapon):
+		if firer.at_ammo <= 0:
+			return false
+		if not firer.at_loaded and not _has_mg_assistant(state, firer):
+			return false
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	if Weapons.range_ws_modifier(weapon, dist) == null:
 		return false

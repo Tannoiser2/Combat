@@ -93,6 +93,13 @@ static func info(name: String) -> Dictionary:
 	return DATA[key]
 
 
+# Bazooka / Light AT che richiede caricamento (Rule 32.1): arma "at" di fanteria
+# non monouso (il Panzerfaust e' monouso e non si ricarica).
+static func is_loadable_at(name: String) -> bool:
+	var f: Array = info(name)["flags"]
+	return "at" in f and not ("main_gun" in f) and not ("single_use" in f)
+
+
 # Rate of Fire alla gittata data. Le armi senza "rof_bands" hanno ROF fisso;
 # lo StG 44 (Rule 26) spara a ROF 3 entro 13 hex e ROF 1 oltre.
 static func rof_at(name: String, dist: int) -> int:
