@@ -1,3 +1,24 @@
+v0.78 — 2026-06-17
+- Veicoli, modello hit-location AFV fedele (Rule 31.10) - prima fetta (carri
+  armati Sherman/PzIVH; Jeep/Halftrack/Truck restano sul modello a bande, fette
+  successive). Sostituisce le 3 bande "home-brew" con:
+  - AFV Hit Location Table percentile (d100) per faccia scafo (Front/Side/Rear)
+    + sotto-tabella torretta per faccia, trascritte dalla tabella ufficiale.
+  - Armatura per-zona dai Vehicle Display (turret/lower hull/upper hull/rear,
+    valore Normal e Glancing) per M4A3 Sherman e PzIVH.
+  - Penetrazione 31.10.4: la penetrazione deve SUPERARE l'armatura della zona
+    colpita (glancing usa il valore Glancing). Una penetrazione netta mette KO
+    il mezzo (equipaggio colpito).
+  - Esiti speciali: Suspension/Track/Drive Wheel -> immobilizzato (non muove);
+    Gun Barrel -> cannone distrutto; Turret Ring -> torretta inceppata (non
+    ruota); Co-Ax/Hull MG -> arma distrutta; periscopi/portelli/mirino -> MC.
+  - Crew Morale Check per le lettere della tabella (CM/G/L/D/CD/ALL, 31.10.6).
+  - Stati nuovi su Character: immobilized, main_gun_wrecked, turret_jammed,
+    coax_wrecked, bow_mg_wrecked, con i gate in Move/Fire/turret_aim.
+  Test _test_afv. NOTA: l'AI automatica dei veicoli resta debole (gli scenari
+  AFV erano già a 0% col balance test prima di questa fetta); il modello di
+  danno è ora fedele, l'AI dei mezzi e' un lavoro a parte.
+
 v0.77 — 2026-06-17
 - Granate (Rule 14.2): la Grenade WS del fante regolare per il check Near/Far
   scende da 4 a 2 (valore dell'esempio del regolamento): i lanci risultavano

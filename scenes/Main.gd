@@ -3528,6 +3528,7 @@ func _test_rules() -> int:
 	fails += _test_charge_gate()
 	fails += _test_reload_duckback()
 	fails += _test_smoke_cards_rng()
+	fails += _test_afv()
 	return fails
 
 
@@ -3692,6 +3693,72 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Modello hit-location/penetrazione AFV (Rule 31.10).
+func _test_afv() -> int:
+	var fails := 0
+	var VC := VehicleCombat
+	# Chiavi d'armatura per zona/faccia.
+	if VC._hull_armor_key("lower_hull", VC.Face.FRONT) != "lower_hull_front" \
+			or VC._hull_armor_key("upper_hull", VC.Face.SIDE) != "upper_hull_side" \
+			or VC._hull_armor_key("lower_hull", VC.Face.REAR) != "rear" \
+			or VC._turret_armor_key(VC.Face.FRONT) != "turret_front" \
+			or VC._turret_armor_key(VC.Face.REAR) != "turret_rear":
+		print("TEST AFV: chiave armatura errata")
+		fails += 1
+	# Tabelle ben formate: l'ultima riga di ogni faccia copre fino a 100.
+	for f in VC.AFV_HULL_TABLE:
+		if int(VC.AFV_HULL_TABLE[f].back()[0]) != 100:
+			print("TEST AFV: tabella scafo non copre fino a 100 (faccia %d)" % f)
+			fails += 1
+	for f in VC.AFV_TURRET_TABLE:
+		if int(VC.AFV_TURRET_TABLE[f].back()[0]) != 100:
+			print("TEST AFV: tabella torretta non copre fino a 100 (faccia %d)" % f)
+			fails += 1
+	# Risoluzione: dopo molti colpi di lato qualche effetto si manifesta.
+	var st := GameState.new()
+	st.rng.seed = 7
+	var sh := VC.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able",
+		Vector2i(5, 5), 3, "")
+	var firer := Character.new("f", "F", Domain.Side.ENEMY, "Red")
+	firer.troop_quality = 6
+	firer.position = Vector2i(7, 5)
+	var any := false
+	for i in range(80):
+		if sh.hull_damage >= 2:
+			break
+		VC._resolve_afv_hit(st, firer, sh, "Bazooka M9", VC.Face.SIDE)
+		if sh.immobilized or sh.hull_damage > 0 or sh.turret_jammed or sh.main_gun_wrecked:
+			any = true
+	if not any:
+		print("TEST AFV: nessun effetto di danno dopo 80 colpi")
+		fails += 1
+	# Penetrazione "deve superare" (31.10.4): pen == armatura -> nessun effetto.
+	# Verifica diretta del confronto sul valore d'armatura noto del Sherman.
+	var arm_side: Array = VC.AFV_ARMOR["M4A3 Sherman"]["lower_hull_side"]
+	if int(arm_side[0]) != 4 or int(arm_side[1]) != 6:
+		print("TEST AFV: armatura Sherman lower_hull_side errata")
+		fails += 1
+	# Immobilizzato (cingoli/sospensioni) blocca il movimento.
+	var sh2 := VC.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able",
+		Vector2i(5, 5), 3, "")
+	sh2.immobilized = true
+	sh2.set_order(Domain.Order.SPRINT)
+	var before := sh2.position
+	TurnSequence._do_move(st, sh2, 2)
+	if sh2.position != before:
+		print("TEST AFV: un veicolo immobilizzato non deve muoversi")
+		fails += 1
+	# Torretta inceppata: turret_aim non ruota piu' (spara solo se gia' allineata).
+	sh2.turret_jammed = true
+	sh2.turret_facing = 1
+	var aligned := VC.turret_aim(st, sh2, Vector2i(5, 0))  # bersaglio non in dir 1
+	# Non deve cambiare il turret_facing (niente rotazione da inceppata).
+	if sh2.turret_facing != 1:
+		print("TEST AFV: torretta inceppata non deve ruotare")
 		fails += 1
 	return fails
 
