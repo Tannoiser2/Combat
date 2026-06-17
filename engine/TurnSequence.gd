@@ -609,6 +609,8 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 			state.log_event("%s (mischia obbligata con %s) -> Melee" % [
 				c.display_name, rival.display_name])
 			return
+	# Rule 32.3: piazzamento dinamico del Panzerfaust (prima di scegliere l'ordine).
+	_maybe_take_panzerfaust(state, c)
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
@@ -1327,12 +1329,79 @@ static func _try_fire(state: GameState, firer: Character) -> void:
 		best = target
 		best_dist = Spotting.hex_distance(firer.position, best.position)
 		break
+	# Rule 32: se il tiratore ha un'arma AT di fanteria (Bazooka/Panzerfaust) e
+	# c'e' un veicolo nemico ingaggiabile, la usa contro il veicolo (priorita').
+	var at_w := _infantry_at_weapon(firer)
+	if not at_w.is_empty():
+		var veh := _nearest_fireable_vehicle(state, firer, at_w)
+		if veh != null:
+			Fire.fire_action(state, firer, veh, at_w)
+			return
 	if best == null:
 		return
 	if firer.order_grenade and not firer.thrown and best_dist <= 3:
 		throw_grenade(state, firer, best.position)
 		return
 	Fire.fire_action(state, firer, best, firer.weapon_skills.keys()[0])
+
+
+# Rule 32.3: piazzamento dinamico del Panzerfaust. Un nemico (non Officer/MG/
+# Sniper, senza gia' un'arma AT) con LOS a un veicolo amico entro la gittata del
+# Panzerfaust, se il Livello > 0, fa un TQC: se passa raccoglie un Panzerfaust
+# (riducendo il Livello). Poi l'AI lo usera' contro il veicolo (_try_fire).
+const _PF_EXEMPT_ROLES := ["Officer", "SS Officer", "Sniper"]
+static func _maybe_take_panzerfaust(state: GameState, c: Character) -> void:
+	if state.panzerfaust_level <= 0 or c.is_vehicle:
+		return
+	if not _infantry_at_weapon(c).is_empty():
+		return  # ne ha gia' uno
+	if c.role in _PF_EXEMPT_ROLES or c.mg_role == "operator":
+		return
+	var ptype := state.panzerfaust_type
+	var max_r := int(Weapons.info(ptype)["max_range"])
+	var sees := false
+	for v in state.characters:
+		if v.side == c.side or not v.is_vehicle or v.is_dead() or not v.spotted:
+			continue
+		if Spotting.hex_distance(c.position, v.position) <= max_r and LOS.clear(state, c, v):
+			sees = true
+			break
+	if not sees:
+		return
+	if Checks.troop_quality_check(c, state.rng)["passed"]:
+		c.weapon_skills[ptype] = c.troop_quality  # il WS e' ignorato (HEAT usa la TQ)
+		state.panzerfaust_level -= 1
+		state.log_event("%s raccoglie un %s (Livello Panzerfaust: %d)" % [
+			c.display_name, ptype, state.panzerfaust_level])
+
+
+# Nome dell'arma AT di fanteria (Bazooka/Panzerfaust) del tiratore, o "".
+static func _infantry_at_weapon(firer: Character) -> String:
+	for w: String in firer.weapon_skills.keys():
+		var f: Array = Weapons.info(w)["flags"]
+		if ("at" in f) and not ("main_gun" in f):
+			return w
+	return ""
+
+
+# Il veicolo nemico ingaggiabile piu' vicino con l'arma AT `weapon`, o null.
+static func _nearest_fireable_vehicle(state: GameState, firer: Character, weapon: String) -> Character:
+	var best: Character = null
+	var bd := 9999
+	for v in state.characters:
+		if v.side == firer.side or not v.is_vehicle or v.is_dead():
+			continue
+		if v.side == Domain.Side.ENEMY and not v.known:
+			continue
+		if v.side == Domain.Side.FRIENDLY and not v.spotted:
+			continue
+		if not Fire.can_fire(state, firer, v, weapon):
+			continue
+		var d := Spotting.hex_distance(firer.position, v.position)
+		if d < bd:
+			bd = d
+			best = v
+	return best
 
 
 # Spotting check dello spotter contro ogni avversario non ancora

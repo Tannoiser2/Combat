@@ -3748,6 +3748,72 @@ func _test_bazooka() -> int:
 		print("TEST Bazooka: movimento veloce non scarica/perde razzo (loaded=%s ammo=%d)" % [
 			op.at_loaded, op.at_ammo])
 		fails += 1
+	# Rule 32.2: il Bazooka colpisce fanteria solo in copertura dura, non in aperto.
+	var st2 := GameState.new()
+	for y in range(0, 5):
+		st2.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 2)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var bz := Character.new("bz2", "Bz", Domain.Side.FRIENDLY, "Able")
+	bz.troop_quality = 6
+	bz.weapon_skills = {"Bazooka M9": 5}
+	bz.at_ammo = 3
+	bz.at_loaded = true
+	bz.position = Vector2i(0, 0)
+	var inf_cover := Character.new("ic", "InfC", Domain.Side.ENEMY, "Red")
+	inf_cover.troop_quality = 5
+	inf_cover.position = Vector2i(0, 2)  # in edificio
+	inf_cover.known = true
+	var inf_open := Character.new("io", "InfO", Domain.Side.ENEMY, "Red")
+	inf_open.troop_quality = 5
+	inf_open.position = Vector2i(0, 3)  # in aperto
+	inf_open.known = true
+	st2.characters = [bz, inf_cover, inf_open]
+	if not Fire.can_fire(st2, bz, inf_cover, "Bazooka M9"):
+		print("TEST 32.2: il Bazooka deve poter colpire fanteria in edificio")
+		fails += 1
+	if Fire.can_fire(st2, bz, inf_open, "Bazooka M9"):
+		print("TEST 32.2: il Bazooka non deve colpire fanteria in aperto")
+		fails += 1
+	# Rule 32.3: piazzamento dinamico del Panzerfaust su un nemico con LOS a un
+	# veicolo amico (TQC garantito con TQ alta + seed; Livello scende).
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	for y in range(0, 6):
+		st3.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st3.panzerfaust_level = 2
+	st3.panzerfaust_type = "Panzerfaust 60"
+	var ss := Character.new("ss", "SS", Domain.Side.ENEMY, "Red")
+	ss.troop_quality = 9
+	ss.role = "SS Schutze"
+	ss.weapon_skills = {"KAR 98K": 5}
+	ss.position = Vector2i(0, 0)
+	ss.alerted = true
+	var hjeep := VehicleCombat.make_vehicle("Jeep", Domain.Side.FRIENDLY, "Able",
+		Vector2i(0, 3), 3)
+	hjeep.spotted = true
+	st3.characters = [ss, hjeep]
+	TurnSequence._maybe_take_panzerfaust(st3, ss)
+	if not ss.weapon_skills.has("Panzerfaust 60"):
+		print("TEST 32.3: il nemico non raccoglie il Panzerfaust col veicolo in vista")
+		fails += 1
+	if st3.panzerfaust_level != 1:
+		print("TEST 32.3: il Livello Panzerfaust non e' sceso (%d)" % st3.panzerfaust_level)
+		fails += 1
+	# Un Officer non raccoglie il Panzerfaust.
+	var off := Character.new("off", "Off", Domain.Side.ENEMY, "Red")
+	off.troop_quality = 9
+	off.role = "SS Officer"
+	off.weapon_skills = {"KAR 98K": 5}
+	off.position = Vector2i(0, 0)
+	st3.characters = [off, hjeep]
+	TurnSequence._maybe_take_panzerfaust(st3, off)
+	if off.weapon_skills.has("Panzerfaust 60"):
+		print("TEST 32.3: un Officer non deve raccogliere il Panzerfaust")
+		fails += 1
+	# Preferenza arma AT: l'AI con Panzerfaust + fucile spara al veicolo.
+	if TurnSequence._infantry_at_weapon(ss) != "Panzerfaust 60":
+		print("TEST 32.3: _infantry_at_weapon non trova il Panzerfaust")
+		fails += 1
 	return fails
 
 

@@ -848,6 +848,7 @@ const SCENARIOS := {
 	"s11": {
 		"name": "11. Payback Time",
 		"map": "woods", "turns": 14, "hand_limit": 3,
+		"panzerfaust_level": 2,
 		"compass": ["34,5", "33,5"],
 		"deploy": {"cols": [31, 35], "rows": [0, 19]},
 		"desc": "I tedeschi si sono ritirati nel bosco pensando di essere al\nsicuro. Dimostriamo loro che si sbagliano.",
@@ -1079,6 +1080,7 @@ const SCENARIOS := {
 	"s20": {
 		"name": "20. Long Run Home",
 		"map": "hedgerows2", "turns": 12, "hand_limit": 3,
+		"panzerfaust_level": 2,
 		"compass": ["2,5", "3,5"],
 		"deploy": {"cols": [14, 20], "rows": [0, 19]},
 		"desc": "Intrappolati tra le siepi, circondati. La via di\nfuga è verso ovest: raggiungete le linee alleate.",
@@ -1103,6 +1105,7 @@ const SCENARIOS := {
 	"s21": {
 		"name": "21. Machine-Gun Ridge",
 		"map": "ridge", "turns": 15, "hand_limit": 3,
+		"panzerfaust_level": 3, "panzerfaust_type": "Panzerfaust 100",
 		"compass": ["34,5", "33,5"],
 		"deploy": {"cols": [31, 35], "rows": [0, 19]},
 		"desc": "Una mitragliatrice tedesca controlla tutta la cresta.\nNeutralizzatela prima che l'avanzata sia bloccata.",
@@ -1226,6 +1229,9 @@ static func build(state: GameState, scenario_id: String) -> void:
 	state.weather = Weather.TYPE_BY_NAME.get(sc.get("weather", "clear"), Weather.Type.CLEAR)
 	state.ground = Weather.GROUND_BY_NAME.get(sc.get("ground", "none"), Weather.Ground.NONE)
 	state.max_los = Weather.roll_max_los(state.weather, state.rng)
+	# Panzerfaust (Rule 32.3): Livello e tipo dichiarati dallo scenario.
+	state.panzerfaust_level = int(sc.get("panzerfaust_level", 0))
+	state.panzerfaust_type = String(sc.get("panzerfaust_type", "Panzerfaust 60"))
 	# Filo spinato (Rule 27.7): overlay sugli hex elencati nella chiave "wire".
 	for wk in sc.get("wire", []):
 		var wp: PackedStringArray = String(wk).split(",")

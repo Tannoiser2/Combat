@@ -1,3 +1,20 @@
+v0.84 — 2026-06-17
+- Light AT, ultimi tasselli (Rule 32.2/32.3) - settima fetta veicoli, completa
+  la Rule 32:
+  - Bersagli "soft" (32.2): il Bazooka/Panzerfaust puo' colpire la FANTERIA solo
+    se nell'hex c'e' copertura dura (Edificio/Macerie/Rocce/Abbazia/Fontana). A
+    segno il razzo esplode nell'hex e frammenta gli occupanti (to-hit con la TQ
+    dell'Operatore). Filtro in Fire.can_fire + Fire._fire_heat_at_hex.
+  - Piazzamento dinamico del Panzerfaust (32.3): un nemico (non Officer/MG/
+    Sniper, senza gia' un'arma AT) con LOS a un veicolo amico entro la gittata
+    del Panzerfaust, se il Livello dello scenario > 0, fa un TQC e puo'
+    raccoglierne uno (riducendo il Livello). Chiavi di scenario
+    "panzerfaust_level"/"panzerfaust_type"; impostate in s11, s20, s21.
+  - L'AI ora preferisce l'arma AT di fanteria contro i veicoli (_try_fire), cosi'
+    chi ha un Panzerfaust/Bazooka lo usa sul mezzo invece del fucile.
+  Test in _test_bazooka. RULE 31-32 (veicoli e anticarro) ora sostanzialmente
+  completa e fedele al regolamento.
+
 v0.83 — 2026-06-17
 - Bazooka, ciclo Load/Fire + munizioni + vincolo Sneak (Rule 32.1) - sesta fetta
   veicoli: l'operatore del Bazooka parte con 3 razzi e l'arma scarica.
