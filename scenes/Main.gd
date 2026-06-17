@@ -3770,6 +3770,26 @@ func _test_vehicle_ai() -> int:
 	if not gren.has_order or gren.order != Domain.Order.DUCK_BACK:
 		print("TEST 32.3: dopo il Panzerfaust il tiratore non va in Duck Back")
 		fails += 1
+	# Rule 31.9.4: il cannone usa la TQ del Gunner; leadership del Commander su HE.
+	var sh3 := VC.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able",
+		Vector2i(8, 8), 3)
+	var gun3 := VC.crew_with_role(sh3, "Gunner")
+	if gun3 != null:
+		gun3.morale = Domain.Morale.NORMAL
+		if VC.main_gun_tq(sh3) != Checks.effective_tq(gun3):
+			print("TEST 31.9.4: main_gun_tq non usa la TQ del Gunner")
+			fails += 1
+	var cmd3 := VC.crew_with_role(sh3, "Commander")
+	if cmd3 != null:
+		cmd3.leadership = 2
+		cmd3.morale = Domain.Morale.NORMAL
+		if VC.commander_leadership(sh3) != 2:
+			print("TEST 31.9.4: leadership del Commander non applicata (Normal)")
+			fails += 1
+		cmd3.morale = Domain.Morale.SHAKEN
+		if VC.commander_leadership(sh3) != 0:
+			print("TEST 31.9.4: leadership del Commander non azzerata se scosso")
+			fails += 1
 	return fails
 
 

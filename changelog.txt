@@ -1,3 +1,12 @@
+v0.82 — 2026-06-17
+- Veicoli, to-hit del cannone principale sulla TQ del Gunner (Rule 31.9.4) -
+  quinta fetta: il fuoco del cannone (AP vs veicolo in at_fire, HE vs fanteria
+  in he_fire) usa ora la TQ del Gunner (con ferite e morale del Gunner) invece
+  del WS dell'arma. Il fuoco HE somma il +1 del Commander in Direct Firing e la
+  leadership del Commander (se vivo, a bordo e morale >= Normal, Rule 31.9.4 ii).
+  Helper VehicleCombat.crew_with_role / main_gun_tq / commander_leadership.
+  Test in _test_vehicle_ai.
+
 v0.81 — 2026-06-17
 - Light Anti-Tank (Rule 32) - quarta fetta veicoli: il fuoco delle armi AT di
   fanteria (Bazooka M9, Panzerfaust 60/100) usa ora la TQ dell'Operatore
