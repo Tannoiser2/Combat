@@ -93,6 +93,14 @@ var fire_mode: String = ""
 # Rule 31.1.3: stato di carica del cannone principale. Il Loader deve caricarlo;
 # ogni colpo lo svuota e la ricarica consuma un impulso. Parte carico.
 var main_gun_loaded: bool = true
+# Guasti da hit-location (Rule 31.10): cingoli/sospensioni colpiti = immobilizzato
+# (non muove piu'); cannone distrutto = non spara col main gun; torretta inceppata
+# = non ruota piu' (puo' sparare solo se gia' allineata); coassiale/bow MG distrutte.
+var immobilized: bool = false
+var main_gun_wrecked: bool = false
+var turret_jammed: bool = false
+var coax_wrecked: bool = false
+var bow_mg_wrecked: bool = false
 # Rule 31.9.4c: se true il Gunner spara la MG coassiale invece del cannone
 # (usato sul membro Gunner del veicolo).
 var fires_coax: bool = false

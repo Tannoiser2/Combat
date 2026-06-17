@@ -140,6 +140,9 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	var is_main_gun: bool = firer.is_vehicle \
 		and "main_gun" in Weapons.info(weapon)["flags"]
 	if is_main_gun:
+		# Rule 31.10: cannone distrutto da un colpo precedente -> non spara piu'.
+		if firer.main_gun_wrecked:
+			return
 		if VehicleCombat.has_turret(firer) \
 				and not VehicleCombat.turret_aim(state, firer, target.position):
 			return

@@ -82,6 +82,68 @@ const VEHICLE_DATA := {
 # AFV con torretta rotante (Rule 31.6). Jeep e Halftrack non hanno torretta.
 const TURRETED := ["M4A3 Sherman", "PzIVH"]
 
+# Armatura per-zona degli AFV (Rule 31.10), dai Vehicle Display ufficiali.
+# Ogni voce: [valore NORMAL, valore GLANCING]. Le zone scafo hanno una variante
+# Lower/Upper per fronte e lato; rear unica.
+const AFV_ARMOR := {
+	"M4A3 Sherman": {
+		"turret_front": [8, 14], "turret_side": [7, 11], "turret_rear": [7, 11],
+		"lower_hull_front": [10, 18], "upper_hull_front": [9, 16],
+		"lower_hull_side": [4, 6], "upper_hull_side": [4, 6], "rear": [4, 6],
+	},
+	"PzIVH": {
+		"turret_front": [6, 9], "turret_side": [5, 7], "turret_rear": [5, 7],
+		"lower_hull_front": [9, 16], "upper_hull_front": [9, 12],
+		"lower_hull_side": [3, 5], "upper_hull_side": [3, 5], "rear": [2, 4],
+	},
+}
+
+# AFV Hit Location Table (Rule 31.10), trascritta dalla tabella ufficiale
+# "AFV Hit Locations". Tiro d100; si prende la prima riga con roll <= max.
+# Ogni riga: [max, kind, glancing, [crew MC]]. kind:
+#  bounce, hull_mg, periscope, hatch, suspension, track, drive_wheel,
+#  gun_barrel, turret_ring, coax, gunner_sight, lower_hull, upper_hull, turret.
+# "turret" rimanda alla sotto-tabella torretta (per faccia della torretta).
+const AFV_HULL_TABLE := {
+	Face.FRONT: [
+		[15, "bounce", false, []], [16, "hull_mg", false, ["CD"]],
+		[20, "periscope", false, ["D"]], [22, "hatch", false, ["D"]],
+		[31, "lower_hull", false, []], [39, "upper_hull", false, []],
+		[44, "lower_hull", true, []], [54, "suspension", false, ["ALL"]],
+		[70, "turret", true, []], [94, "turret", false, []],
+		[100, "turret_ring", false, ["CM", "G", "L"]],
+	],
+	Face.SIDE: [
+		[15, "bounce", false, []], [16, "gun_barrel", false, ["CD"]],
+		[20, "periscope", false, ["D"]], [22, "drive_wheel", false, []],
+		[24, "track", false, []], [32, "lower_hull", false, []],
+		[39, "upper_hull", false, []], [44, "lower_hull", true, []],
+		[64, "suspension", false, ["ALL"]], [70, "turret", true, []],
+		[94, "turret", false, []], [100, "turret_ring", false, ["CM", "G", "L"]],
+	],
+	Face.REAR: [
+		[10, "suspension", false, ["ALL"]], [75, "upper_hull", false, []],
+		[95, "turret", false, []], [100, "turret_ring", false, ["CM", "G", "L"]],
+	],
+}
+# Sotto-tabella torretta: "turret_armor" = colpo da risolvere con la penetrazione
+# vs armatura torretta della faccia colpita.
+const AFV_TURRET_TABLE := {
+	Face.FRONT: [
+		[7, "gun_barrel", false, []], [12, "coax", false, []],
+		[16, "periscope", false, ["CM"]], [23, "periscope", false, ["L"]],
+		[27, "hatch", false, ["L"]], [30, "gunner_sight", false, ["G"]],
+		[35, "turret_ring", false, ["CM", "G", "L"]], [100, "turret_armor", false, []],
+	],
+	Face.SIDE: [
+		[7, "gun_barrel", false, []], [11, "turret_ring", false, ["CM", "G", "L"]],
+		[100, "turret_armor", false, []],
+	],
+	Face.REAR: [
+		[100, "turret_armor", false, []],
+	],
+}
+
 
 # Vero se il veicolo e' un AFV dotato di torretta (Rule 31.6).
 static func has_turret(c: Character) -> bool:
@@ -106,6 +168,9 @@ static func turret_aim(state: GameState, vehicle: Character, target_pos: Vector2
 	if vehicle.turret_facing <= 0:
 		vehicle.turret_facing = vehicle.facing
 	var want := Move.dir_toward(vehicle.position, target_pos)
+	# Rule 31.10: torretta inceppata -> non ruota; spara solo se gia' allineata.
+	if vehicle.turret_jammed:
+		return vehicle.turret_facing == want
 	if vehicle.turret_facing == want:
 		return true
 	vehicle.turret_facing = Move.rotate_toward(vehicle.turret_facing, want)
@@ -239,11 +304,15 @@ static func populate_crew(vehicle: Character) -> void:
 
 # Nome dell'arma bow MG del veicolo (Rule 31.9.4b), o "" se non ne ha.
 static func bow_mg_weapon(vehicle: Character) -> String:
+	if vehicle.bow_mg_wrecked:  # Rule 31.10: distrutta da un colpo precedente
+		return ""
 	return String(VEHICLE_DATA.get(vehicle.vehicle_type, {}).get("bow_mg", ""))
 
 
 # Nome dell'arma coassiale del veicolo (Rule 31.9.4c), o "" se non ne ha.
 static func coax_mg_weapon(vehicle: Character) -> String:
+	if vehicle.coax_wrecked:  # Rule 31.10: distrutta da un colpo precedente
+		return ""
 	return String(VEHICLE_DATA.get(vehicle.vehicle_type, {}).get("coax_mg", ""))
 
 
@@ -366,10 +435,10 @@ static func vehicle_hexes(v_name: String, is_must_move_2: bool) -> int:
 	return 2 if is_fast(v_name) else 1
 
 
-# Faccia colpita in base alla posizione del tiratore e al facing del veicolo.
-static func hit_face(vehicle: Character, firer_pos: Vector2i) -> int:
-	var vdir: Vector3i = Move.CUBE_DIRS[(vehicle.facing - 1) % 6]
-	var delta: Vector3i = Move.to_cube(firer_pos) - Move.to_cube(vehicle.position)
+# Faccia colpita data una direzione di facing (1..6) e la posizione del tiratore.
+static func face_from(facing: int, vehicle_pos: Vector2i, firer_pos: Vector2i) -> int:
+	var vdir: Vector3i = Move.CUBE_DIRS[(facing - 1) % 6]
+	var delta: Vector3i = Move.to_cube(firer_pos) - Move.to_cube(vehicle_pos)
 	var front_dot: int = vdir.x * delta.x + vdir.y * delta.y + vdir.z * delta.z
 	var rear_dot: int = -vdir.x * delta.x + -vdir.y * delta.y + -vdir.z * delta.z
 	if front_dot >= rear_dot and front_dot > 0:
@@ -377,6 +446,133 @@ static func hit_face(vehicle: Character, firer_pos: Vector2i) -> int:
 	if rear_dot > front_dot and rear_dot > 0:
 		return Face.REAR
 	return Face.SIDE
+
+
+# Faccia dello SCAFO colpita (in base al facing del veicolo).
+static func hit_face(vehicle: Character, firer_pos: Vector2i) -> int:
+	return face_from(vehicle.facing, vehicle.position, firer_pos)
+
+
+# Faccia della TORRETTA colpita (in base al turret_facing; ripiego sullo scafo).
+static func turret_hit_face(vehicle: Character, firer_pos: Vector2i) -> int:
+	var tf: int = vehicle.turret_facing if vehicle.turret_facing > 0 else vehicle.facing
+	return face_from(tf, vehicle.position, firer_pos)
+
+
+# Tira sulla tabella (lista [max, kind, glancing, mc]) con un d100 (1..100).
+static func _roll_loc(rng: RandomNumberGenerator, table: Array) -> Array:
+	var roll := rng.randi_range(1, 100)
+	for row in table:
+		if roll <= int(row[0]):
+			return row
+	return table.back()
+
+
+# Chiave d'armatura (AFV_ARMOR) per una zona scafo e la faccia colpita.
+static func _hull_armor_key(kind: String, face: int) -> String:
+	if face == Face.REAR:
+		return "rear"
+	var side := "front" if face == Face.FRONT else "side"
+	return "%s_%s" % [kind, side]  # es. lower_hull_front / upper_hull_side
+
+
+# Faccia torretta -> chiave armatura torretta.
+static func _turret_armor_key(face: int) -> String:
+	match face:
+		Face.FRONT: return "turret_front"
+		Face.REAR: return "turret_rear"
+		_: return "turret_side"
+
+
+# MC dei crew indicati dalle lettere della tabella (CM/G/L/D/CD/ALL, Rule 31.10.6).
+const _MC_ROLE := {"CM": "Commander", "G": "Gunner", "L": "Loader",
+	"D": "Driver", "CD": "Co-Driver"}
+static func _crew_mc_letters(state: GameState, vehicle: Character, letters: Array) -> void:
+	if letters.is_empty():
+		return
+	if "ALL" in letters:
+		_crew_morale_checks(state, vehicle)
+		return
+	for L in letters:
+		var role: String = _MC_ROLE.get(L, "")
+		for cm in _embarked_alive(vehicle):
+			if cm.crew_role == role:
+				var mc := Checks.morale_check(cm, state.rng)
+				if int(mc["delta"]) < 0:
+					state.log_event("  %s (%s): MC fallito -> %s" % [
+						cm.display_name, role, D.MORALE_NAMES[cm.morale]])
+
+
+# Risoluzione fedele del colpo su un AFV (Rule 31.10): tira la hit location,
+# applica guasti/MC e, per le zone corazzate, il check di penetrazione
+# (pen DEVE superare l'armatura della zona; glancing usa il valore Glancing).
+static func _resolve_afv_hit(state: GameState, firer: Character, vehicle: Character,
+		weapon: String, hull_face: int) -> String:
+	var row := _roll_loc(state.rng, AFV_HULL_TABLE[hull_face])
+	var kind: String = row[1]
+	var glancing: bool = row[2]
+	var armor_face := hull_face
+	# "turret": rimanda alla sotto-tabella torretta (faccia della torretta).
+	if kind == "turret":
+		armor_face = turret_hit_face(vehicle, firer.position)
+		var trow := _roll_loc(state.rng, AFV_TURRET_TABLE[armor_face])
+		kind = trow[1]
+		glancing = glancing or bool(trow[2])
+		_crew_mc_letters(state, vehicle, trow[3])
+	else:
+		_crew_mc_letters(state, vehicle, row[3])
+	match kind:
+		"bounce":
+			state.log_event("  Rimbalzo: nessun effetto")
+			return "rimbalzo"
+		"suspension", "track", "drive_wheel":
+			vehicle.immobilized = true
+			state.log_event("  %s immobilizzato (%s)" % [vehicle.display_name, kind])
+			return "immobilizzato"
+		"gun_barrel":
+			vehicle.main_gun_wrecked = true
+			state.log_event("  Cannone del %s distrutto!" % vehicle.display_name)
+			return "cannone_ko"
+		"turret_ring":
+			vehicle.turret_jammed = true
+			state.log_event("  Torretta del %s inceppata (non ruota piu')" % vehicle.display_name)
+			return "torretta_inceppata"
+		"coax":
+			vehicle.coax_wrecked = true
+			state.log_event("  Coassiale del %s distrutta" % vehicle.display_name)
+			return "coax_ko"
+		"hull_mg":
+			vehicle.bow_mg_wrecked = true
+			state.log_event("  Bow MG del %s distrutta" % vehicle.display_name)
+			return "bowmg_ko"
+		"periscope", "hatch", "gunner_sight":
+			state.log_event("  Colpo a %s (MC equipaggio)" % kind)
+			return "componente"
+		_:
+			# Zona corazzata (lower_hull/upper_hull/turret_armor): penetrazione.
+			var akey := _turret_armor_key(armor_face) if kind == "turret_armor" \
+				else _hull_armor_key(kind, armor_face)
+			var arm: Array = AFV_ARMOR.get(vehicle.vehicle_type, {}).get(akey, [99, 99])
+			var armor := int(arm[1] if glancing else arm[0])
+			var pen := roll_pen(state.rng, weapon)
+			if pen > armor:  # Rule 31.10.4: deve SUPERARE l'armatura della zona
+				# Una penetrazione netta di scafo/torretta mette KO il mezzo
+				# (equipaggio colpito, possibile incendio/esplosione munizioni).
+				vehicle.hull_damage = 2
+				state.log_event("  Penetrazione (%s%s)! pen %d > arm %d -> %s DISTRUTTO!" % [
+					akey, " glancing" if glancing else "", pen, armor, vehicle.display_name])
+				state.audio_events.append({"type": "explosion", "hex": vehicle.position})
+				_kill_embarked_crew(state, vehicle)
+				return "penetrazione"
+			state.log_event("  Mancata penetrazione (%s%s): pen %d <= arm %d" % [
+				akey, " glancing" if glancing else "", pen, armor])
+			return "non_penetrato"
+
+
+# Rule 31.9.4: bonus al colpo (TQ/WS) per la faccia bersagliata. Il fianco
+# offre il profilo piu' ampio (+2); fronte e retro +1.
+static func face_to_hit_bonus(face: int) -> int:
+	return 2 if face == Face.SIDE else 1
 
 
 # Penetrazione: pen_base + 1d{pen_die} (dalla Weapons.DATA).
@@ -407,6 +603,10 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 		ws += 1
 	if firer.is_vehicle and firer.emergency_stop:
 		ws -= 2
+	# Rule 31.9.4: bonus al colpo secondo la faccia bersagliata (il fianco offre
+	# il profilo piu' ampio): +2 di lato, +1 frontale o posteriore.
+	var face := hit_face(vehicle, firer.position)
+	ws += face_to_hit_bonus(face)
 	var roll: int = Checks.roll_d10(state.rng)
 	var hit: bool = (roll == 0 or roll <= ws) and roll != 9
 	state.log_event("%s -> %s con %s (WS %d, d10: %d): %s" % [
@@ -421,8 +621,11 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	if not hit:
 		return {"hit": false, "result": "mancato"}
 
-	# 2. Faccia e penetrazione.
-	var face := hit_face(vehicle, firer.position)
+	# 2a. AFV con tabella ufficiale (Rule 31.10): hit-location + penetrazione fedele.
+	if AFV_ARMOR.has(vehicle.vehicle_type):
+		return {"hit": true, "result": _resolve_afv_hit(state, firer, vehicle, weapon, face)}
+
+	# 2b. Jeep/Halftrack/Truck: modello a bande (prossime fette del rework).
 	var pen  := roll_pen(state.rng, weapon)
 	var vd: Dictionary = VEHICLE_DATA.get(vehicle.vehicle_type, {})
 	var armor_n := int((vd.get("armor", [0,0,0]) as Array)[face])

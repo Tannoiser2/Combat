@@ -1171,6 +1171,9 @@ static func discretionary_action(c: Character, impulse: int, state: GameState = 
 # Movimento nell'impulse: verso il nemico (Sneak/Sprint/Run&Gun/Charge)
 # o lontano (Evade/Carry-Drag), del numero di hex consentito.
 static func _do_move(state: GameState, c: Character, hexes: int) -> void:
+	# Rule 31.10: un veicolo immobilizzato (cingoli/sospensioni) non si muove piu'.
+	if c.is_vehicle and c.immobilized:
+		return
 	var from := c.position
 	var n := Move.move_character(state, c, hexes)
 	if n > 0:
