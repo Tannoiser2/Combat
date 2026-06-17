@@ -3518,6 +3518,7 @@ func _test_rules() -> int:
 	fails += _test_abbey()
 	fails += _test_vehicles()
 	fails += _test_grenade()
+	fails += _test_alert()
 	return fails
 
 
@@ -3561,6 +3562,39 @@ func _test_grenade() -> int:
 	# L'adiacente fa solo un MC: non viene rivelato dalla scheggia.
 	if adj.known:
 		print("TEST granata: adiacente rivelato per errore")
+		fails += 1
+	return fails
+
+
+# Allerta da colpo e da veicolo (Rule 9.7, v0.65/v0.66).
+func _test_alert() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 42
+	var firer := Character.new("fr", "Firer", Domain.Side.FRIENDLY, "Able")
+	firer.troop_quality = 6
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	firer.set_order(Domain.Order.AIMED_FIRE)
+	var tgt := Character.new("tg", "Target", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 4
+	tgt.position = Vector2i(0, 1)
+	tgt.alerted = false
+	var nearby := Character.new("nb", "Nearby", Domain.Side.ENEMY, "Red")
+	nearby.troop_quality = 4
+	nearby.position = Vector2i(0, 5)
+	nearby.alerted = false
+	var far_e := Character.new("fe", "Far", Domain.Side.ENEMY, "Red")
+	far_e.troop_quality = 4
+	far_e.position = Vector2i(0, 9)
+	far_e.alerted = false
+	st.characters = [firer, tgt, nearby, far_e]
+	Fire.fire_action(st, firer, tgt, "M1 Garand")
+	if not nearby.alerted:
+		print("TEST allerta: nemico a 5 hex non allertato dal colpo")
+		fails += 1
+	if far_e.alerted:
+		print("TEST allerta: nemico a 9 hex allertato per errore (oltre 8 hex)")
 		fails += 1
 	return fails
 

@@ -1,3 +1,8 @@
+v0.67 — 2026-06-17
+- Allerta da fuoco AT/veicolo: `_alert_from_shot` ora viene chiamata anche
+  quando il bersaglio è un veicolo (il colpo di carro/bazooka era l'unico
+  tipo di fuoco che non allertava i nemici vicini). Aggiunto test _test_alert.
+
 v0.66 — 2026-06-17
 - Notte: -2 WS oltre 2 hex esente se tiratore e bersaglio sono nello stesso
   edificio (era già così per il meteo; ora coerente con Rule 18/28).

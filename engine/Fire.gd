@@ -146,6 +146,7 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		else:
 			# Armi leggere: colpiscono l'equipaggio esposto (Rule 31.10).
 			_fire_at_exposed_crew(state, firer, target, weapon)
+		_alert_from_shot(state, firer)
 		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
 	var rof := Weapons.rof_at(weapon, dist)
