@@ -1,3 +1,13 @@
+v0.75 — 2026-06-17
+- Reload automatico nemici (Rule 10.10): un nemico con marker No Ammo a cui
+  toccherebbe un ordine di fuoco (Aimed/Rapid/Suppressive/Run&Gun) riceve
+  invece Reload, e a fine turno rimuove il No Ammo. Prima restava col fuoco e
+  non ricaricava mai da solo.
+- Duck Back all'ingresso in terreno coperto (Rule 9.4): un nemico che entra in
+  un esagono non-Aperto avendo LOS a un Friendly individuato fa un TQC (non
+  modificato da ferite/morale); se passa si butta al riparo (Duck Back). Esente
+  con ordini Run&Gun/Granata/Carica o morale Berserk. Test 9.4 e 10.10.
+
 v0.74 — 2026-06-17
 - Charge/Grenade Checks dei nemici (Rule 9.6): le lettere C/G sulle Enemy Card
   ora si applicano fedelmente. Prima di assegnare l'ordine, se c'è un Friendly

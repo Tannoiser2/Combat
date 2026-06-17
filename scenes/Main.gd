@@ -3526,6 +3526,7 @@ func _test_rules() -> int:
 	fails += _test_melee_passive()
 	fails += _test_waiting()
 	fails += _test_charge_gate()
+	fails += _test_reload_duckback()
 	return fails
 
 
@@ -3690,6 +3691,73 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Reload automatico (10.10) e Duck Back d'ingresso (9.4).
+func _test_reload_duckback() -> int:
+	var fails := 0
+	# 10.10: No Ammo + ordine di fuoco -> Reload.
+	var st := GameState.new()
+	var e := Character.new("e", "E", Domain.Side.ENEMY, "Red")
+	e.troop_quality = 5
+	e.weapon_skills = {"KAR 98K": 5}
+	e.position = Vector2i(5, 5)
+	e.no_ammo = true
+	st.characters = [e]
+	TurnSequence._set_enemy_order(st, e, Domain.Order.AIMED_FIRE)
+	if e.order != Domain.Order.RELOAD:
+		print("TEST 10.10: No Ammo + Aimed Fire non convertito in Reload (got %d)" % e.order)
+		fails += 1
+	# Con munizioni: l'ordine di fuoco resta.
+	e.no_ammo = false
+	TurnSequence._set_enemy_order(st, e, Domain.Order.AIMED_FIRE)
+	if e.order != Domain.Order.AIMED_FIRE:
+		print("TEST 10.10: con munizioni l'Aimed Fire non deve diventare Reload")
+		fails += 1
+	# 9.4: entra in terreno coperto con LOS a un Friendly Spotted, TQC passa -> Duck Back.
+	var st2 := GameState.new()
+	st2.rng.seed = 1  # roll basso: TQC passa con TQ alta
+	for y in range(0, 6):
+		st2.map[GameState.hex_key(5, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(5, 2)] = GameState.MapHex.new(Domain.Terrain.BUILDING)
+	var mover := Character.new("m", "M", Domain.Side.ENEMY, "Red")
+	mover.troop_quality = 9
+	mover.position = Vector2i(5, 2)  # gia' nell'edificio (post-movimento)
+	mover.set_order(Domain.Order.SNEAK)
+	var fr := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	fr.troop_quality = 5
+	fr.position = Vector2i(5, 5)
+	fr.spotted = true
+	st2.characters = [mover, fr]
+	TurnSequence._enter_terrain_duck_back(st2, mover)
+	if mover.order != Domain.Order.DUCK_BACK:
+		print("TEST 9.4: in terreno coperto con LOS al nemico non fa Duck Back (got %d)" % mover.order)
+		fails += 1
+	# In terreno Aperto: nessun Duck Back.
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	for y in range(0, 6):
+		st3.map[GameState.hex_key(5, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var mover2 := Character.new("m2", "M2", Domain.Side.ENEMY, "Red")
+	mover2.troop_quality = 9
+	mover2.position = Vector2i(5, 2)
+	mover2.set_order(Domain.Order.SNEAK)
+	var fr2 := Character.new("f2", "F2", Domain.Side.FRIENDLY, "Able")
+	fr2.troop_quality = 5
+	fr2.position = Vector2i(5, 5)
+	fr2.spotted = true
+	st3.characters = [mover2, fr2]
+	TurnSequence._enter_terrain_duck_back(st3, mover2)
+	if mover2.order == Domain.Order.DUCK_BACK:
+		print("TEST 9.4: in terreno Aperto non deve fare Duck Back")
+		fails += 1
+	# Ordine Charge: esente dal Duck Back anche in terreno coperto.
+	mover.set_order(Domain.Order.CHARGE)
+	TurnSequence._enter_terrain_duck_back(st2, mover)
+	if mover.order != Domain.Order.CHARGE:
+		print("TEST 9.4: la Carica deve essere esente dal Duck Back")
 		fails += 1
 	return fails
 

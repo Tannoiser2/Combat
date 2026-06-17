@@ -164,6 +164,11 @@ static func enemy_order_phase(state: GameState) -> void:
 const WIRE_MOVEMENT := [Domain.Order.RUN_AND_GUN, Domain.Order.SPRINT,
 	Domain.Order.EVADE, Domain.Order.CHARGE]
 
+# Rule 10.10: ordini di fuoco che un nemico con No Ammo non puo' eseguire e che
+# vengono convertiti in Reload.
+const FIRE_ORDERS_RELOAD := [Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE,
+	Domain.Order.SUPPRESSIVE_FIRE, Domain.Order.RUN_AND_GUN]
+
 
 # Filo spinato (Rule 27.7): in ogni hex con filo spinato e 2+ nemici vivi, il
 # personaggio col TQ piu' basso riceve un Hide automatico (il primo trovato a
@@ -220,6 +225,13 @@ static func _set_enemy_order(state: GameState, c: Character, order: int,
 	if final_order in WIRE_MOVEMENT and state.has_wire(c.position) \
 			and not Move.wire_hide_exempt(state, c):
 		final_order = Domain.Order.SNEAK
+	# Rule 10.10: un nemico con No Ammo a cui toccherebbe un ordine di fuoco
+	# (Aimed/Rapid/Suppressive/Run&Gun) riceve invece Reload (a fine turno
+	# rimuove il marker No Ammo, gia' gestito in activate_passive impulso 4).
+	if c.no_ammo and not c.is_vehicle and final_order in FIRE_ORDERS_RELOAD:
+		c.set_order(Domain.Order.RELOAD)
+		state.log_event("  %s e' a corto di munizioni -> Reload" % c.display_name)
+		return
 	c.set_order(final_order, move, grenade, charge)
 	if final_order != order:
 		state.log_event("  %s: %s impedito dal %s -> %s" % [c.display_name,
@@ -1160,6 +1172,48 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 			how = "in direzione %s (bussola)" % c.order_move
 		state.log_event("%s si sposta %s: %02d.%02d -> %02d.%02d" % [
 			c.display_name, how, from.x, from.y, c.position.x, c.position.y])
+		# Rule 9.4: un nemico che entra in terreno coperto con LOS a un Friendly
+		# Spotted puo' buttarsi al riparo (Duck Back).
+		_enter_terrain_duck_back(state, c)
+
+
+# Terreni "Aperti" (Rule 11): non innescano il Duck Back d'ingresso (Rule 9.4).
+const OPEN_TERRAINS := [Domain.Terrain.OPEN_LEVEL_0, Domain.Terrain.OPEN_LEVEL_1,
+	Domain.Terrain.OPEN_LEVEL_2, Domain.Terrain.OPEN_LEVEL_3]
+# Ordini esenti dal Duck Back d'ingresso (Rule 9.4): R&G, Granata, Carica.
+const DUCKBACK_EXEMPT_ORDERS := [Domain.Order.RUN_AND_GUN, Domain.Order.GRENADE,
+	Domain.Order.RIFLE_GRENADE, Domain.Order.SMOKE_GRENADE, Domain.Order.CHARGE]
+
+
+# Rule 9.4: quando un nemico ENTRA in terreno non-Aperto e ha LOS a un Friendly
+# individuato, fa un TQC NON modificato da ferite e morale; se passa, a fine
+# Impulse cambia ordine in Duck Back (si butta al riparo). Esente con ordini
+# R&G/Granata/Carica o morale Berserk.
+static func _enter_terrain_duck_back(state: GameState, c: Character) -> void:
+	if c.side != Domain.Side.ENEMY or c.is_vehicle or c.is_dead():
+		return
+	if c.morale == Domain.Morale.BERSERK:
+		return
+	if not c.has_order or c.order in DUCKBACK_EXEMPT_ORDERS:
+		return
+	var hex := state.hex_at(c.position.x, c.position.y)
+	if hex == null or hex.terrain in OPEN_TERRAINS:
+		return
+	var sees := false
+	for f in state.characters:
+		if f.side != Domain.Side.FRIENDLY or f.is_dead() or not f.spotted:
+			continue
+		if LOS.clear(state, c, f):
+			sees = true
+			break
+	if not sees:
+		return
+	# TQC non modificato da ferite/morale: confronto sul TQ base.
+	var roll := Checks.roll_d10(state.rng)
+	if roll <= c.troop_quality:
+		c.set_order(Domain.Order.DUCK_BACK)
+		state.log_event("%s entra al riparo e si butta giu' (Duck Back, TQC %d<=%d)" % [
+			c.display_name, roll, c.troop_quality])
 
 
 # Bersagli che il tiratore puo' ingaggiare ora (visti, in gittata, LOS).
