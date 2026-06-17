@@ -144,6 +144,36 @@ const AFV_TURRET_TABLE := {
 	],
 }
 
+# Tabelle danno mezzi leggeri/soft (Rule 31.10.1 Jeep, 31.10.2 Truck/Half-Track),
+# ADATTATE: i 12 passeggeri del display NON sono modellati, quindi gli esiti su
+# "hull/passeggeri" diventano nessun effetto. Riga: [max d100, kind, ruolo].
+# kind: none, crew (uccide quel ruolo), crew_stop (uccide + immobilizza),
+# track (immobilizza), engine (tira sul danno motore), destroy (distrutto).
+const TRUCK_FACES := {
+	Face.FRONT: [[19, "none", ""], [29, "crew", "Driver"], [39, "crew_stop", "Co-Driver"],
+		[49, "none", ""], [59, "none", ""], [100, "engine", ""]],
+	Face.SIDE: [[65, "none", ""], [71, "none", ""], [83, "crew", "Driver"], [100, "engine", ""]],
+	Face.REAR: [[70, "none", ""], [100, "none", ""]],
+}
+const SOFT_HIT_TABLE := {
+	"Jeep": {
+		Face.FRONT: [[9, "none", ""], [19, "crew", "Driver"], [29, "crew_stop", "Co-Driver"],
+			[39, "none", ""], [54, "engine", ""], [100, "none", ""]],
+		Face.SIDE: [[19, "destroy", ""], [57, "none", ""], [71, "none", ""],
+			[83, "crew", "Driver"], [100, "engine", ""]],
+		Face.REAR: [[45, "destroy", ""], [77, "none", ""], [100, "none", ""]],
+	},
+	"M3A1 Halftrack": {
+		Face.FRONT: [[15, "none", ""], [26, "crew", "Co-Driver"], [37, "crew", "Driver"],
+			[45, "none", ""], [55, "none", ""], [65, "crew", "Gunner"], [100, "engine", ""]],
+		Face.SIDE: [[40, "none", ""], [55, "track", ""], [60, "track", ""], [66, "none", ""],
+			[75, "crew", "Driver"], [92, "engine", ""], [100, "none", ""]],
+		Face.REAR: [[70, "none", ""], [100, "track", ""]],
+	},
+	"GMC 2.5t": TRUCK_FACES,
+	"Opel Blitz": TRUCK_FACES,
+}
+
 
 # Vero se il veicolo e' un AFV dotato di torretta (Rule 31.6).
 static func has_turret(c: Character) -> bool:
@@ -569,6 +599,84 @@ static func _resolve_afv_hit(state: GameState, firer: Character, vehicle: Charac
 			return "non_penetrato"
 
 
+# Uccide il crew con un dato ruolo (colpo AP/HE letale); se quel ruolo non e'
+# piu' a bordo, colpisce un crew a caso.
+static func _crew_kill_role(state: GameState, vehicle: Character, role: String) -> void:
+	for cm in _embarked_alive(vehicle):
+		if cm.crew_role == role:
+			_kill(cm)
+			state.log_event("  %s (%s) UCCISO nel mezzo" % [cm.display_name, role])
+			return
+	_crew_casualty(state, vehicle)
+
+
+# Danno al vano motore (Rule 31.10): 1D10. 9 = esplode (distrutto); 6-8 =
+# incendio motore (immobilizzato + un crew colpito); 2-5 = avaria (immobilizzato);
+# 0-1 = nessun effetto.
+static func _engine_damage(state: GameState, vehicle: Character) -> String:
+	var r := Checks.roll_d10(state.rng)
+	if r == 9:
+		vehicle.hull_damage = 2
+		state.log_event("  Il motore esplode: %s DISTRUTTO!" % vehicle.display_name)
+		state.audio_events.append({"type": "explosion", "hex": vehicle.position})
+		_kill_embarked_crew(state, vehicle)
+		return "distrutto"
+	if r >= 6:
+		vehicle.immobilized = true
+		state.log_event("  Incendio al motore del %s (immobilizzato)" % vehicle.display_name)
+		_crew_casualty(state, vehicle)
+		return "immobilizzato"
+	if r >= 2:
+		vehicle.immobilized = true
+		state.log_event("  Avaria al motore del %s (immobilizzato)" % vehicle.display_name)
+		return "immobilizzato"
+	state.log_event("  Colpo al motore senza effetto")
+	return "nessun_effetto"
+
+
+# Risoluzione del colpo su un mezzo leggero/soft (Jeep/Truck/Half-Track,
+# Rule 31.10.1/.2): tira la hit location e applica l'esito. Il Half-Track ha
+# armatura: il danno al motore richiede la penetrazione (pen > armatura faccia).
+static func _resolve_soft_hit(state: GameState, firer: Character, vehicle: Character,
+		weapon: String, face: int) -> String:
+	var tbl: Dictionary = SOFT_HIT_TABLE.get(vehicle.vehicle_type, {})
+	if tbl.is_empty():
+		return "nessun_effetto"
+	var row := _roll_loc(state.rng, tbl[face])
+	var kind: String = row[1]
+	var role: String = row[2]
+	match kind:
+		"none":
+			state.log_event("  Colpo senza effetto sul mezzo")
+			return "nessun_effetto"
+		"destroy":
+			vehicle.hull_damage = 2
+			state.log_event("  %s DISTRUTTO!" % vehicle.display_name)
+			state.audio_events.append({"type": "explosion", "hex": vehicle.position})
+			_kill_embarked_crew(state, vehicle)
+			return "distrutto"
+		"track":
+			vehicle.immobilized = true
+			state.log_event("  %s immobilizzato (cingoli/sospensioni)" % vehicle.display_name)
+			return "immobilizzato"
+		"crew", "crew_stop":
+			_crew_kill_role(state, vehicle, role)
+			if kind == "crew_stop":
+				vehicle.immobilized = true
+				state.log_event("  %s si ferma" % vehicle.display_name)
+			return "crew"
+		_:  # engine
+			# Rule 31.10.2: sul Half-Track il danno al motore richiede penetrazione.
+			var vd: Dictionary = VEHICLE_DATA.get(vehicle.vehicle_type, {})
+			var armor := int((vd.get("armor", [0, 0, 0]) as Array)[face])
+			if armor > 0:
+				var pen := roll_pen(state.rng, weapon)
+				if pen <= armor:
+					state.log_event("  Il colpo non penetra (pen %d <= arm %d)" % [pen, armor])
+					return "non_penetrato"
+			return _engine_damage(state, vehicle)
+
+
 # Rule 31.9.4: bonus al colpo (TQ/WS) per la faccia bersagliata. Il fianco
 # offre il profilo piu' ampio (+2); fronte e retro +1.
 static func face_to_hit_bonus(face: int) -> int:
@@ -621,45 +729,12 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	if not hit:
 		return {"hit": false, "result": "mancato"}
 
-	# 2a. AFV con tabella ufficiale (Rule 31.10): hit-location + penetrazione fedele.
+	# 2. Risoluzione fedele del danno (Rule 31.10): gli AFV usano la hit-location
+	# table con penetrazione per-zona; i mezzi leggeri (Jeep/Truck/Half-Track)
+	# le loro tabelle danno (col gate di penetrazione per il Half-Track).
 	if AFV_ARMOR.has(vehicle.vehicle_type):
 		return {"hit": true, "result": _resolve_afv_hit(state, firer, vehicle, weapon, face)}
-
-	# 2b. Jeep/Halftrack/Truck: modello a bande (prossime fette del rework).
-	var pen  := roll_pen(state.rng, weapon)
-	var vd: Dictionary = VEHICLE_DATA.get(vehicle.vehicle_type, {})
-	var armor_n := int((vd.get("armor", [0,0,0]) as Array)[face])
-	var armor_g := int((vd.get("armor_g", [0,0,0]) as Array)[face])
-	const FACE_NAMES := ["frontale", "laterale", "posteriore"]
-
-	var result: String
-	if pen > armor_g:
-		result = "penetrazione"
-		vehicle.hull_damage += 1
-		state.log_event("  Penetrazione (%s)! pen %d > arm_g %d -> hull_damage %d" % [
-			FACE_NAMES[face], pen, armor_g, vehicle.hull_damage])
-		# Il colpo penetrante ferisce un membro dell'equipaggio (Rule 31.10.8).
-		_crew_casualty(state, vehicle)
-		if vehicle.hull_damage >= 2:
-			state.log_event("  %s DISTRUTTO!" % vehicle.display_name)
-			state.audio_events.append({"type": "explosion", "hex": vehicle.position})
-			# Esplosione: tutti i crew ancora a bordo muoiono (Rule 31.10.8).
-			_kill_embarked_crew(state, vehicle)
-		elif vehicle.hull_damage == 1:
-			state.log_event("  %s immobilizzato (hull_damage 1)" % vehicle.display_name)
-			# Immobilizzato: l'equipaggio superstite abbandona il mezzo.
-			bail_out(state, vehicle)
-	elif pen > armor_n:
-		result = "striscio"
-		state.log_event("  Colpo di striscio (%s): pen %d in [%d..%d] -> MC equipaggio" % [
-			FACE_NAMES[face], pen, armor_n, armor_g])
-		# Ogni crew a bordo fa un MC individuale (Rule 31.10.6/31.10.9).
-		_crew_morale_checks(state, vehicle)
-	else:
-		result = "rimbalzo"
-		state.log_event("  Rimbalzo (%s): pen %d <= armor %d" % [
-			FACE_NAMES[face], pen, armor_n])
-	return {"hit": true, "result": result}
+	return {"hit": true, "result": _resolve_soft_hit(state, firer, vehicle, weapon, face)}
 
 
 # MC individuali dei crew a bordo (colpo di striscio). Il morale del veicolo

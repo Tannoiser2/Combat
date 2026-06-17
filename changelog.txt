@@ -1,3 +1,18 @@
+v0.79 — 2026-06-17
+- Veicoli, hit-location mezzi leggeri (Rule 31.10.1/.2) - seconda fetta:
+  Jeep, Truck (GMC/Opel) e Half-Track M3 ora usano le loro tabelle danno
+  ufficiali invece del modello a 3 bande (ora rimosso del tutto: AFV e mezzi
+  leggeri sono entrambi sul modello fedele).
+  - Tabella hit-location d100 per faccia (trascritta/adattata dalle tabelle
+    Truck-Jeep e M3 Half-Track ufficiali). I 12 passeggeri NON sono modellati,
+    quindi gli esiti "hull/passeggeri" diventano nessun effetto.
+  - Esiti: equipaggio ucciso per ruolo (Driver/Co-Driver/Gunner), motore
+    (1D10: avaria->immobilizzato, incendio->immobilizzato+crew, esplode->
+    distrutto), cingoli/sospensioni->immobilizzato, scocca Jeep AP/HE->distrutta.
+  - Half-Track (armatura 2/1/1): il danno al motore richiede la penetrazione
+    (pen > armatura della faccia, Rule 31.10.2); Jeep/Truck sono soft-skin.
+  Test estesi in _test_afv (tabelle ben formate, distruzione Jeep, effetti HT).
+
 v0.78 — 2026-06-17
 - Veicoli, modello hit-location AFV fedele (Rule 31.10) - prima fetta (carri
   armati Sherman/PzIVH; Jeep/Halftrack/Truck restano sul modello a bande, fette
