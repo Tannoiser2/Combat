@@ -41,26 +41,27 @@ func _build_tiles() -> void:
 	_add("terrain", D.Terrain.FORTIFIED_BUILDING, "square", 78, 512)
 	_add("terrain", D.Terrain.TRENCH, "square", 78, 654)
 	_add("wire", 1, "square", 78, 796)
-	# Esagoni terreno (colonne interne).
-	_add("terrain", D.Terrain.ROCKS, "hex", 234, 110)
-	_add("terrain", D.Terrain.BUILDING, "hex", 234, 322)
-	_add("terrain", D.Terrain.TREES, "hex", 234, 533)
-	_add("terrain", D.Terrain.MARSH, "hex", 234, 744)
-	_add("terrain", D.Terrain.HEDGEROW, "hex", 477, 218)
-	_add("terrain", D.Terrain.WALL, "hex", 477, 430)
-	_add("terrain", D.Terrain.LONG_GRASS, "hex", 477, 641)
-	_add("terrain", D.Terrain.DEPRESSION, "hex", 678, 110)
-	_add("terrain", D.Terrain.STREAM, "hex", 678, 322)
-	_add("terrain", D.Terrain.ORCHARD, "hex", 678, 533)
-	_add("terrain", D.Terrain.LOGS, "hex", 678, 744)
-	_add("terrain", D.Terrain.FIELD, "hex", 850, 218)
-	_add("terrain", D.Terrain.FOUNTAIN, "hex", 850, 430)
-	_add("terrain", D.Terrain.BOCAGE, "hex", 850, 641)
+	# Esagoni terreno (colonne interne) — centri ricavati dal punto bianco
+	# stampato al centro di ogni tessera dell'immagine.
+	_add("terrain", D.Terrain.ROCKS, "hex", 287, 119)
+	_add("terrain", D.Terrain.BUILDING, "hex", 287, 328)
+	_add("terrain", D.Terrain.TREES, "hex", 288, 540)
+	_add("terrain", D.Terrain.MARSH, "hex", 285, 754)
+	_add("terrain", D.Terrain.HEDGEROW, "hex", 479, 223)
+	_add("terrain", D.Terrain.WALL, "hex", 478, 430)
+	_add("terrain", D.Terrain.LONG_GRASS, "hex", 479, 644)
+	_add("terrain", D.Terrain.DEPRESSION, "hex", 668, 121)
+	_add("terrain", D.Terrain.STREAM, "hex", 666, 327)
+	_add("terrain", D.Terrain.ORCHARD, "hex", 667, 540)
+	_add("terrain", D.Terrain.LOGS, "hex", 665, 754)
+	_add("terrain", D.Terrain.FIELD, "hex", 850, 222)
+	_add("terrain", D.Terrain.FOUNTAIN, "hex", 850, 435)
+	_add("terrain", D.Terrain.BOCAGE, "hex", 850, 646)
 	# Colonna elevazione (Level 0..3).
-	_add("level", 0, "hex", 1031, 110)
-	_add("level", 1, "hex", 1031, 322)
-	_add("level", 2, "hex", 1031, 533)
-	_add("level", 3, "hex", 1031, 744)
+	_add("level", 0, "hex", 1039, 118)
+	_add("level", 1, "hex", 1039, 332)
+	_add("level", 2, "hex", 1036, 542)
+	_add("level", 3, "hex", 1037, 753)
 
 
 func _add(kind: String, value: int, shape: String, px: float, py: float) -> void:
@@ -136,15 +137,17 @@ func _draw() -> void:
 
 func _draw_marker(tile: Dictionary, col: Color) -> void:
 	var c := _to_local_px(tile["c"])
-	var w := 0.18 * size.x   # mezza-larghezza tessera in px locali
 	if tile["shape"] == "square":
-		var hw := w * 0.55
+		# Tessere quadrate: semi-larghezza = ~58/1182 dell'immagine nativa.
+		var hw := 0.05 * size.x
 		var r := Rect2(c - Vector2(hw, hw), Vector2(hw, hw) * 2.0)
 		draw_rect(r, col, false, 4.0)
 	else:
+		# Esagoni: raggio = ~105/1182 dell'immagine nativa.
+		var rad := 0.09 * size.x
 		var pts := PackedVector2Array()
 		for k in 6:
 			var ang := deg_to_rad(60.0 * k)
-			pts.append(c + Vector2(cos(ang) * w, sin(ang) * w * 0.86))
+			pts.append(c + Vector2(cos(ang) * rad, sin(ang) * rad * 0.86))
 		pts.append(pts[0])
 		draw_polyline(pts, col, 4.0)

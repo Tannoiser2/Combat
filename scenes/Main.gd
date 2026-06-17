@@ -1848,7 +1848,7 @@ func _build_hud() -> void:
 	editor_panel = PanelContainer.new()
 	editor_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	editor_panel.position = Vector2(8, 50)
-	editor_panel.custom_minimum_size = Vector2(360, 0)
+	editor_panel.custom_minimum_size = Vector2(580, 0)
 	editor_panel.hide()
 	root.add_child(editor_panel)
 	var ep_box := VBoxContainer.new()
@@ -1901,7 +1901,7 @@ func _build_hud() -> void:
 	# Tavolozza grafica: immagine con sopra le tessere cliccabili (terreno,
 	# segnalini, elevazione, filo spinato). Larghezza fissa, aspetto nativo.
 	var pal := TerrainPalette.new()
-	var pal_w := 340.0
+	var pal_w := 560.0
 	pal.custom_minimum_size = Vector2(pal_w, pal_w * TerrainPalette.NATIVE.y / TerrainPalette.NATIVE.x)
 	pal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	pal.terrain_picked.connect(func(t: int):
@@ -1916,7 +1916,7 @@ func _build_hud() -> void:
 	pal_hint.text = "Terreno=ciano · Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
 	pal_hint.add_theme_font_size_override("font_size", 10)
 	pal_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pal_hint.custom_minimum_size = Vector2(pal_w, 0)
+	pal_hint.custom_minimum_size = Vector2(560.0, 0)
 	pal_hint.add_theme_color_override("font_color", Color(0.65, 0.72, 0.50))
 	ep_box.add_child(pal_hint)
 	ep_box.add_child(HSeparator.new())
