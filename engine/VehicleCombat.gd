@@ -788,14 +788,20 @@ static func at_fire(state: GameState, firer: Character, vehicle: Character, weap
 	return {"hit": true, "result": result}
 
 
-# Rule 32.3: un'arma monouso (Panzerfaust) sparata viene rimossa e il tiratore
-# va in Duck Back.
+# Dopo aver sparato un'arma Light AT: il Panzerfaust monouso (Rule 32.3) viene
+# rimosso e il tiratore va in Duck Back; il Bazooka (Rule 32.1) consuma un razzo
+# e resta scarico (va ricaricato).
 static func _consume_single_use(state: GameState, firer: Character, weapon: String, flags: Array) -> void:
 	if "single_use" in flags:
 		firer.weapon_skills.erase(weapon)
 		firer.set_order(D.Order.DUCK_BACK)
 		state.log_event("  %s ha usato il %s (monouso) -> Duck Back" % [
 			firer.display_name, weapon])
+	elif Weapons.is_loadable_at(weapon):
+		firer.at_ammo -= 1
+		firer.at_loaded = false
+		firer.at_fired_this_turn = true
+		state.log_event("  %s: razzo sparato (%d rimasti)" % [firer.display_name, firer.at_ammo])
 
 
 # MC individuali dei crew a bordo (colpo di striscio). Il morale del veicolo

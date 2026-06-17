@@ -3530,6 +3530,7 @@ func _test_rules() -> int:
 	fails += _test_smoke_cards_rng()
 	fails += _test_afv()
 	fails += _test_vehicle_ai()
+	fails += _test_bazooka()
 	return fails
 
 
@@ -3694,6 +3695,58 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Ciclo Load/Fire, munizioni e vincolo Sneak del Bazooka (Rule 32.1).
+func _test_bazooka() -> int:
+	var fails := 0
+	var st := GameState.new()
+	for y in range(0, 8):
+		st.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var op := Character.new("op", "Op", Domain.Side.FRIENDLY, "Able")
+	op.troop_quality = 6
+	op.weapon_skills = {"Bazooka M9": 5}
+	op.at_ammo = 3
+	op.position = Vector2i(0, 0)
+	var tank := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.ENEMY, "Red",
+		Vector2i(0, 4), 3)
+	tank.known = true
+	st.characters = [op, tank]
+	# Operatore solo e scarico: non puo' sparare (deve prima caricare).
+	op.at_loaded = false
+	if Fire.can_fire(st, op, tank, "Bazooka M9"):
+		print("TEST Bazooka: solo e scarico non deve poter sparare")
+		fails += 1
+	# Operatore solo e carico: puo' sparare.
+	op.at_loaded = true
+	if not Fire.can_fire(st, op, tank, "Bazooka M9"):
+		print("TEST Bazooka: solo e carico deve poter sparare")
+		fails += 1
+	# Assistente nell'hex: carica al volo anche se scarico.
+	op.at_loaded = false
+	var helper := Character.new("h", "Help", Domain.Side.FRIENDLY, "Able")
+	helper.troop_quality = 5
+	helper.position = Vector2i(0, 0)
+	st.characters = [op, helper, tank]
+	if not Fire.can_fire(st, op, tank, "Bazooka M9"):
+		print("TEST Bazooka: con assistente nell'hex deve poter sparare")
+		fails += 1
+	# Senza razzi: non spara.
+	op.at_ammo = 0
+	if Fire.can_fire(st, op, tank, "Bazooka M9"):
+		print("TEST Bazooka: senza razzi non deve sparare")
+		fails += 1
+	# Vincolo Sneak (32.1): carico + Sprint -> si scarica e perde un razzo.
+	op.at_ammo = 2
+	op.at_loaded = true
+	op.set_order(Domain.Order.SPRINT)
+	op.position = Vector2i(0, 0)
+	TurnSequence._do_move(st, op, 1)
+	if op.at_loaded or op.at_ammo != 1:
+		print("TEST Bazooka: movimento veloce non scarica/perde razzo (loaded=%s ammo=%d)" % [
+			op.at_loaded, op.at_ammo])
 		fails += 1
 	return fails
 
@@ -5072,6 +5125,7 @@ func _test_vehicles() -> int:
 	var bazooka_man := Character.new("bz", "Bazooka", Domain.Side.FRIENDLY, "Able")
 	bazooka_man.troop_quality = 5
 	bazooka_man.weapon_skills = {"Bazooka M9": 5}
+	bazooka_man.at_ammo = 3   # Rule 32.1: razzi disponibili
 	bazooka_man.position = Vector2i(5, 5)
 	var rifleman := Character.new("rf", "Rifle", Domain.Side.FRIENDLY, "Able")
 	rifleman.troop_quality = 6

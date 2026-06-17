@@ -1221,6 +1221,13 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 	# Rule 31.10: un veicolo immobilizzato (cingoli/sospensioni) non si muove piu'.
 	if c.is_vehicle and c.immobilized:
 		return
+	# Rule 32.1: un Bazooka carico puo' muovere solo in Sneak; con un movimento
+	# piu' veloce si scarica e il razzo gia' caricato va perso.
+	if c.at_loaded and c.has_order and c.order != Domain.Order.SNEAK:
+		c.at_loaded = false
+		if c.at_ammo > 0:
+			c.at_ammo -= 1
+		state.log_event("%s: il Bazooka si scarica nel movimento (razzo perso)" % c.display_name)
 	var from := c.position
 	var n := Move.move_character(state, c, hexes)
 	if n > 0:
@@ -1405,6 +1412,12 @@ static func end_phase(state: GameState) -> void:
 	# veicoli: i crew sono fuori da state.characters).
 	for c in state.characters:
 		c.clear_order()
+		# Bazooka (Rule 32.1): un operatore che NON ha sparato ricarica nel turno
+		# "vuoto" (cosi' l'operatore solo spara a turni alterni; con un assistente
+		# la ricarica e' al volo, gestita in can_fire). Reset del flag di fuoco.
+		if c.at_ammo > 0 and not c.at_fired_this_turn and not c.at_loaded:
+			c.at_loaded = true
+		c.at_fired_this_turn = false
 		if c.is_vehicle:
 			c.emergency_stop = false
 			c.direct_firing = false

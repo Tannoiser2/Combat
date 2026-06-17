@@ -1,3 +1,17 @@
+v0.83 — 2026-06-17
+- Bazooka, ciclo Load/Fire + munizioni + vincolo Sneak (Rule 32.1) - sesta fetta
+  veicoli: l'operatore del Bazooka parte con 3 razzi e l'arma scarica.
+  - Con un assistente nello stesso hex carica e spara nello stesso turno; da
+    solo spara a turni alterni (carica nel turno "vuoto").
+  - can_fire blocca il Bazooka senza razzi o scarico (senza assistente).
+  - Ogni colpo consuma un razzo (massimo 3).
+  - Un Bazooka carico puo' muoversi solo in Sneak: con un movimento piu' veloce
+    si scarica e il razzo gia' caricato va perso.
+  Stati nuovi su Character: at_ammo / at_loaded / at_fired_this_turn; razzi
+  assegnati in Scenario._make. Test _test_bazooka. RESTANO (minori): fuoco su
+  bersagli "soft" col Bazooka (32.2) e piazzamento dinamico del Panzerfaust col
+  Livello (32.3); il Panzerfaust funziona gia' come monouso per gli AT Grenadier.
+
 v0.82 — 2026-06-17
 - Veicoli, to-hit del cannone principale sulla TQ del Gunner (Rule 31.9.4) -
   quinta fetta: il fuoco del cannone (AP vs veicolo in at_fire, HE vs fanteria
