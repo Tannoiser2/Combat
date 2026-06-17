@@ -1,3 +1,18 @@
+v0.86 — 2026-06-17
+- UI ordini: filtri context-aware in TurnSequence.legal_orders per ridurre il
+  pannello ordini ai soli ordini sensati in quel momento:
+  - Duck Back: rimosso dalla lista del giocatore (e' un ordine di sistema
+    assegnato automaticamente quando si entra in copertura sotto fuoco).
+  - Melee: nascosto quando non c'e' un avversario nel proprio hex (il forza-
+    Melee gia' esistente all'inizio di legal_orders copre il caso contrario).
+  - Rifle Grenade: disponibile solo se il personaggio ha il "M7 Grenade
+    Launcher" nell'equipaggiamento.
+  - Guard: disponibile solo se c'e' un prigioniero (is_prisoner) nel proprio
+    hex o in uno adiacente.
+  - Carry/Drag: disponibile solo se c'e' un alleato incapacitato adiacente
+    (stesso hex o adiacente).
+  Test: _test_order_filters in Main.gd.
+
 v0.85 — 2026-06-17
 - UI ordini: gli ordini di fuoco mirato (Aimed/Rapid/Suppressive Fire) non
   compaiono piu' nel menu per chi e' disarmato (nessun'arma da fuoco) o a corto

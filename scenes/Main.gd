@@ -3559,6 +3559,7 @@ func _test_rules() -> int:
 	fails += _test_afv()
 	fails += _test_vehicle_ai()
 	fails += _test_bazooka()
+	fails += _test_order_filters()
 	return fails
 
 
@@ -3841,6 +3842,69 @@ func _test_bazooka() -> int:
 	# Preferenza arma AT: l'AI con Panzerfaust + fucile spara al veicolo.
 	if TurnSequence._infantry_at_weapon(ss) != "Panzerfaust 60":
 		print("TEST 32.3: _infantry_at_weapon non trova il Panzerfaust")
+		fails += 1
+	return fails
+
+
+# Filtro ordini legal_orders: Duck Back, Melee, Rifle Grenade, Guard, Carry/Drag.
+func _test_order_filters() -> int:
+	var fails := 0
+	var st := GameState.new()
+	for y in range(0, 5):
+		st.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var sol := Character.new("s1", "Sol", Domain.Side.FRIENDLY, "Able")
+	sol.troop_quality = 6
+	sol.weapon_skills = {"M1 Garand": 5}
+	sol.position = Vector2i(0, 0)
+	st.characters = [sol]
+	var orders := TurnSequence.legal_orders(st, sol)
+	# Duck Back mai nella lista del giocatore.
+	if Domain.Order.DUCK_BACK in orders:
+		print("TEST filtri ordini: Duck Back non deve apparire per il giocatore")
+		fails += 1
+	# Melee non disponibile senza nemici nello stesso hex.
+	if Domain.Order.MELEE in orders:
+		print("TEST filtri ordini: Melee non deve apparire senza nemici nell'hex")
+		fails += 1
+	# Rifle Grenade senza lanciagranate.
+	if Domain.Order.RIFLE_GRENADE in orders:
+		print("TEST filtri ordini: Rifle Grenade non deve apparire senza M7 Grenade Launcher")
+		fails += 1
+	# Guard senza prigionieri vicini.
+	if Domain.Order.GUARD in orders:
+		print("TEST filtri ordini: Guard non deve apparire senza prigionieri vicini")
+		fails += 1
+	# Carry/Drag senza alleati incapacitati vicini.
+	if Domain.Order.CARRY_DRAG in orders:
+		print("TEST filtri ordini: Carry/Drag non deve apparire senza alleati incapacitati vicini")
+		fails += 1
+	# Con lanciagranate -> Rifle Grenade compare.
+	sol.weapon_skills = {"M1 Garand": 5, "M7 Grenade Launcher": 4}
+	orders = TurnSequence.legal_orders(st, sol)
+	if Domain.Order.RIFLE_GRENADE not in orders:
+		print("TEST filtri ordini: Rifle Grenade deve apparire con M7 Grenade Launcher")
+		fails += 1
+	# Con prigioniero adiacente -> Guard compare.
+	sol.weapon_skills = {"M1 Garand": 5}
+	var prisoner := Character.new("p1", "Pri", Domain.Side.ENEMY, "Red")
+	prisoner.troop_quality = 5
+	prisoner.position = Vector2i(0, 1)
+	prisoner.is_prisoner = true
+	st.characters = [sol, prisoner]
+	orders = TurnSequence.legal_orders(st, sol)
+	if Domain.Order.GUARD not in orders:
+		print("TEST filtri ordini: Guard deve apparire con prigioniero adiacente")
+		fails += 1
+	# Con alleato incapacitato adiacente -> Carry/Drag compare.
+	var incap := Character.new("w1", "Wnd", Domain.Side.FRIENDLY, "Able")
+	incap.troop_quality = 5
+	incap.position = Vector2i(0, 1)
+	incap.wounds = [Domain.Wound.LIGHT, Domain.Wound.LIGHT, Domain.Wound.LIGHT,
+		Domain.Wound.LIGHT, Domain.Wound.LIGHT]  # wound_total >= TQ
+	st.characters = [sol, incap]
+	orders = TurnSequence.legal_orders(st, sol)
+	if Domain.Order.CARRY_DRAG not in orders:
+		print("TEST filtri ordini: Carry/Drag deve apparire con alleato incapacitato adiacente")
 		fails += 1
 	return fails
 

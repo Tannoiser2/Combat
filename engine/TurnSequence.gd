@@ -1177,6 +1177,39 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 		# scarico. Granate, carica e mischia non richiedono l'arma da fuoco.
 		if o in FIREARM_FIRE_ORDERS and (c.weapon_skills.is_empty() or c.no_ammo):
 			continue
+		# Duck Back (Rule 9.4): ordine assegnato dal sistema (ingresso in hex
+		# coperto mentre si e' Spotted), non una scelta del giocatore.
+		if o == Domain.Order.DUCK_BACK:
+			continue
+		# Melee (Rule 15): il blocco all'inizio della funzione ha gia' restituito
+		# [MELEE] se c'e' un nemico nel nostro hex; se siamo qui non ce n'e' alcuno.
+		if o == Domain.Order.MELEE:
+			continue
+		# Rifle Grenade (Rule 14.2): richiede il lanciagranate montato sul fucile.
+		if o == Domain.Order.RIFLE_GRENADE \
+				and not c.weapon_skills.has("M7 Grenade Launcher"):
+			continue
+		# Guard (Rule 15.5): solo con un prigioniero (is_prisoner) vicino.
+		if o == Domain.Order.GUARD:
+			var _has_prisoner := false
+			for _rival in state.characters:
+				if _rival.is_prisoner and not _rival.is_dead() \
+						and Spotting.hex_distance(c.position, _rival.position) <= 1:
+					_has_prisoner = true
+					break
+			if not _has_prisoner:
+				continue
+		# Carry/Drag (Rule 13.3): solo se c'e' un alleato incapacitato vicino.
+		if o == Domain.Order.CARRY_DRAG:
+			var _has_target := false
+			for _ally in state.characters:
+				if _ally.side == c.side and _ally != c \
+						and _ally.is_incapacitated() \
+						and Spotting.hex_distance(c.position, _ally.position) <= 1:
+					_has_target = true
+					break
+			if not _has_target:
+				continue
 		# Filo spinato (Rule 27.7): per muoversi fuori si usa solo Sneak.
 		if o in WIRE_MOVEMENT and state.has_wire(c.position) \
 				and not Move.wire_hide_exempt(state, c):
