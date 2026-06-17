@@ -863,11 +863,14 @@ func _input(event: InputEvent) -> void:
 		# NON marcare come handled: il rilascio del tocco deve generare il clic sulla mappa
 		# tramite l'emulazione MouseButton che Godot inietta per i Control.
 	elif event is InputEventScreenDrag:
-		var other_idx: int = 0 if event.index == 1 else 1
-		if other_idx in _touch_points:
-			# Pinch-zoom: confronta distanza vecchia vs nuova tra le due dita.
+		if _touch_points.size() >= 2:
+			# Pinch-zoom: prende qualunque altra dita nel dict (indipendente dall'indice).
+			var other_pos := Vector2.ZERO
+			for k: int in _touch_points:
+				if k != event.index:
+					other_pos = _touch_points[k]
+					break
 			var old_pos: Vector2 = event.position - event.relative
-			var other_pos: Vector2 = _touch_points[other_idx]
 			var old_dist: float = old_pos.distance_to(other_pos)
 			var new_dist: float = event.position.distance_to(other_pos)
 			if old_dist > 1.0:
