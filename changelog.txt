@@ -1,3 +1,22 @@
+v0.80 — 2026-06-17
+- Veicoli, Vehicle Order Matrix (Rule 31.11) - terza fetta: l'AI dei veicoli
+  nemici e' ora un adattamento fedele della matrice ufficiale. Un tiro d100 +
+  il modificatore di morale del mezzo (Shaken -50, Cautious -30, Normal 0,
+  Bold +20, Aggressive +30; Rout = Bail Out) sceglie gli ordini:
+  - Rout -> l'equipaggio abbandona il mezzo (Bail Out), lo scafo Duck Back.
+  - Morale molto basso -> Panic (Duck Back) o Rally.
+  - Driver: velocita' d'avvicinamento per morale (Cautious -> Sneak, Normal ->
+    Run&Gun, Bold/Aggressive -> Sprint); con bersaglio in buona gittata si ferma
+    e spara (Spot & Halt).
+  - Gunner: la matrice sceglie Aimed/Rapid (ravvicinato)/Suppressive (vs
+    fanteria) per il fuoco del cannone.
+  - Commander Direct Fire (31.9.4): col Commander vivo e morale >= Normal, +1 WS
+    a tutto il fuoco del veicolo (Character.direct_firing, azzerato a fine turno).
+  Le 5 velocita' della matrice (Crawl/Ahead Slow/Forward/Fast/Reverse) sono
+  mappate sugli ordini del motore. Test _test_vehicle_ai. NOTA: gli scenari AFV
+  restano duri per l'AI AMICA del balance test (debole con AT/manovra): l'AI
+  NEMICA dei mezzi e' ora fedele, l'auto-play amico e' un lavoro separato.
+
 v0.79 — 2026-06-17
 - Veicoli, hit-location mezzi leggeri (Rule 31.10.1/.2) - seconda fetta:
   Jeep, Truck (GMC/Opel) e Half-Track M3 ora usano le loro tabelle danno

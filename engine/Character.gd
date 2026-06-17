@@ -107,6 +107,9 @@ var fires_coax: bool = false
 # Rule 31.6: Emergency Stop — il Driver ha smesso di avanzare per una minaccia AT.
 # -2 WS a tutto il fuoco del veicolo; +1 WS per chi spara contro il veicolo.
 var emergency_stop: bool = false
+# Rule 31.9.4: il Commander dirige il fuoco (Direct Firing Order) -> +1 WS a
+# tutto il fuoco del veicolo questo turno. Azzerato a fine turno.
+var direct_firing: bool = false
 # Equipaggio (Rule 31). I crew sono Character veri con un ruolo: nel modello
 # intermedio sono feribili/uccidibili individualmente e possono abbandonare
 # il mezzo (bail out). Tenerli come Character (non semplici contatori) rende
