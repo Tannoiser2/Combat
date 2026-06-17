@@ -12,14 +12,17 @@ extends RefCounted
 # Step 1 - Friendly Card Phase (Rule 5.0), in due meta' cosi' la UI puo'
 # mostrare la mano e far scegliere il giocatore tra prepare e play.
 
-# SOP 1a-1c: pesca fino al limite di mano, scarta l'eccesso.
+# SOP 1a-1c (Rule 5.0). NB: non si rabbocca la mano ogni turno; si pesca UNA
+# sola carta e solo a mano vuota. Le carte extra arrivano dal Plan (Rule 7.12).
 static func friendly_card_phase_prepare(state: GameState) -> void:
-	# SOP 1a: riporta la mano a hand_limit (5) pescando nuove carte.
-	while state.friendly_hand.size() < state.hand_limit:
+	# SOP 1a: se non hai carte in mano, ne peschi UNA (unico modo oltre al Plan).
+	if state.friendly_hand.is_empty():
 		state.friendly_hand.append(state.draw_friendly_card())
-	# TODO SOP 1b: aggiungere le carte messe da parte da un Plan riuscito.
-	# SOP 1c: se la mano supera il limite (es. da Plan), scarta le piu' vecchie.
-	while state.friendly_hand.size() > state.hand_limit:
+	# SOP 1b: aggiungi le carte messe da parte da un Plan riuscito il turno prima.
+	while not state.friendly_pending_cards.is_empty():
+		state.friendly_hand.append(state.friendly_pending_cards.pop_front())
+	# SOP 1c: la mano massima e' 5 carte; scarta l'eccesso (le piu' vecchie).
+	while state.friendly_hand.size() > GameState.HAND_LIMIT:
 		state.friendly_discard.append(state.friendly_hand.pop_front())
 
 
@@ -752,9 +755,10 @@ static func activate_passive(state: GameState, c: Character) -> void:
 					state.log_event("%s piazza una carica C4 in %02d.%02d" % [
 						c.display_name, c.position.x, c.position.y])
 				else:
-					# Plan (approssimato): genera una carta da parte (Rule 5/7).
-					state.friendly_hand.append(state.draw_friendly_card())
-					state.log_event("%s pianifica: una carta extra in mano" % c.display_name)
+					# Plan (Rule 7.12): mette da parte una carta che entra in mano
+					# nel SOP Step 1b del PROSSIMO turno (non subito).
+					state.friendly_pending_cards.append(state.draw_friendly_card())
+					state.log_event("%s pianifica: una carta extra il prossimo turno" % c.display_name)
 	# SOP 4a-ii: spotting a ogni attivazione (le posizioni cambiano col
 	# movimento, quindi LOS e gittata vanno ricontrollate ogni impulse).
 	_spotting_checks(state, c)
@@ -788,6 +792,10 @@ static func resolve_action(state: GameState, c: Character) -> void:
 				# Lanciagranate M7: gittata lunga ma non sotto i 5 hex.
 				if not c.thrown:
 					_try_throw(state, c, 12, 5)
+			elif c.order == Domain.Order.RUN_AND_GUN and valid_fire_targets(state, c).is_empty():
+				# Rule 10.04: in Run & Gun, se sull'impulso di fuoco non c'e' un
+				# bersaglio, il personaggio avanza di 1 hex invece di sparare.
+				_do_move(state, c, 1)
 			else:
 				_try_fire(state, c)
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
@@ -1147,6 +1155,10 @@ static func discretionary_action(c: Character, impulse: int, state: GameState = 
 			if c.order in GRENADE_ORDERS:
 				return {"kind": Act.NONE, "hexes": 0} if c.thrown \
 					else {"kind": Act.THROW, "hexes": 0}
+			# Rule 10.04: Run & Gun senza bersaglio sull'impulso di fuoco -> muove.
+			if c.order == Domain.Order.RUN_AND_GUN and state != null \
+					and valid_fire_targets(state, c).is_empty():
+				return {"kind": Act.MOVE, "hexes": 1}
 			return {"kind": Act.FIRE, "hexes": 0}
 		Domain.ImpulseAction.MAY_MOVE_1, Domain.ImpulseAction.MUST_MOVE_1:
 			return {"kind": Act.MOVE, "hexes": 1}

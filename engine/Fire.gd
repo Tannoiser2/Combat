@@ -100,7 +100,19 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 		if not ("at" in flags or "main_gun" in flags):
 			if not VehicleCombat.crew_exposed(target):
 				return false
+	# Rule 29.5: troppo fumo lungo la linea acceca del tutto (LOS bloccata).
+	if smoke_blocks_los(state, firer, firer.position, target.position):
+		return false
 	return LOS.clear(state, firer, target)
+
+
+# Rule 29.5: il fumo (e gli incendi) bloccano DEL TUTTO la LOS quando il
+# modificatore cumulativo lungo la linea raggiunge, in modulo, il doppio della
+# TQ dell'osservatore. Esempio del manuale: due fumi pieni (-8) accecano chi ha
+# TQ 4 o meno. Sotto questa soglia resta solo il malus -4/-2 al WS/spotting.
+static func smoke_blocks_los(state: GameState, observer: Character, a: Vector2i, b: Vector2i) -> bool:
+	var penalty := -_smoke_modifier(state, a, b)  # come valore positivo
+	return penalty > 0 and penalty >= 2 * Checks.effective_tq(observer)
 
 
 # Il personaggio e' dentro l'abbazia (suo hex con collare rosso o rosso+giallo)?
