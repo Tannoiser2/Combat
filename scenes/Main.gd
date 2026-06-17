@@ -1913,7 +1913,7 @@ func _build_hud() -> void:
 		editor_wire = m)
 	ep_box.add_child(pal)
 	var pal_hint := Label.new()
-	pal_hint.text = "Terreno=ciano · Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
+	pal_hint.text = "Clicca una tessera (ciano=posa). Riclicca la stessa per la gomma (rosso=cancella, torna Open), terza per deselezionare. Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
 	pal_hint.add_theme_font_size_override("font_size", 10)
 	pal_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pal_hint.custom_minimum_size = Vector2(560.0, 0)
