@@ -3527,6 +3527,7 @@ func _test_rules() -> int:
 	fails += _test_waiting()
 	fails += _test_charge_gate()
 	fails += _test_reload_duckback()
+	fails += _test_smoke_cards_rng()
 	return fails
 
 
@@ -3691,6 +3692,85 @@ func _test_melee_passive() -> int:
 		fails += 1
 	if Domain.terrain_gives_cover(Domain.Terrain.OPEN_LEVEL_0):
 		print("TEST cover: Open Level 0 non dovrebbe dare copertura")
+		fails += 1
+	return fails
+
+
+# Fumo che blocca la LOS (29.5), Run & Gun "se non spari muovi" (10.04) ed
+# economia delle carte (5.0).
+func _test_smoke_cards_rng() -> int:
+	var fails := 0
+	# --- 29.5: due fumi pieni (-8) accecano chi ha TQ <= 4, non chi ha TQ >= 5.
+	var st := GameState.new()
+	for y in range(0, 6):
+		st.map[GameState.hex_key(0, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st.area_markers = [
+		{"type": Area.Type.SMOKE, "hex": Vector2i(0, 2), "placed_turn": 1, "turns_left": 2},
+		{"type": Area.Type.SMOKE, "hex": Vector2i(0, 3), "placed_turn": 1, "turns_left": 2},
+	]
+	var firer := Character.new("f", "F", Domain.Side.FRIENDLY, "Able")
+	firer.weapon_skills = {"M1 Garand": 6}
+	firer.position = Vector2i(0, 0)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 4)
+	tgt.known = true
+	st.characters = [firer, tgt]
+	firer.troop_quality = 4
+	if Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST 29.5: con -8 di fumo e TQ 4 il fuoco non dovrebbe passare")
+		fails += 1
+	firer.troop_quality = 6
+	if not Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST 29.5: con TQ 6 il fumo (-8) non deve bloccare del tutto")
+		fails += 1
+	# Senza fumo: nessun blocco.
+	st.area_markers = []
+	firer.troop_quality = 4
+	if not Fire.can_fire(st, firer, tgt, "M1 Garand"):
+		print("TEST 29.5: senza fumo il fuoco deve passare")
+		fails += 1
+	# --- 10.04: Run & Gun senza bersaglio -> azione di movimento.
+	var st2 := GameState.new()
+	var rg := Character.new("rg", "RG", Domain.Side.ENEMY, "Red")
+	rg.troop_quality = 5
+	rg.weapon_skills = {"KAR 98K": 5}
+	rg.position = Vector2i(5, 5)
+	rg.set_order(Domain.Order.RUN_AND_GUN)
+	st2.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.characters = [rg]  # nessun friendly: niente bersagli
+	var act := TurnSequence.discretionary_action(rg, 2, st2)
+	if act["kind"] != TurnSequence.Act.MOVE:
+		print("TEST 10.04: R&G senza bersaglio deve muovere (got %d)" % act["kind"])
+		fails += 1
+	# --- 5.0: si pesca UNA carta solo a mano vuota, niente refill a 5.
+	var st3 := GameState.new()
+	st3.friendly_deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+	st3.hand_limit = 3
+	st3.friendly_hand = []
+	TurnSequence.friendly_card_phase_prepare(st3)
+	if st3.friendly_hand.size() != 1:
+		print("TEST 5.0: a mano vuota si pesca 1 carta (got %d)" % st3.friendly_hand.size())
+		fails += 1
+	# Mano gia' con 2 carte: non si rabbocca.
+	st3.friendly_hand = [1, 2]
+	TurnSequence.friendly_card_phase_prepare(st3)
+	if st3.friendly_hand.size() != 2:
+		print("TEST 5.0: con carte in mano non si rabbocca (got %d)" % st3.friendly_hand.size())
+		fails += 1
+	# Carte messe da parte dal Plan (Step 1b) entrano in mano.
+	st3.friendly_hand = [1]
+	st3.friendly_pending_cards = [9]
+	TurnSequence.friendly_card_phase_prepare(st3)
+	if not (9 in st3.friendly_hand) or not st3.friendly_pending_cards.is_empty():
+		print("TEST 5.0/1b: le carte del Plan non entrano in mano")
+		fails += 1
+	# Cap a 5: l'eccesso viene scartato.
+	st3.friendly_hand = [1, 2, 3, 4, 5, 6, 7]
+	st3.friendly_pending_cards = []
+	TurnSequence.friendly_card_phase_prepare(st3)
+	if st3.friendly_hand.size() != 5:
+		print("TEST 5.0/1c: la mano non e' limitata a 5 (got %d)" % st3.friendly_hand.size())
 		fails += 1
 	return fails
 

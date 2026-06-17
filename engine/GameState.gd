@@ -86,6 +86,9 @@ var hand_limit: int = HAND_LIMIT
 var friendly_deck: Array[int] = []
 var friendly_discard: Array[int] = []
 var friendly_hand: Array[int] = []
+# Carte messe da parte da un Plan riuscito: entrano in mano nel SOP Step 1b
+# del turno SUCCESSIVO (Rule 5.0 / 7.12).
+var friendly_pending_cards: Array[int] = []
 var friendly_card_played: int = -1
 
 # Scenario in corso e riserva nemica (Coppa non ancora schierata, per i

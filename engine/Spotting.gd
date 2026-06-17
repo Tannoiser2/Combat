@@ -118,6 +118,9 @@ static func target_modifier(state: GameState, target: Character, spotter: Charac
 static func attempt(state: GameState, spotter: Character, target: Character) -> Dictionary:
 	if not LOS.clear(state, spotter, target):
 		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
+	# Rule 29.5: troppo fumo lungo la linea acceca del tutto (niente spotting).
+	if Fire.smoke_blocks_los(state, spotter, spotter.position, target.position):
+		return {"roll": -1, "threshold": -1, "dist": -1, "success": false, "blocked": true}
 	var dist := hex_distance(spotter.position, target.position)
 	# Eagle Eyes (Rule 24): +1 alla TQ effettiva per lo spotting, max 8.
 	var tq := Checks.effective_tq(spotter)

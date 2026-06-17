@@ -1,3 +1,22 @@
+v0.76 — 2026-06-17
+- Economia delle carte fedele al regolamento (Rule 5.0): NON si rabbocca più la
+  mano a 5 ogni turno. Si pesca UNA sola carta e solo a mano vuota (SOP 1a);
+  le carte extra arrivano solo dal Plan. Il Plan (7.12) ora mette la carta DA
+  PARTE per il turno successivo (SOP 1b, GameState.friendly_pending_cards)
+  invece di darla subito. Mano massima 5 (SOP 1c). Il gioco diventa più duro e
+  costringe a gestire le carte. La "Starting Hand Size" di scenario resta il
+  numero di carte iniziali.
+- Run & Gun "se non spari, muovi" (Rule 10.04): sull'impulso di fuoco senza
+  bersaglio il personaggio avanza di 1 hex invece di sprecare l'impulso (AI in
+  resolve_action e prompt interattivo in discretionary_action).
+- Fumo che blocca la LOS (Rule 29.5): quando il modificatore cumulativo del
+  fumo lungo la linea raggiunge in modulo il doppio della TQ dell'osservatore,
+  la LOS è bloccata del tutto (niente fuoco né spotting), non solo penalizzata.
+  Esempio del manuale: due fumi pieni (-8) accecano chi ha TQ 4 o meno. Sotto
+  soglia resta il malus -4/-2. Helper Fire.smoke_blocks_los, usato in can_fire
+  e Spotting.attempt (dipende dalla TQ di chi guarda, resta fuori dalla LOS
+  geometrica). Test 5.0/10.04/29.5.
+
 v0.75 — 2026-06-17
 - Reload automatico nemici (Rule 10.10): un nemico con marker No Ammo a cui
   toccherebbe un ordine di fuoco (Aimed/Rapid/Suppressive/Run&Gun) riceve
