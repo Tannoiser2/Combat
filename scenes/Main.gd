@@ -3749,6 +3749,27 @@ func _test_vehicle_ai() -> int:
 	if still_aboard:
 		print("TEST AI: Rout non fa il Bail Out dell'equipaggio")
 		fails += 1
+	# Rule 32.3: Panzerfaust monouso -> rimosso dopo il fuoco + tiratore Duck Back.
+	var st3 := GameState.new()
+	st3.rng.seed = 1
+	for dx in range(-1, 2):
+		for dy in range(-1, 3):
+			st3.map[GameState.hex_key(5 + dx, 5 + dy)] = \
+				GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var gren := Character.new("gr", "Gren", Domain.Side.ENEMY, "Red")
+	gren.troop_quality = 6
+	gren.weapon_skills = {"Panzerfaust 60": 5}
+	gren.position = Vector2i(5, 5)
+	var shm := VC.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able",
+		Vector2i(5, 6), 3)
+	st3.characters = [gren, shm]
+	VC.at_fire(st3, gren, shm, "Panzerfaust 60")
+	if gren.weapon_skills.has("Panzerfaust 60"):
+		print("TEST 32.3: il Panzerfaust monouso non viene rimosso dopo il fuoco")
+		fails += 1
+	if not gren.has_order or gren.order != Domain.Order.DUCK_BACK:
+		print("TEST 32.3: dopo il Panzerfaust il tiratore non va in Duck Back")
+		fails += 1
 	return fails
 
 

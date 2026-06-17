@@ -1,3 +1,15 @@
+v0.81 — 2026-06-17
+- Light Anti-Tank (Rule 32) - quarta fetta veicoli: il fuoco delle armi AT di
+  fanteria (Bazooka M9, Panzerfaust 60/100) usa ora la TQ dell'Operatore
+  (non un WS), modificata da gittata, morale, ferite e ambiente (notte/meteo/
+  fumo), come da Rule 32.1/32.3. Il cannone principale e l'AT pesante restano
+  sul WS dell'arma.
+  - Panzerfaust monouso (32.3): dopo aver sparato l'arma viene rimossa e il
+    tiratore va in Duck Back.
+  Test _test_vehicle_ai (Panzerfaust one-shot). DA FARE nelle prossime fette:
+  ciclo Load/Fire e munizioni del Bazooka, vincolo Sneak da carico, fuoco su
+  bersagli "soft" (32.2), piazzamento dinamico del Panzerfaust col Livello (32.3).
+
 v0.80 — 2026-06-17
 - Veicoli, Vehicle Order Matrix (Rule 31.11) - terza fetta: l'AI dei veicoli
   nemici e' ora un adattamento fedele della matrice ufficiale. Un tiro d100 +
