@@ -194,14 +194,21 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	_alert_from_shot(state, firer)
 
 
-# Rule 9.7: il suono del fuoco sveglia i nemici non-allertati nel raggio di 8 hex.
-static func _alert_from_shot(state: GameState, shooter: Character) -> void:
+# Rule 9.8: porta in Allerta i nemici in Attesa entro `radius` hex da `center`.
+# Usata da tutte le condizioni di attivazione (colpo, ferita, esplosione,
+# mischia, fine turno). I veicoli non hanno stato di Attesa.
+static func alert_waiting_near(state: GameState, center: Vector2i, radius: int, reason: String) -> void:
 	for e in state.characters:
-		if e.side == shooter.side or e.is_dead() or e.alerted:
+		if e.side != D.Side.ENEMY or e.is_dead() or e.alerted or e.is_vehicle:
 			continue
-		if Spotting.hex_distance(e.position, shooter.position) <= 8:
+		if Spotting.hex_distance(e.position, center) <= radius:
 			e.alert()
-			state.log_event("  %s si allerta (colpo udito)" % e.display_name)
+			state.log_event("  %s si allerta (%s)" % [e.display_name, reason])
+
+
+# Rule 9.8 cond.1: un'arma sparata entro 10 hex allerta i nemici in Attesa.
+static func _alert_from_shot(state: GameState, shooter: Character) -> void:
+	alert_waiting_near(state, shooter.position, 10, "colpo udito")
 
 
 # Rule 31.10: fuoco di armi leggere contro l'equipaggio esposto di un veicolo.
@@ -479,6 +486,8 @@ static func _resolve_attack(state: GameState, firer: Character, target: Characte
 		firer.morale = D.raise_morale(firer.morale, 1, D.Morale.AGGRESSIVE)
 		_log(state, "%s si esalta: morale %s" % [
 			firer.display_name, D.MORALE_NAMES[firer.morale]])
+	# Rule 9.8 cond.3: un compagno colpito entro 3 hex allerta i nemici in Attesa.
+	alert_waiting_near(state, target.position, 3, "compagno colpito vicino")
 	return {"hit": true, "nine": false}
 
 

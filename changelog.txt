@@ -1,3 +1,24 @@
+v0.73 — 2026-06-17
+- Attesa/Preparato resi fedeli allo Scenario Book e alle regole 9.7-9.8
+  (lette dal regolamento ufficiale). Correzioni rispetto alla v0.72:
+  - Alert/Waiting (9.8) e Prepared/Unprepared (9.7) sono ora DUE flag di
+    scenario distinti: "enemy_alerted_start" e "enemy_prepared" (default:
+    Preparato segue l'Alert Level).
+  - Classificazione Vol.1 corretta dal booklet: intro1 = Alert+Prepared,
+    s3 = Alert+Prepared (erano in Attesa per errore), s8 = Waiting+Prepared.
+    Confermati Waiting+Unprepared: intro2/3, s1, s4, s6, s9; Alert+Prepared:
+    intro4, s2, s5, s7, s10.
+  - Non-Preparato (9.7): ora PERDE la prima attivazione (pesca l'ordine solo
+    dal turno successivo), invece del vecchio "solo Aimed Fire/Hide". È una
+    proprietà di scenario, non una conseguenza dell'allertarsi a metà partita.
+  - Raggio del colpo udito 8 -> 10 hex (cond.1, era errato).
+  - Nuove condizioni di attivazione (9.8): compagno colpito entro 3 hex
+    (cond.3), esplosione granata/artiglieria entro 5 hex (cond.5), mischia
+    entro 3 hex (cond.7), propagazione a fine turno a un nemico in Attesa con
+    un allertato entro 3 hex (cond.8). Più colpo (1) e avvistamento (2/9) già
+    presenti. Helper unico Fire.alert_waiting_near.
+  - I rinforzi restano sempre Allertati e Preparati.
+
 v0.72 — 2026-06-17
 - Stato "Attesa" e "Non-Preparato" (Rule 9.7-9.8): i nemici a piedi ora
   partono IN ATTESA (non allertati, non visibili) negli scenari d'attacco/

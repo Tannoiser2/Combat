@@ -132,6 +132,8 @@ static func enemy_order_phase(state: GameState) -> void:
 				team, serial, EnemyCards.initiative_of(serial)])
 			for c in state.characters_of_team(team):
 				if c.alerted and not c.is_dead() and not c.has_order and not c.is_prisoner:
+					if _unprepared_skips(state, c):
+						continue
 					_assign_enemy_order(state, c, serial)
 	else:
 		# Rule 9 standard: una carta per ogni personaggio nemico Alerted.
@@ -141,6 +143,8 @@ static func enemy_order_phase(state: GameState) -> void:
 			var team_init := 999
 			for c in state.characters_of_team(team):
 				if not c.alerted or c.is_dead() or c.has_order or c.is_prisoner:
+					continue
+				if _unprepared_skips(state, c):
 					continue
 				var serial := state.draw_enemy_card()
 				state.log_event("  %s pesca Enemy Card %d (init %d)" % [
@@ -543,20 +547,6 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 			state.log_event("%s (mischia obbligata con %s) -> Melee" % [
 				c.display_name, rival.display_name])
 			return
-	# Non-Preparato (Rule 9.8): un nemico che si e' allertato a meta' partita
-	# (era in Attesa) nel suo PRIMO turno da allertato puo' solo orientarsi e
-	# sparare mirato, oppure restare fermo. Niente carica/movimento aggressivo.
-	# Dal turno successivo (prepared=true) agisce normalmente.
-	if not c.prepared:
-		c.had_first_order = true
-		c.prepared = true
-		if not valid_fire_targets(state, c).is_empty():
-			_set_enemy_order(state, c, Domain.Order.AIMED_FIRE)
-			state.log_event("%s (Non-Preparato) si orienta -> Aimed Fire" % c.display_name)
-		else:
-			_set_enemy_order(state, c, Domain.Order.HIDE)
-			state.log_event("%s (Non-Preparato) resta in agguato -> Hide" % c.display_name)
-		return
 	# SR10: il PRIMO ordine (turno 1, e i rinforzi al turno 4) viene da un
 	# 1D6 di scenario, non dal lookup morale x cover.
 	if not c.had_first_order and not state.scenario_id.is_empty():
@@ -621,6 +611,37 @@ static func run_impulse(state: GameState, imp: int) -> void:
 	waiting_watch(state)
 	for c in impulse_order(state):
 		activate(state, c)
+
+
+# Rule 9.7: un nemico Non-Preparato che si e' allertato perde la PRIMA
+# attivazione (pesca l'Ordine solo dal turno successivo). Ritorna true se va
+# saltato in questa Order Phase; lo segna Preparato per il turno dopo.
+# Rule 9.8 cond.8: a fine turno l'allerta si propaga ai nemici in Attesa con un
+# compagno gia' allertato entro 3 hex. Un solo passaggio (i neo-allertati
+# pescheranno l'ordine, da Non-Preparati, il turno dopo).
+static func _alert_spread_end_turn(state: GameState) -> void:
+	var newly: Array[Character] = []
+	for w in state.characters:
+		if w.side != Domain.Side.ENEMY or w.is_dead() or w.alerted or w.is_vehicle:
+			continue
+		for a in state.characters:
+			if a.side != Domain.Side.ENEMY or a.is_dead() or not a.alerted:
+				continue
+			if Spotting.hex_distance(w.position, a.position) <= 3:
+				newly.append(w)
+				break
+	for w in newly:
+		w.alert()
+		state.log_event("%s si allerta (compagno allertato vicino, fine turno)" % w.display_name)
+
+
+static func _unprepared_skips(state: GameState, c: Character) -> bool:
+	if c.prepared:
+		return false
+	c.prepared = true
+	c.had_first_order = true
+	state.log_event("%s (Non-Preparato) perde la prima attivazione" % c.display_name)
+	return true
 
 
 # Ronda di vigilanza (Rule 9.7): i nemici in Attesa (non allertati) non sono
@@ -943,6 +964,8 @@ static func _do_melee(state: GameState, attacker: Character) -> void:
 		return
 	# Segnalino mischia: flash rosso sull'hex (visibile in MapView).
 	state.melee_events.append({"hex": attacker.position})
+	# Rule 9.8 cond.7: una mischia entro 3 hex allerta i nemici in Attesa.
+	Fire.alert_waiting_near(state, attacker.position, 3, "mischia vicina")
 	if rivals_in_hex > 1:
 		state.log_event("Mischia: %d avversari nell'hex — %s attacca %s" % [
 			rivals_in_hex, attacker.display_name, target.display_name])
@@ -1228,6 +1251,9 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 static func end_phase(state: GameState) -> void:
 	# SOP 5: le granate/munizioni d'area esplodono, il fumo degrada.
 	Area.end_phase(state)
+	# Rule 9.8 cond.8: a fine turno, un nemico in Attesa con un nemico ALLERTATO
+	# entro 3 hex passa anch'esso in Allerta (l'allerta si propaga nel gruppo).
+	_alert_spread_end_turn(state)
 	# Pioggia battente: puo' trasformare il terreno in fango (Rule 28.1).
 	Weather.maybe_make_mud(state)
 	# Obiettivi di ricognizione raggiunti in questo turno.

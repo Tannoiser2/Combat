@@ -293,6 +293,7 @@ const SCENARIOS := {
 		"map": "hedgerows",
 		"turns": 7,
 		"hand_limit": 3,
+		"enemy_alerted_start": true,
 		"compass": ["19,2", "18,1"],
 		"deploy": {"triangle": ["18,14", "18,19", "28,19"]},
 		"desc": "Normandia, giugno 1944. Una pattuglia di sei uomini avanza\ntra le siepi per scoprire posizioni e forze del nemico.",
@@ -578,6 +579,7 @@ const SCENARIOS := {
 	"s3": {
 		"name": "3. Let's Get Out of Here!",
 		"map": "farmhouse", "turns": 12, "hand_limit": 3, "event_table": "s3",
+		"enemy_alerted_start": true,
 		"deploy": {"cols": [18, 26], "rows": [0, 19]},
 		"desc": "Prigioniero catturato, Taylor ferito grave,\ne il nemico lancia l'attacco. Si torna a casa.",
 		"squad_full": true,
@@ -733,6 +735,7 @@ const SCENARIOS := {
 	"s8": {
 		"name": "8. Rescue Mission",
 		"map": "hedgerows", "turns": 12, "hand_limit": 3, "event_table": "attacking",
+		"enemy_prepared": true,
 		"compass": ["2,3", "2,2"],
 		"deploy": {"cols": [1, 3], "rows": [0, 19]},
 		"desc": "Un partigiano con documenti vitali e' nascosto in\nun casolare oltre le linee. Riportatelo a casa.",
@@ -1323,7 +1326,12 @@ static func _place_enemy(state: GameState, entry: Dictionary, hexkey: String) ->
 	var e := _make(entry, D.Side.ENEMY)
 	var p: PackedStringArray = String(hexkey).split(",")
 	e.position = Vector2i(int(p[0]), int(p[1]))
-	e.alerted = bool(SCENARIOS[state.scenario_id].get("enemy_alerted_start", false))
+	# Alert/Waiting (9.8) e Prepared/Unprepared (9.7) sono proprieta' di scenario
+	# distinte. Default: Waiting; Preparato segue l'Alert Level salvo override
+	# (es. s8 Waiting+Prepared) tramite la chiave "enemy_prepared".
+	var alerted_start := bool(SCENARIOS[state.scenario_id].get("enemy_alerted_start", false))
+	e.alerted = alerted_start
+	e.prepared = bool(SCENARIOS[state.scenario_id].get("enemy_prepared", alerted_start))
 	e.morale = int(SCENARIOS[state.scenario_id].get("enemy_morale", D.Morale.NORMAL))
 	state.characters.append(e)
 	return e

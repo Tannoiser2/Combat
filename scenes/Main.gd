@@ -3592,7 +3592,7 @@ func _test_alert() -> int:
 	nearby.alerted = false
 	var far_e := Character.new("fe", "Far", Domain.Side.ENEMY, "Red")
 	far_e.troop_quality = 4
-	far_e.position = Vector2i(0, 9)
+	far_e.position = Vector2i(0, 12)  # dist 12 dal tiratore: oltre i 10 hex (Rule 9.8)
 	far_e.alerted = false
 	st.characters = [firer, tgt, nearby, far_e]
 	Fire.fire_action(st, firer, tgt, "M1 Garand")
@@ -3600,7 +3600,7 @@ func _test_alert() -> int:
 		print("TEST allerta: nemico a 5 hex non allertato dal colpo")
 		fails += 1
 	if far_e.alerted:
-		print("TEST allerta: nemico a 9 hex allertato per errore (oltre 8 hex)")
+		print("TEST allerta: nemico a 12 hex allertato per errore (oltre 10 hex)")
 		fails += 1
 	return fails
 
@@ -3693,24 +3693,25 @@ func _test_melee_passive() -> int:
 	return fails
 
 
-# Attesa e Non-Preparato (Rule 9.7-9.8, v0.72).
+# Attesa (Alert/Waiting 9.8) e Preparato/Non-Preparato (9.7).
 func _test_waiting() -> int:
 	var fails := 0
-	# Character.alert(): allerta + Non-Preparato, idempotente.
+	var stx := GameState.new()
+	# alert() porta in Allerta SENZA toccare prepared (proprieta' di scenario).
 	var en := Character.new("e", "Wait", Domain.Side.ENEMY, "Red")
-	if en.alerted or not en.prepared:
-		print("TEST attesa: stato iniziale errato (alerted=%s prepared=%s)" % [en.alerted, en.prepared])
-		fails += 1
+	en.prepared = false  # scenario Non-Preparato
 	en.alert()
 	if not en.alerted or en.prepared:
-		print("TEST attesa: alert() non imposta Non-Preparato")
+		print("TEST attesa: alert() deve allertare senza cambiare prepared")
 		fails += 1
-	en.prepared = true  # finto "preparato dal turno dopo"
-	en.alert()          # gia' allertato: non deve ri-azzerare prepared
-	if not en.prepared:
-		print("TEST attesa: alert() ha ri-azzerato prepared su un gia' allertato")
+	var ep := Character.new("ep", "Prep", Domain.Side.ENEMY, "Red")
+	ep.prepared = true
+	ep.alert()
+	if not ep.prepared:
+		print("TEST attesa: alert() non deve azzerare prepared di un Preparato")
 		fails += 1
-	# Ronda di vigilanza: un nemico in agguato che vede un amico si allerta.
+	# Ronda di vigilanza: un nemico in agguato che vede un amico si allerta
+	# (e resta Non-Preparato se lo scenario lo prevede).
 	var st := GameState.new()
 	st.rng.seed = 1
 	for y in range(0, 6):
@@ -3719,51 +3720,53 @@ func _test_waiting() -> int:
 	watcher.troop_quality = 8
 	watcher.position = Vector2i(0, 0)
 	watcher.alerted = false
+	watcher.prepared = false
 	var intruder := Character.new("in", "Intruder", Domain.Side.FRIENDLY, "Able")
 	intruder.troop_quality = 5
 	intruder.position = Vector2i(0, 2)
 	st.characters = [watcher, intruder]
 	TurnSequence.waiting_watch(st)
 	if not watcher.alerted or watcher.prepared:
-		print("TEST attesa: la ronda non allerta (Non-Preparato) il nemico in agguato")
+		print("TEST attesa: la ronda non allerta (restando Non-Preparato) il nemico in agguato")
 		fails += 1
-	# Non-Preparato: primo ordine = Aimed Fire con bersaglio, poi diventa Preparato.
-	var st2 := GameState.new()
-	st2.rng.seed = 1
-	for y in range(8, 16):
-		st2.map[GameState.hex_key(10, y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	# Non-Preparato (9.7): perde la PRIMA attivazione, poi diventa Preparato.
 	var np := Character.new("np", "NonPrep", Domain.Side.ENEMY, "Red")
-	np.troop_quality = 6
-	np.weapon_skills = {"KAR 98K": 6}
-	np.position = Vector2i(10, 10)
 	np.alerted = true
 	np.prepared = false
-	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
-	prey.troop_quality = 5
-	prey.weapon_skills = {"M1 Garand": 5}
-	prey.position = Vector2i(10, 13)
-	prey.spotted = true
-	st2.characters = [np, prey]
-	TurnSequence._assign_enemy_order(st2, np, 1)
-	if np.order != Domain.Order.AIMED_FIRE:
-		print("TEST Non-Preparato: con bersaglio in vista non si orienta (got %d)" % np.order)
+	if not TurnSequence._unprepared_skips(stx, np):
+		print("TEST Non-Preparato: non perde la prima attivazione")
 		fails += 1
 	if not np.prepared:
-		print("TEST Non-Preparato: non diventa Preparato dopo il primo ordine")
+		print("TEST Non-Preparato: non diventa Preparato per il turno dopo")
 		fails += 1
-	# Senza bersaglio: il Non-Preparato resta in agguato (Hide).
-	var st3 := GameState.new()
-	var np2 := Character.new("np2", "NonPrep2", Domain.Side.ENEMY, "Red")
-	np2.troop_quality = 6
-	np2.weapon_skills = {"KAR 98K": 6}
-	np2.position = Vector2i(5, 5)
-	np2.alerted = true
-	np2.prepared = false
-	st3.map[GameState.hex_key(5, 5)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
-	st3.characters = [np2]
-	TurnSequence._assign_enemy_order(st3, np2, 1)
-	if np2.order != Domain.Order.HIDE:
-		print("TEST Non-Preparato: senza bersaglio non resta in agguato (got %d)" % np2.order)
+	# Un Preparato non salta mai l'attivazione.
+	var pp := Character.new("pp", "Prep2", Domain.Side.ENEMY, "Red")
+	pp.alerted = true
+	pp.prepared = true
+	if TurnSequence._unprepared_skips(stx, pp):
+		print("TEST Preparato: non deve saltare l'attivazione")
+		fails += 1
+	# Cond.8 (fine turno): l'allerta si propaga a un nemico in Attesa entro 3 hex.
+	var st2 := GameState.new()
+	var a_alert := Character.new("a", "Alert", Domain.Side.ENEMY, "Red")
+	a_alert.troop_quality = 5
+	a_alert.position = Vector2i(5, 5)
+	a_alert.alerted = true
+	var w_near := Character.new("wn", "Near", Domain.Side.ENEMY, "Red")
+	w_near.troop_quality = 5
+	w_near.position = Vector2i(5, 7)  # dist 2
+	w_near.alerted = false
+	var w_far := Character.new("wf", "Far", Domain.Side.ENEMY, "Red")
+	w_far.troop_quality = 5
+	w_far.position = Vector2i(5, 12)  # dist 7
+	w_far.alerted = false
+	st2.characters = [a_alert, w_near, w_far]
+	TurnSequence._alert_spread_end_turn(st2)
+	if not w_near.alerted:
+		print("TEST cond.8: nemico in Attesa a 2 hex non allertato a fine turno")
+		fails += 1
+	if w_far.alerted:
+		print("TEST cond.8: nemico in Attesa a 7 hex allertato per errore")
 		fails += 1
 	return fails
 
