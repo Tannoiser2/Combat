@@ -508,8 +508,12 @@ func _draw() -> void:
 				_draw_marker(wire_tex, hex_center(wc.x, wc.y), radius, 0.85)
 	# Trincee (Rule 27.4) ed edifici fortificati (Rule 27.2): terreno di
 	# scenario non disegnato sull'immagine della board -> marker dedicato.
+	# Foxhole e Rubble: come trincee/fortificati, segnalino dedicato (non
+	# esagono colorato) cosi' si leggono sopra l'immagine della board.
 	var trench_tex := _named_tex("GEN-Trench-Marker-f")
 	var fort_tex := _named_tex("GEN-Fortified-Marker-f")
+	var foxhole_tex := _named_tex("GEN-Foxhole-Marker-1-f")
+	var rubble_tex := _named_tex("GEN-Rubble-Marker-1-f")
 	for key in state.map:
 		var sh: GameState.MapHex = state.map[key]
 		var scell := _key_to_cell(key)
@@ -517,6 +521,10 @@ func _draw() -> void:
 			_draw_marker(trench_tex, hex_center(scell.x, scell.y), radius, 0.9)
 		elif sh.terrain == D.Terrain.FORTIFIED_BUILDING and fort_tex != null:
 			_draw_marker(fort_tex, hex_center(scell.x, scell.y), radius, 0.9)
+		elif sh.terrain == D.Terrain.FOXHOLE and foxhole_tex != null:
+			_draw_marker(foxhole_tex, hex_center(scell.x, scell.y), radius, 0.9)
+		elif sh.terrain == D.Terrain.RUBBLE and rubble_tex != null:
+			_draw_marker(rubble_tex, hex_center(scell.x, scell.y), radius, 0.9)
 	# Strumento LOS: linea spessa tra i due hex scelti.
 	if not los_tool.is_empty():
 		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \
@@ -872,7 +880,6 @@ func _draw_feature(center: Vector2, radius: float, terrain: int, rng: RandomNumb
 		D.Terrain.HEDGEROW: _draw_hedge(center, radius, rng, C_HEDGE, radius * 0.40)
 		D.Terrain.BOCAGE: _draw_hedge(center, radius, rng, C_BOCAGE, radius * 0.55)
 		D.Terrain.ROCKS: _draw_rocks(center, radius, rng, 5)
-		D.Terrain.RUBBLE: _draw_rocks(center, radius, rng, 7)
 		D.Terrain.BUILDING: _draw_building(center, radius, rng)
 		D.Terrain.STREAM: _draw_band(center, radius, rng, C_WATER, radius * 0.5)
 		D.Terrain.WALL: _draw_band(center, radius, rng, C_WALL, radius * 0.2)
@@ -880,7 +887,6 @@ func _draw_feature(center: Vector2, radius: float, terrain: int, rng: RandomNumb
 		D.Terrain.MARSH: _draw_marsh(center, radius, rng)
 		D.Terrain.DEPRESSION: _draw_rings(center, radius)
 		D.Terrain.CRATER: _draw_crater(center, radius)
-		D.Terrain.FOXHOLE: _draw_foxhole(center, radius)
 		D.Terrain.FIELD: _draw_furrows(center, radius, rng)
 		D.Terrain.LONG_GRASS: _draw_grass(center, radius, rng)
 
@@ -1033,8 +1039,7 @@ const OVERLAY_TINTS := {
 	D.Terrain.ORCHARD: Color(0.35, 0.75, 0.35, 0.50),       # verde medio
 	D.Terrain.LOGS: Color(0.60, 0.40, 0.15, 0.55),          # marrone
 	D.Terrain.FIELD: Color(0.95, 0.80, 0.10, 0.45),         # oro
-	D.Terrain.FOXHOLE: Color(0.40, 0.30, 0.20, 0.60),       # marrone scuro
-	D.Terrain.RUBBLE: Color(0.75, 0.70, 0.60, 0.55),        # grigio-sabbia
+	# Foxhole e Rubble: disegnati come segnalino (vedi _draw), non come tinta.
 	D.Terrain.CRATER: Color(0.45, 0.35, 0.25, 0.60),        # terra scura
 	D.Terrain.BOCAGE: Color(0.05, 0.35, 0.10, 0.55),        # verde molto scuro
 	D.Terrain.FOUNTAIN: Color(0.50, 0.85, 1.00, 0.55),      # azzurro chiaro

@@ -22,6 +22,7 @@ var _tex: Texture2D
 var _tiles: Array = []
 
 var sel_terrain: int = -1
+var sel_erase: bool = false   # 2a pressione sulla stessa tessera = gomma (OPEN)
 var sel_level: int = -1
 var sel_wire: int = -1   # -1 nessuno, 1 posa, 0 rimuovi
 
@@ -101,8 +102,20 @@ func _gui_input(event: InputEvent) -> void:
 func _apply(tile: Dictionary) -> void:
 	match tile["kind"]:
 		"terrain":
-			sel_terrain = -1 if sel_terrain == tile["value"] else tile["value"]
-			terrain_picked.emit(sel_terrain)
+			# Ciclo a 3 stati sulla stessa tessera: dipingi -> gomma (OPEN) ->
+			# niente. Cosi' ripremendo un terreno/segnalino lo si cancella
+			# (riporta l'hex a Open) e poi si deseleziona.
+			if sel_terrain == tile["value"] and not sel_erase:
+				sel_erase = true
+				terrain_picked.emit(D.Terrain.OPEN_LEVEL_0)
+			elif sel_terrain == tile["value"] and sel_erase:
+				sel_terrain = -1
+				sel_erase = false
+				terrain_picked.emit(-1)
+			else:
+				sel_terrain = tile["value"]
+				sel_erase = false
+				terrain_picked.emit(tile["value"])
 		"level":
 			sel_level = -1 if sel_level == tile["value"] else tile["value"]
 			level_picked.emit(sel_level)
@@ -121,7 +134,9 @@ func _draw() -> void:
 		match tile["kind"]:
 			"terrain":
 				if tile["value"] == sel_terrain:
-					col = Color(0.10, 0.85, 1.0)      # ciano
+					# Rosso = modalita' gomma (riporta a Open), ciano = posa.
+					col = Color(1.0, 0.30, 0.30) if sel_erase \
+						else Color(0.10, 0.85, 1.0)
 			"level":
 				if tile["value"] == sel_level:
 					col = Color(1.0, 0.85, 0.05)       # giallo
