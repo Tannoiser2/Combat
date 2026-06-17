@@ -103,6 +103,10 @@ var large_battle: bool = false  # Rule 9.2: una carta per Gruppo invece che per 
 var weather: int = Weather.Type.CLEAR
 var ground: int = Weather.Ground.NONE
 var max_los: int = 0
+# Panzerfaust (Rule 32.3): Livello = numero di Panzerfaust ancora disponibili
+# da piazzare dinamicamente sui nemici; tipo dell'arma (Panzerfaust 60/100).
+var panzerfaust_level: int = 0
+var panzerfaust_type: String = "Panzerfaust 60"
 var guns_destroyed: Array = []  # hex (chiavi) dei cannoni saltati
 var visited_objectives: Array = []  # punti di ricognizione raggiunti
 

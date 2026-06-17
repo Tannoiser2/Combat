@@ -17,6 +17,41 @@ extends RefCounted
 
 const D := preload("res://engine/Domain.gd")
 
+# Rule 32.2: terreni a copertura dura in cui il Light AT (HEAT) puo' colpire la
+# fanteria.
+const HEAT_SOFT_TERRAINS := [D.Terrain.BUILDING, D.Terrain.RUBBLE, D.Terrain.ROCKS,
+	D.Terrain.FORTIFIED_BUILDING, D.Terrain.ABBEY_EXTERIOR, D.Terrain.ABBEY_INTERIOR,
+	D.Terrain.FOUNTAIN]
+
+
+# Light AT di fanteria (Bazooka/Panzerfaust): arma "at" non da veicolo.
+static func _is_infantry_at(weapon: String) -> bool:
+	var f: Array = Weapons.info(weapon)["flags"]
+	return ("at" in f) and not ("main_gun" in f)
+
+
+# Rule 32.2: il Light AT (HEAT) spara su un hex di fanteria in copertura dura.
+# To-hit con la TQ dell'Operatore (gittata + morale); a segno, il razzo esplode
+# nell'hex e frammenta gli occupanti (come una granata col WS = TQ dell'Operatore).
+static func _fire_heat_at_hex(state: GameState, firer: Character, hex: Vector2i, weapon: String) -> void:
+	var dist := Spotting.hex_distance(firer.position, hex)
+	var rmod = Weapons.range_ws_modifier(weapon, dist)
+	var tq := Checks.effective_tq(firer) + int(rmod if rmod != null else 0) \
+		+ int(MORALE_WS_MOD.get(firer.morale, 0))
+	var roll := Checks.roll_d10(state.rng)
+	var hit := roll == 0 or (roll != 9 and roll <= tq)
+	_log(state, "%s spara %s (HEAT) su %02d.%02d (TQ %d, d10 %d): %s" % [
+		firer.display_name, weapon, hex.x, hex.y, tq, roll, "colpito" if hit else "mancato"])
+	state.shots.append({"from": firer.position, "to": hex, "hit": hit,
+		"side": firer.side, "weapon": weapon, "outcome": "Colpito!" if hit else "Mancato"})
+	Replay.shot(state, state.shots.back())
+	state.audio_events.append({"type": "shot", "weapon": weapon,
+		"outcome": "Colpito!" if hit else "Mancato", "hex": firer.position})
+	if hit:
+		Area._explode(state, {"type": Area.Type.GRENADE, "hex": hex,
+			"placed_turn": state.turn, "turns_left": 1,
+			"thrower_ws": Checks.effective_tq(firer)})
+
 # Gruppi di ordini del bersaglio per la matrice WS (nota: diversi dallo
 # Spotting Chart - Evade sta con Sneak, "no order" sta con le granate).
 const WS_GROUP := {
@@ -107,6 +142,13 @@ static func can_fire(state: GameState, firer: Character, target: Character, weap
 		if not ("at" in flags or "main_gun" in flags):
 			if not VehicleCombat.crew_exposed(target):
 				return false
+	# Rule 32.2: il Light AT (HEAT, Bazooka/Panzerfaust) puo' colpire la FANTERIA
+	# solo se nell'hex bersaglio c'e' copertura dura (Edificio/Macerie/Rocce/
+	# Abbazia/Fontana).
+	elif _is_infantry_at(weapon):
+		var thx := state.hex_at(target.position.x, target.position.y)
+		if thx == null or thx.terrain not in HEAT_SOFT_TERRAINS:
+			return false
 	# Rule 29.5: troppo fumo lungo la linea acceca del tutto (LOS bloccata).
 	if smoke_blocks_los(state, firer, firer.position, target.position):
 		return false
@@ -168,6 +210,13 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 		else:
 			# Armi leggere: colpiscono l'equipaggio esposto (Rule 31.10).
 			_fire_at_exposed_crew(state, firer, target, weapon)
+		_alert_from_shot(state, firer)
+		return
+	# Rule 32.2: Light AT (HEAT) contro fanteria in copertura dura -> il razzo
+	# esplode nell'hex (frammentazione sugli occupanti), non un colpo singolo.
+	if _is_infantry_at(weapon):
+		_fire_heat_at_hex(state, firer, target.position, weapon)
+		VehicleCombat._consume_single_use(state, firer, weapon, Weapons.info(weapon)["flags"])
 		_alert_from_shot(state, firer)
 		return
 	var dist := Spotting.hex_distance(firer.position, target.position)
