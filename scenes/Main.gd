@@ -3760,6 +3760,44 @@ func _test_afv() -> int:
 	if sh2.turret_facing != 1:
 		print("TEST AFV: torretta inceppata non deve ruotare")
 		fails += 1
+	# --- Mezzi leggeri (slice 2): tabelle ben formate e risoluzione.
+	for vt in VC.SOFT_HIT_TABLE:
+		for f in VC.SOFT_HIT_TABLE[vt]:
+			if int(VC.SOFT_HIT_TABLE[vt][f].back()[0]) != 100:
+				print("TEST soft: tabella %s faccia %d non copre 100" % [vt, f])
+				fails += 1
+	var firer2 := Character.new("f2", "F2", Domain.Side.ENEMY, "Red")
+	firer2.troop_quality = 6
+	firer2.position = Vector2i(7, 5)
+	# Jeep colpita di lato (bodywork AP/HE -> distrutta): entro pochi colpi accade.
+	var st4 := GameState.new()
+	st4.rng.seed = 3
+	var jeep_destroyed := false
+	for i in range(40):
+		var jp := VC.make_vehicle("Jeep", Domain.Side.FRIENDLY, "Able",
+			Vector2i(5, 5), 3, "")
+		VC._resolve_soft_hit(st4, firer2, jp, "Bazooka M9", VC.Face.SIDE)
+		if jp.hull_damage >= 2:
+			jeep_destroyed = true
+			break
+	if not jeep_destroyed:
+		print("TEST soft: la Jeep non viene mai distrutta di lato")
+		fails += 1
+	# Half-Track: su molti colpi qualche effetto (immobilizzo/distruzione) si vede.
+	var st5 := GameState.new()
+	st5.rng.seed = 9
+	var ht := VC.make_vehicle("M3A1 Halftrack", Domain.Side.FRIENDLY, "Able",
+		Vector2i(5, 5), 3, "")
+	var ht_effect := false
+	for i in range(60):
+		if ht.hull_damage >= 2:
+			break
+		VC._resolve_soft_hit(st5, firer2, ht, "Bazooka M9", VC.Face.SIDE)
+		if ht.immobilized or ht.hull_damage > 0:
+			ht_effect = true
+	if not ht_effect:
+		print("TEST soft: nessun effetto sul Half-Track dopo 60 colpi")
+		fails += 1
 	return fails
 
 
