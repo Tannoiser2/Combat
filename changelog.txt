@@ -1,3 +1,12 @@
+v0.65 — 2026-06-17
+- Notte come limite LOS (Rule 18.1): visibilità notturna massima 5 hex;
+  chi si trova sotto illuminazione (flare/traccianti) ignora il limite.
+  La notte era già un malus WS oltre 2 hex; ora è anche una vera barriera LOS.
+- Allerta per spotting (Rule 9.7): un nemico che viene individuato (known=true)
+  diventa subito alerted e pesca carte nella Order Phase.
+- Allerta per colpo (Rule 9.7): ogni sparo sveglia i nemici non-allertati
+  entro 8 hex dallo sparatore; messaggi di log per ogni unità allertata.
+
 v0.64 — 2026-06-17
 - Audit regolamento Vol.1+Vol.2: corretti 8 scostamenti dal regolamento.
   - Fuoco: 0-naturale premia sempre il tiratore (+1 morale), con o senza ferita

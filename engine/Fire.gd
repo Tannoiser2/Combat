@@ -190,6 +190,17 @@ static func fire_action(state: GameState, firer: Character, target: Character, w
 	Replay.shot(state, state.shots.back())
 	state.audio_events.append({"type": "shot", "weapon": weapon,
 		"outcome": outcome, "hex": firer.position})
+	_alert_from_shot(state, firer)
+
+
+# Rule 9.7: il suono del fuoco sveglia i nemici non-allertati nel raggio di 8 hex.
+static func _alert_from_shot(state: GameState, shooter: Character) -> void:
+	for e in state.characters:
+		if e.side == shooter.side or e.is_dead() or e.alerted:
+			continue
+		if Spotting.hex_distance(e.position, shooter.position) <= 8:
+			e.alerted = true
+			state.log_event("  %s si allerta (colpo udito)" % e.display_name)
 
 
 # Rule 31.10: fuoco di armi leggere contro l'equipaggio esposto di un veicolo.

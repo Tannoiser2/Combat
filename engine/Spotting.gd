@@ -142,6 +142,7 @@ static func attempt(state: GameState, spotter: Character, target: Character) -> 
 	if success:
 		if target.side == D.Side.ENEMY:
 			target.known = true
+			target.alerted = true
 		else:
 			target.spotted = true
 	return {"roll": roll, "threshold": threshold, "dist": dist, "success": success}
