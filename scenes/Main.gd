@@ -1433,15 +1433,33 @@ func _export_map_data() -> void:
 			lines.append(e + ",")
 		lines.append("],")
 	var text := "\n".join(lines)
-	var path := "/tmp/map_export_%s.txt" % map_name
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(text)
-		f.close()
-		hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [
-			path, by_terrain.size(), state.hexsides.size()]
+	var fname := "map_export_%s.txt" % map_name
+	var n_hex := by_terrain.size()
+	var n_hs := state.hexsides.size()
+	if OS.get_name() == "Web":
+		# Su web non si puo' scrivere su path arbitrari: scarica il file tramite
+		# il browser (Blob API), che apre la finestra "Salva come..." del sistema.
+		var js_content: String = JSON.stringify(text)
+		JavaScriptBridge.eval("""
+(function() {
+	var blob = new Blob([%s], {type: 'text/plain'});
+	var url = URL.createObjectURL(blob);
+	var a = document.createElement('a');
+	a.href = url; a.download = '%s';
+	document.body.appendChild(a); a.click(); document.body.removeChild(a);
+	setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+})();
+""" % [js_content, fname])
+		hint_label.text = "Download: %s (%d terreni, %d hexside)" % [fname, n_hex, n_hs]
 	else:
-		hint_label.text = "Errore scrittura %s" % path
+		var path := "/tmp/%s" % fname
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f != null:
+			f.store_string(text)
+			f.close()
+			hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [path, n_hex, n_hs]
+		else:
+			hint_label.text = "Errore scrittura %s" % path
 
 
 func _build_hud() -> void:
