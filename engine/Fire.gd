@@ -620,6 +620,7 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			target.clear_order()
 			state.audio_events.append({"type": "scream", "hex": target.position})
 			Replay.sfx(state, "scream")
+			_mg_transfer_if_operator(state, target)
 			_medic_shock(state, target)
 			return true
 		_:
@@ -631,9 +632,11 @@ static func _resolve_wound_melee(state: GameState, firer: Character, target: Cha
 			if target.is_dead():
 				_log(state, "  le ferite uccidono %s" % target.display_name)
 				target.clear_order()
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 				return true
 			if w == D.Wound.BAD:
+				_mg_transfer_if_operator(state, target)
 				_medic_shock(state, target)
 			# In mischia non si riceve Duck Back, ma MC e WMC come al solito.
 			var mc := Checks.morale_check(target, state.rng)

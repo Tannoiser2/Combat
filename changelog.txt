@@ -1,3 +1,9 @@
+v0.68 — 2026-06-17
+- MG transfer in mischia (Rule 14.3): `_mg_transfer_if_operator` ora viene
+  chiamata anche in `_resolve_wound_melee` (KIA e Bad Wound). Prima, se
+  l'operatore dell'MG cadeva in mischia, l'arma non passava al compagno
+  nell'hex — solo il fuoco normale trasferiva l'MG.
+
 v0.67 — 2026-06-17
 - Allerta da fuoco AT/veicolo: `_alert_from_shot` ora viene chiamata anche
   quando il bersaglio è un veicolo (il colpo di carro/bazooka era l'unico
