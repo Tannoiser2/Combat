@@ -1,3 +1,14 @@
+v0.71 — 2026-06-17
+- Nebbia vs Foschia (Rule 28.1): la Nebbia (1D6) non può più dare visibilità
+  pari o superiore alla Foschia (1D6+4, minimo 5 hex). Ora la nebbia è sempre
+  più densa (max 4 hex). Prima un tiro di 5-6 rendeva la nebbia più rada della
+  foschia minima — incoerente.
+- Sniper SS (Rule 24.1): il +2 in Aimed Fire ora richiede un bersaglio a 3+ hex
+  (oltre al vincolo "non all'impulso 2"). A distanza ravvicinata la skill non
+  dà più vantaggio. Il bersaglio è già sempre Spotted (filtro valid_fire_targets).
+  NOTA: il TQC di abilitazione citato nell'audit non è applicato — _compute_ws
+  è deterministica (usata anche per l'anteprima UI), un tiro lì consumerebbe RNG.
+
 v0.70 — 2026-06-17
 - Mischia (Rule 15): ordine passivo del bersaglio ora applicato. MELEE_PASSIVE
   (Hide/Rally/Reload/Medical Aid/Carry-Drag/Plan) era definita ma non usata:

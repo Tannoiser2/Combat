@@ -4281,15 +4281,20 @@ func _test_weather() -> int:
 	if th_camo - th_plain != -1:
 		print("TEST Winter Camo: -1 allo spotting errato (%d vs %d)" % [th_camo, th_plain])
 		fails += 1
-	# Limite di visibilita' tirato: fasce d10 corrette.
+	# Limite di visibilita' tirato: fasce d10 corrette. La Nebbia (v0.71) e'
+	# sempre piu' densa della Foschia: max 4 hex (mai >= il minimo Mist 5).
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99
 	for i in range(60):
 		var f := Weather.roll_max_los(Weather.Type.FOG, rng)
 		var mi := Weather.roll_max_los(Weather.Type.MIST, rng)
 		var hr := Weather.roll_max_los(Weather.Type.HEAVY_RAIN, rng)
-		if f < 1 or f > 6 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
-			print("TEST visibilita': fasce di tiro fuori range")
+		if f < 1 or f > 4 or mi < 5 or mi > 10 or hr < 2 or hr > 12:
+			print("TEST visibilita': fasce di tiro fuori range (fog=%d)" % f)
+			fails += 1
+			break
+		if f >= mi:
+			print("TEST visibilita': nebbia (%d) non piu' densa della foschia (%d)" % [f, mi])
 			fails += 1
 			break
 	if Weather.roll_max_los(Weather.Type.CLEAR, rng) != 0:
@@ -4351,6 +4356,42 @@ func _test_weather() -> int:
 	var ws_day_bldg: int = Fire._compute_ws(stn2c, fn2, tn2, "M1 Garand")["ws"]
 	if ws_day_bldg - ws_night_bldg != 0:
 		print("TEST notte edificio: -2 non esentato (giorno=%d notte=%d)" % [ws_day_bldg, ws_night_bldg])
+		fails += 1
+	# Sniper (Rule 24.1, v0.71): +2 in Aimed Fire solo a 3+ hex e non all'impulso 2.
+	var sts := GameState.new()
+	sts.impulse = 4
+	var sniper := Character.new("sn", "Sniper", Domain.Side.ENEMY, "Red")
+	sniper.troop_quality = 6
+	sniper.weapon_skills = {"KAR 98K": 6}
+	sniper.skills = [Character.SKILL_SNIPER]
+	sniper.position = Vector2i(0, 0)
+	sniper.set_order(Domain.Order.AIMED_FIRE)
+	var sv := Character.new("sv", "Vittima", Domain.Side.FRIENDLY, "Able")
+	sv.troop_quality = 5
+	sv.position = Vector2i(0, 5)  # dist 5 (>=3)
+	sts.characters = [sniper, sv]
+	var ws_far: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	sv.position = Vector2i(0, 2)  # dist 2 (<3): niente bonus
+	var ws_near: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	# A 5 hex il bonus +2 c'e'; a 2 hex no. La differenza di gittata pura
+	# (range_ws_modifier) si annulla confrontando con uno Sniper senza skill.
+	sniper.skills = []
+	var base_far: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]  # dist 2, no skill
+	sv.position = Vector2i(0, 5)
+	var base_far5: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]  # dist 5, no skill
+	# Con skill a 5 hex: base5 + 2; a 2 hex: base2 + 0.
+	if ws_far - base_far5 != 2:
+		print("TEST Sniper: +2 a 5 hex non applicato (%d vs base %d)" % [ws_far, base_far5])
+		fails += 1
+	if ws_near - base_far != 0:
+		print("TEST Sniper: bonus applicato a 2 hex (%d vs base %d)" % [ws_near, base_far])
+		fails += 1
+	# All'impulso 2 niente bonus anche a distanza.
+	sts.impulse = 2
+	sniper.skills = [Character.SKILL_SNIPER]
+	var ws_imp2: int = Fire._compute_ws(sts, sniper, sv, "KAR 98K")["ws"]
+	if ws_imp2 - base_far5 != 0:
+		print("TEST Sniper: bonus applicato all'impulso 2 (%d vs base %d)" % [ws_imp2, base_far5])
 		fails += 1
 	return fails
 
@@ -4499,7 +4540,7 @@ func _test_ss_skills() -> int:
 	sniper.set_order(Domain.Order.AIMED_FIRE)
 	var prey := Character.new("pr", "Prey", Domain.Side.FRIENDLY, "Able")
 	prey.troop_quality = 6
-	prey.position = Vector2i(10, 12)
+	prey.position = Vector2i(10, 13)  # dist 3 (>=3, v0.71: il bonus richiede 3+ hex)
 	st.impulse = 1
 	var ws_imp1 := Fire._fire_ws(st, sniper, prey)
 	st.impulse = 2

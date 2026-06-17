@@ -364,9 +364,14 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		elif target.has_skill(Character.SKILL_DODGE):
 			bits.append("-1 Dodge (Evade)")
 			ws -= 1
+	# Sniper (Rule 24.1): +2 in Aimed Fire (non all'impulso 2) solo su un
+	# bersaglio individuato a 3+ hex. Il bersaglio del fuoco e' sempre
+	# Spotted/Known (filtro in valid_fire_targets), resta il vincolo di gittata:
+	# a distanza ravvicinata la skill non da' vantaggio.
 	if firer.has_skill(Character.SKILL_SNIPER) and firer.has_order \
-			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2:
-		bits.append("+2 Sniper (Aimed)")
+			and firer.order == D.Order.AIMED_FIRE and state.impulse != 2 \
+			and dist >= 3:
+		bits.append("+2 Sniper (Aimed >=3)")
 		ws += 2
 	# Mirino (Rule 26, es. M1903 Springfield): +1 in Aimed Fire oltre i 3 hex.
 	if "scoped" in Weapons.info(weapon)["flags"] and firer.has_order \
