@@ -521,8 +521,13 @@ func _draw() -> void:
 			_draw_marker(foxhole_tex, hex_center(scell.x, scell.y), radius, 0.9)
 		elif sh.terrain == D.Terrain.RUBBLE and rubble_tex != null:
 			_draw_marker(rubble_tex, hex_center(scell.x, scell.y), radius, 0.9)
-	# Strumento LOS: linea spessa tra i due hex scelti.
-	if not los_tool.is_empty():
+	# Strumento LOS: dopo il primo click un solo cerchio (ancora); dopo il
+	# secondo la linea spessa tra i due hex scelti.
+	if los_tool.has("anchor"):
+		var ac := Color(0.95, 0.85, 0.2, 0.95)
+		draw_circle(los_tool["anchor"], radius * 0.38, ac)
+		draw_circle(los_tool["anchor"], radius * 0.18, Color(1.0, 1.0, 1.0, 0.9))
+	elif not los_tool.is_empty():
 		var lt_col: Color = Color(0.2, 0.95, 0.3, 0.95) if los_tool["clear"] \
 			else Color(0.95, 0.2, 0.15, 0.95)
 		_draw_dashed(los_tool["from"], los_tool["to"], lt_col,
