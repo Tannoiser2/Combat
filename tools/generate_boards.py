@@ -87,7 +87,7 @@ MANUAL_LEVELS = {
 # il classificatore vede i bordi dei boschetti come "siepi" e su mappe boschive
 # senza siepi vere questo crea esagoni-siepe spuri. Si aggiungono qui le mappe
 # man mano che si rivedono (revisione visiva). woods: nessuna siepe vera.
-SKIP_EDGE_FOLD = {"woods"}
+SKIP_EDGE_FOLD = {"woods", "hamlet"}
 
 
 def apply_manual(name, result):
