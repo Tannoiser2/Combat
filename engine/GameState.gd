@@ -26,33 +26,6 @@ var impulse: int = 1  # 1..4
 # Mappa: chiave "col,row" -> MapHex
 var map: Dictionary = {}
 
-# Hexside (siepi/bocage/muri sui BORDI): chiave canonica
-# "c1,r1|c2,r2" (coppia ordinata) -> Domain.Terrain.
-var hexsides: Dictionary = {}
-
-
-# Chiave canonica del bordo tra due hex adiacenti.
-static func hexside_key(a: Vector2i, b: Vector2i) -> String:
-	if b.x < a.x or (b.x == a.x and b.y < a.y):
-		var t := a
-		a = b
-		b = t
-	return "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
-
-
-# Tipo di hexside tra due hex adiacenti, o -1 se nessuno.
-func hexside_between(a: Vector2i, b: Vector2i) -> int:
-	return hexsides.get(hexside_key(a, b), -1)
-
-
-# L'hex ha almeno un hexside (siepe/muro) su un bordo? (per la copertura)
-func hex_has_hexside(pos: Vector2i) -> bool:
-	for dir in Move.CUBE_DIRS:
-		var n := Move.from_cube(Move.to_cube(pos) + dir)
-		if hexside_between(pos, n) >= 0:
-			return true
-	return false
-
 # Tutti i personaggi in gioco
 var characters: Array[Character] = []
 

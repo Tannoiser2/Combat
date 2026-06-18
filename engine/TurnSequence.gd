@@ -667,9 +667,8 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 				c.display_name, c.order_move])
 		return
 	var hex := state.hex_at(c.position.x, c.position.y)
-	# In Cover se il terreno protegge O se l'hex ha una siepe/muro sul bordo.
-	var in_cover := (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
-		or state.hex_has_hexside(c.position)
+	# In Cover se il terreno dell'hex protegge (siepe/muro inclusi: ora esagoni).
+	var in_cover := hex != null and Domain.terrain_gives_cover(hex.terrain)
 	var entry := EnemyCards.lookup(serial, c.morale, in_cover)
 	var order: int = entry["order"]
 	var move: String = entry["move"]

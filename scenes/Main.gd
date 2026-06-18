@@ -72,10 +72,8 @@ var los_dragging := -1               # -1=nessuno, 0=trascina A, 1=trascina B
 # Editor di mappa: pannello pittura terreno (tasto E).
 var editor_panel: PanelContainer
 var editor_brush: int = -1        # >= 0 = terreno hex da dipingere
-var editor_is_hexside: bool = false  # true = si dipinge lato (hexside)
 var editor_level: int = -1        # >= 0 = elevazione da dipingere (indipendente dal terreno)
 var editor_wire: int = -1         # -1 nessuno, 1 posa filo spinato, 0 rimuovi
-var editor_hexside_brush: int = -1   # >= 0 = tipo lato; -1 = rimuovi lato
 var _palette_dragging := false       # tavolozza editor: trascinamento header in corso
 
 # Action Phase interattiva: coda di attivazione e personaggio in attesa
@@ -1257,7 +1255,6 @@ func _handle_action_click(hex: Vector2i) -> void:
 		_consume_audio_events()
 		_finish_friendly_action()
 	else:  # MOVE
-		var from := acting.position
 		if not Move.step_to(state, acting, hex):
 			return
 		if acting.is_vehicle:
@@ -1266,10 +1263,6 @@ func _handle_action_click(hex: Vector2i) -> void:
 		TurnSequence.reaction_fire(state, acting)
 		_consume_audio_events()
 		moves_left -= 1
-		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
-		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:
-			moves_left = 0
-			state.log_event("%s scavalca il bocage e si ferma" % acting.display_name)
 		if moves_left <= 0:
 			# Move-and-shoot: dopo il movimento del veicolo, il Gunner spara
 			# interattivamente se ha un ordine di fuoco attivo questo impulse.
@@ -1372,16 +1365,7 @@ func _on_palette_drag(event: InputEvent) -> void:
 
 
 func _editor_act(local_pos: Vector2) -> void:
-	if editor_is_hexside:
-		var hs := _pick_hexside(local_pos)
-		if hs.is_empty():
-			return
-		if editor_hexside_brush < 0:
-			state.hexsides.erase(hs)
-		else:
-			state.hexsides[hs] = editor_hexside_brush
-		map_view.queue_redraw()
-	elif editor_brush >= 0 or editor_level >= 0 or editor_wire >= 0:
+	if editor_brush >= 0 or editor_level >= 0 or editor_wire >= 0:
 		var hex := map_view.pick_hex(local_pos)
 		if hex.x <= -99:
 			return
@@ -1427,22 +1411,6 @@ func _is_open(t: int) -> bool:
 		Domain.Terrain.OPEN_LEVEL_2, Domain.Terrain.OPEN_LEVEL_3]
 
 
-func _pick_hexside(local_pos: Vector2) -> String:
-	var h1 := map_view.pick_hex(local_pos)
-	if h1.x <= -99:
-		return ""
-	var best_n := Vector2i(-99, -99)
-	var best_d := INF
-	for n in Move.neighbors(state, h1):
-		var d := map_view.hex_center(n.x, n.y).distance_to(local_pos)
-		if d < best_d:
-			best_d = d
-			best_n = n
-	if best_n.x <= -99:
-		return ""
-	return GameState.hexside_key(h1, best_n)
-
-
 func _export_map_data() -> void:
 	var map_name: String = Scenario.SCENARIOS[state.scenario_id]["map"]
 	# Raggruppa hex per terreno.
@@ -1467,25 +1435,6 @@ func _export_map_data() -> void:
 			quoted.append('"%s"' % e)
 		lines.append('\tD.Terrain.%s: [%s],' % [tname, ", ".join(quoted)])
 	lines.append("},")
-	# Hexside (siepi/bocage/muri).
-	var hs_abbrev := {
-		Domain.Terrain.HEDGEROW: "H",
-		Domain.Terrain.BOCAGE: "B",
-		Domain.Terrain.WALL: "W",
-	}
-	if not state.hexsides.is_empty():
-		lines.append("")
-		lines.append("# Hexside per \"%s\" — incolla in HEXSIDES[\"%s\"]:" % [map_name, map_name])
-		lines.append('"%s": [' % map_name)
-		var hs_entries: Array[String] = []
-		for key in state.hexsides:
-			var t_hs: int = state.hexsides[key]
-			var ab: String = hs_abbrev.get(t_hs, "?")
-			hs_entries.append('\t"%s|%s"' % [key, ab])
-		hs_entries.sort()
-		for e in hs_entries:
-			lines.append(e + ",")
-		lines.append("],")
 	# Elevazione: ogni hex con quota > 0 (il pennello livello imposta .level
 	# senza cambiare il terreno, quindi va esportato a parte). Formato pronto per
 	# MANUAL_LEVELS["<mappa>"] di tools/generate_boards.py.
@@ -1506,7 +1455,6 @@ func _export_map_data() -> void:
 	var text := "\n".join(lines)
 	var fname := "map_export_%s.txt" % map_name
 	var n_hex := by_terrain.size()
-	var n_hs := state.hexsides.size()
 	if OS.get_name() == "Web":
 		# Su web non si puo' scrivere su path arbitrari: scarica il file tramite
 		# il browser (Blob API), che apre la finestra "Salva come..." del sistema.
@@ -1521,14 +1469,14 @@ func _export_map_data() -> void:
 	setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
 })();
 """ % [js_content, fname])
-		hint_label.text = "Download: %s (%d terreni, %d hexside, %d quote)" % [fname, n_hex, n_hs, n_lv]
+		hint_label.text = "Download: %s (%d terreni, %d quote)" % [fname, n_hex, n_lv]
 	else:
 		var path := "/tmp/%s" % fname
 		var f := FileAccess.open(path, FileAccess.WRITE)
 		if f != null:
 			f.store_string(text)
 			f.close()
-			hint_label.text = "Esportato in %s (%d terreni, %d hexside, %d quote)" % [path, n_hex, n_hs, n_lv]
+			hint_label.text = "Esportato in %s (%d terreni, %d quote)" % [path, n_hex, n_lv]
 		else:
 			hint_label.text = "Errore scrittura %s" % path
 
@@ -1853,10 +1801,6 @@ func _build_hud() -> void:
 		var c: Color = MapView.OVERLAY_TINTS[t]
 		rows.append("[bgcolor=#%s]  [/bgcolor] %s" % [
 			Color(c.r, c.g, c.b).to_html(false), Domain.TERRAIN_NAMES[t]])
-	rows.append("[i]Hexside (bordi):[/i]")
-	for t in MapView.HEXSIDE_COLORS:
-		rows.append("[bgcolor=#%s]  [/bgcolor] %s (bordo)" % [
-			MapView.HEXSIDE_COLORS[t].to_html(false), Domain.TERRAIN_NAMES[t]])
 	rows.append("[i]Hex senza tinta = Open L0[/i]")
 	leg.text = "\n".join(rows)
 	overlay_legend.add_child(leg)
@@ -1955,8 +1899,7 @@ func _build_hud() -> void:
 	pal.custom_minimum_size = Vector2(pal_w, pal_w * TerrainPalette.NATIVE.y / TerrainPalette.NATIVE.x)
 	pal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	pal.terrain_picked.connect(func(t: int):
-		editor_brush = t
-		editor_is_hexside = false)
+		editor_brush = t)
 	pal.level_picked.connect(func(lv: int):
 		editor_level = lv)
 	pal.wire_picked.connect(func(m: int):
@@ -5506,6 +5449,10 @@ func _test_vehicles() -> int:
 	pz.known = true
 	pz.position = Vector2i(5, 8)
 	st.characters = [bazooka_man, rifleman, pz]
+	# LOS libera a prescindere dal terreno della board (ora la farmhouse ha
+	# esagoni di siepe che potrebbero cadere sul percorso): apri gli hex interposti.
+	for _h in LOS.hexes_between(bazooka_man.position, pz.position):
+		st.map[GameState.hex_key(_h.x, _h.y)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0, 0)
 	if not Fire.can_fire(st, bazooka_man, pz, "Bazooka M9"):
 		print("TEST veicoli: Bazooka M9 non puo' colpire veicolo")
 		fails += 1

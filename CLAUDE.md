@@ -34,10 +34,26 @@ Lingua del progetto: italiano (log, UI, commenti).
 - Audio: il motore accoda eventi in state.audio_events; la UI li
   consuma con _consume_audio_events (mappa WEAPON_SFX/OUTCOME_SFX).
 
+## Regolamenti e materiali — FONTE DI VERITA'
+
+I regolamenti, le tabelle, le carte, le pedine, gli scenari e i .vsav SONO
+disponibili nel repo `Tabelle_Materiali` (clonato in locale in
+`/home/user/Tabelle_Materiali`), cartella `COMBAT!/`:
+- `Regolamenti/Combat! - VOL 1 (ITALIANO).pdf` (Vol.1 ITA),
+  `Combat-2nd-Printing-Rules-...[annotated].pdf` (Vol.1 EN annotato),
+  `Combat-Vol. 2-Rules-Final-23-Nov-20.pdf` (Vol.2),
+  `Combat!_Scenario_Book_-_...pdf` (scenari).
+- `Player AID/` (Fire Resolution Chart, LOS Flowchart, Player Aid).
+- `tabelle/`, `Carte/`, `pedine/`, `mappe/`, `vassal/`.
+CONSULTARLI come fonte di verita' prima di dedurre regole a memoria. Per
+leggere i PDF: `pip install pypdf` (cffi/cryptography possono richiedere
+`pip install --force-reinstall cffi`), poi estrazione testo con pypdf.
+
 ## Copyright — IMPORTANTE
 
-Il repo e' PUBBLICO. Mai committare: PDF dei regolamenti, .vmod
-(gia' esclusi da .gitignore: riferimenti/, *.pdf, *.vmod).
+Il repo Combat e' PUBBLICO. Mai committare nel repo Combat: PDF dei
+regolamenti, .vmod (gia' esclusi da .gitignore: riferimenti/, *.pdf, *.vmod).
+I materiali stanno nel repo separato Tabelle_Materiali (sopra).
 I segnalini dei personaggi (Vol.1 e Vol.2) sono artwork originale
 del progetto e sono inclusi nel repo pubblico.
 
@@ -77,8 +93,8 @@ per-crew con Vehicle Order Matrix completa (Fase 5), cupola Halftrack 360 e
 fuoco per lato. Fuori scope anche: revisione visiva mappe non annotate
 (woods/hamlet/hedgerows2/ridge), editor di scenari.
 
-## Prossimi passi — Volume 2 (regole in riferimenti/Combat2Rules.pdf,
-gia' lette; asset nel repo privato combat-riferimenti)
+## Prossimi passi — Volume 2 (regole e asset in Tabelle_Materiali/COMBAT!,
+vedi sezione "Regolamenti e materiali" sopra)
 
 Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
 
@@ -404,3 +420,11 @@ serve a non doverlo ricaricare ogni sessione).
 - I file .txt vanno inclusi negli export (include_filter "*.txt").
 - Le armi nemiche usano alias: "Rifle" -> KAR 98K, "SMG" -> Grease
   Gun (Weapons.ALIASES) — aggiornare WEAPON_SFX per armi nuove.
+- TERRENO = SOLO ESAGONI (Rule 11): Siepe/Muro/Bocage sono ESAGONI
+  (terreno dell'hex), NON lati. Il vecchio sistema "hexside" (siepi/muri sui
+  bordi, state.hexsides) e' stato RIMOSSO (v0.91): non esiste nel regolamento
+  (cap. 11 parla solo di esagoni; "hexside" non compare). Copertura/LOS/spotting
+  di siepe/muro passano da Domain.COVER_TERRAINS, Fire.WS_MOD, Spotting.TERRAIN_MOD,
+  LOS.HEIGHT2 e Move.DIFFICULT_MOVE come per ogni altro terreno-hex. La
+  classificazione converte i bordi rilevati in esagoni adiacenti
+  (generate_boards.fold_edges_to_hexes), rifinibili in editor.

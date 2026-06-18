@@ -187,6 +187,8 @@ OVERLAY_COLORS = {
     "ROCKS": (160, 160, 160), "BUILDING": (255, 0, 0), "STREAM": (0, 120, 255),
     "MARSH": (0, 255, 255), "HEDGEROW": (0, 90, 0), "LOGS": (140, 70, 20),
     "OPEN_L1": (230, 230, 120), "OPEN_L2": (255, 120, 0),
+    # Siepe/Muro/Bocage ora ESAGONI (Rule 11.05/11.06).
+    "WALL": (200, 200, 200), "BOCAGE": (0, 60, 0),
     # terreni speciali Vol.2 (override manuali in generate_boards.py)
     "FOUNTAIN": (0, 200, 255), "FORTIFIED_BUILDING": (180, 0, 0),
     "TRENCH": (120, 80, 40), "ABBEY_EXTERIOR": (255, 0, 0),
@@ -202,13 +204,14 @@ def save_overlay(clf, result, path, feats=None):
     ov = clf.img.copy()
     d = ImageDraw.Draw(ov, "RGBA")
     for key, t in result.items():
-        if OVERLAY_COLORS[t] is None:
+        col_rgb = OVERLAY_COLORS.get(t)
+        if col_rgb is None:
             continue
         col, row = map(int, key.split(","))
         cx, cy = hex_center(clf.x0, clf.y0, col, row)
         pts = [(cx + math.cos(a * math.pi / 3) * R * 0.92,
                 cy + math.sin(a * math.pi / 3) * R * 0.92) for a in range(6)]
-        d.polygon(pts, fill=OVERLAY_COLORS[t] + (110,))
+        d.polygon(pts, fill=col_rgb + (110,))
     # hexside rilevati: segmento spesso sul bordo condiviso
     for key, t in (feats or {}).items():
         a, b = key.split("|")

@@ -336,11 +336,10 @@ static func throw_knife(state: GameState, attacker: Character, target: Character
 	return true
 
 
-# Il personaggio e' in copertura (terreno o hexside) nel suo hex?
+# Il personaggio e' in copertura (terreno del suo hex)?
 static func _in_cover(state: GameState, c: Character) -> bool:
 	var hex := state.hex_at(c.position.x, c.position.y)
-	return (hex != null and Domain.terrain_gives_cover(hex.terrain)) \
-		or state.hex_has_hexside(c.position)
+	return hex != null and Domain.terrain_gives_cover(hex.terrain)
 
 
 # WS finale del tiro per la sola fascia di scelta del bersaglio (helper di
@@ -401,12 +400,6 @@ static func _compute_ws(state: GameState, firer: Character, target: Character, w
 		else:
 			tmod = WS_MOD[terrain][group]
 			tname = Domain.TERRAIN_NAMES[terrain]
-			# Hexside sul bordo d'ingresso del tiro (siepe/bocage/muro davanti
-			# al bersaglio): vale il modificatore piu' protettivo.
-			var side := _entry_hexside(state, firer.position, target.position)
-			if side >= 0 and WS_MOD[side][group] < tmod:
-				tmod = WS_MOD[side][group]
-				tname = Domain.TERRAIN_NAMES[side] + " (bordo)"
 		if tmod != 0:
 			bits.append("%+d bersaglio in %s" % [tmod, tname])
 		ws += tmod
@@ -753,21 +746,6 @@ static func _spend_ammo(state: GameState, firer: Character, weapon: String) -> v
 	else:
 		firer.low_ammo = true
 		_log(state, "  %s e' a corto di munizioni" % firer.display_name)
-
-
-# Hexside attraversato entrando nell'hex del bersaglio (l'ultimo bordo
-# del percorso di tiro), o -1.
-static func _entry_hexside(state: GameState, from: Vector2i, to: Vector2i) -> int:
-	var between := LOS.hexes_between(from, to)
-	var prev := from
-	if not between.is_empty():
-		# hexes_between e' canonicalizzato: l'estremo adiacente a `to`
-		# e' la fine o l'inizio a seconda della direzione.
-		prev = between.back() if Spotting.hex_distance(between.back(), to) == 1 \
-			else between[0]
-	if Spotting.hex_distance(prev, to) != 1:
-		return -1
-	return state.hexside_between(prev, to)
 
 
 # Penalita' di fumo e incendi lungo la linea di tiro (numero di fumo per hex,

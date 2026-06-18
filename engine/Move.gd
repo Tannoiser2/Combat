@@ -193,6 +193,8 @@ const DIFFICULT_MOVE := {
 	D.Terrain.STREAM: 2, D.Terrain.LOGS: 2, D.Terrain.RUBBLE: 2,
 	D.Terrain.CRATER: 2, D.Terrain.BUILDING: 2, D.Terrain.FORTIFIED_BUILDING: 2,
 	D.Terrain.FOUNTAIN: 2, D.Terrain.ABBEY_EXTERIOR: 2, D.Terrain.ABBEY_INTERIOR: 2,
+	# Siepe/Muro/Bocage sono Terreno Accidentato (Rule 11.05/11.06): ora esagoni.
+	D.Terrain.HEDGEROW: 2, D.Terrain.WALL: 2, D.Terrain.BOCAGE: 2,
 }
 
 
@@ -344,7 +346,6 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 	# costano 2, gli altri 1. Si parte sempre potendo fare almeno un passo.
 	var budget := hexes
 	while budget > 0:
-		var from := mover.position
 		if use_compass:
 			var res := compass_step(state, mover, dirs)
 			if res != 1:
@@ -364,9 +365,6 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 			if dh != null:
 				step_cost = terrain_move_cost(dh.terrain)
 		budget -= step_cost
-		# Scavalcare un BOCAGE (argine alto) esaurisce il movimento.
-		if state.hexside_between(from, mover.position) == D.Terrain.BOCAGE:
-			break
 	if moved > 0:
 		var sfx := "vehicle" if mover.is_vehicle else \
 			("run" if mover.order in [D.Order.SPRINT, D.Order.RUN_AND_GUN,
