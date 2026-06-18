@@ -303,6 +303,12 @@ static func _explode(state: GameState, m: Dictionary) -> void:
 		var dist := Spotting.hex_distance(c.position, hex)
 		if dist > 1:
 			continue
+		# Rule 31.10.11: l'esplosione investe l'equipaggio/passeggeri esposti del
+		# veicolo (mezzo scoperto o boccaporto aperto); lo scafo non prende ferite
+		# da fante. NELL'hex = perdite, adiacente = solo morale check.
+		if c.is_vehicle:
+			VehicleCombat.explosion_hits_crew(state, c, dist == 0)
+			continue
 		var power: int = pw[0] if dist == 0 else pw[1]
 		_blast_check(state, c, power)
 
@@ -320,6 +326,11 @@ static func _explode_grenade(state: GameState, m: Dictionary) -> void:
 			continue
 		var dist := Spotting.hex_distance(c.position, hex)
 		if dist > 1:
+			continue
+		# Rule 31.10.7: granata nell'hex di un veicolo a equipaggio esposto
+		# (boccaporto aperto / mezzo scoperto) -> colpisce equipaggio e passeggeri.
+		if c.is_vehicle:
+			VehicleCombat.explosion_hits_crew(state, c, dist == 0)
 			continue
 		if c.is_dummy:
 			if dist == 0:

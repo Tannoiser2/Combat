@@ -1,3 +1,28 @@
+v0.88 — 2026-06-18
+- Veicoli, modello equipaggio: tirate dentro le fasi piu' semplici della
+  roadmap (docs/veicoli_roadmap.md).
+  - Fase 7 — Granata nel boccaporto e perdite passeggeri (Rule 31.10.7/31.10.11):
+    un'esplosione (granata, mortaio, artiglieria, HE del cannone) NELL'hex di un
+    veicolo a equipaggio ESPOSTO (mezzo scoperto o AFV col boccaporto aperto)
+    investe equipaggio e passeggeri a bordo: ogni membro rischia una perdita
+    (VehicleCombat.explosion_hits_crew, pesca Friendly Card); da adiacente solo
+    morale check; col boccaporto chiuso l'equipaggio e' al riparo. Lo scafo non
+    prende piu' "ferite da fante" dalle esplosioni (Area._explode/_explode_grenade
+    instradano i veicoli al nuovo modello). Test in _test_vehicles.
+  - Fase 6 — Passeggeri: sbarco e fuoco (Rule 31.9.3). Lo sbarco volontario
+    (VehicleCombat.dismount) fa scendere un singolo passeggero che torna fanteria
+    (senza penalita' di morale, a differenza del Bail Out). I passeggeri di un
+    mezzo SCOPERTO (Jeep/Truck/Half-Track) sparano la propria arma leggera
+    dall'hex del veicolo durante l'attivazione del mezzo
+    (TurnSequence._resolve_vehicle_action; AI in _assign_vehicle_order). UI:
+    strip "PASSEGGERI" nel Vehicle Display con pannello ordini per
+    fuoco/sbarco. Corretto un duplicato latente: i passeggeri saliti con
+    mount_up restano in state.characters (indici del replay), quindi bail_out/
+    dismount non li ri-aggiungono. Test in _test_vehicles.
+  - RESTANO fuori (alto sforzo, basso rendimento): LOS per ruolo/boccaporto e
+    Target Marker/Observed Target (Fase 4), AI per-crew con Vehicle Order Matrix
+    completa (Fase 5), cupola Halftrack 360 e fuoco per lato.
+
 v0.87 — 2026-06-18
 - Audit regole mancanti (chiusura backlog): tre regole completate.
   - Costi di movimento per terreno (Rule 13): i terreni difficili (bosco, rocce,
