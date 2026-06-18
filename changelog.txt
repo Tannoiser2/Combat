@@ -1,3 +1,22 @@
+v0.92 — 2026-06-18
+- Revisione completa delle mappe: tutte e 10 le board (farmhouse, hill, town,
+  ridge, hedgerows2, abbey, woods, hamlet, village, hedgerows) sono state
+  ridisegnate a mano nell'editor. Gli export dell'editor (tools/map_exports/)
+  sono ora la FONTE DI VERITA': il classificatore a colori viene saltato per
+  le board rifinite (terreno + quote presi dall'export). Corretti errori grossi
+  della vecchia classificazione automatica (es. hedgerows2 era quasi tutto
+  "alberi", ora bocage/campi corretti) e ripristinate le quote del crinale di
+  ridge e l'abbazia di abbey (esterno/interno coerenti coi valori validati).
+- Strumento LOS rivisto e INDICATORE OSTACOLO: quando la linea di vista e'
+  bloccata, lo strumento evidenzia con un anello + X l'ESAGONO che la
+  interrompe (prima la X stava al punto medio) e il suggerimento scrive il
+  terreno e la quota del bloccante (es. "BLOCCATA da ... a 28.12"). Allineamento
+  delle board larghe corretto.
+- Promemoria di regola (nessun bug): la LOS tra due quote diverse segue il
+  flowchart ufficiale: se il terreno interposto piu' alto H >= quota del
+  soldato piu' alto T, la LOS e' bloccata (anche a parita' di quota).
+  Selftest OK.
+
 v0.91 — 2026-06-18
 - Terreno = solo ESAGONI (Rule 11): RIMOSSO il sistema "hexside" (siepi/muri/
   bocage sui BORDI). Il regolamento (Combat! Vol.1, cap. 11.05/11.06) li descrive
