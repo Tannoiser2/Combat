@@ -658,7 +658,7 @@ func _draw() -> void:
 	elif not editor_mode:
 		# Primo passaggio: marker KIA sotto le pedine vive.
 		for c in state.characters:
-			if not c.is_dead() or c.embarked:
+			if not c.is_dead() or c.embarked or c.removed:
 				continue
 			var kia_name := "kia-ENEMY" if c.side == D.Side.ENEMY else "kia-FRIENDLY"
 			_draw_marker(_named_tex(kia_name), _pos_of(c), radius)
