@@ -958,10 +958,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			los_dragging = -1
 	elif event is InputEventMouseMotion:
 		if event.button_mask & MOUSE_BUTTON_MASK_LEFT and map_view != null:
-			if map_view.editor_mode:
+			# LOS attiva: ha la priorita' assoluta e ESCLUDE l'editing della
+			# mappa (trascina solo le estremita' afferrate, non dipinge hex).
+			if los_mode:
+				if los_dragging >= 0:
+					_los_drag_update(map_view.get_local_mouse_position())
+			elif map_view.editor_mode:
 				_editor_act(map_view.get_local_mouse_position())
-			elif los_mode and los_dragging >= 0:
-				_los_drag_update(map_view.get_local_mouse_position())
 		if event.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
 			camera.position -= event.relative / camera.zoom.x
 
