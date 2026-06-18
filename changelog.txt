@@ -1,3 +1,27 @@
+v0.87 — 2026-06-18
+- Audit regole mancanti (chiusura backlog): tre regole completate.
+  - Costi di movimento per terreno (Rule 13): i terreni difficili (bosco, rocce,
+    edifici, macerie, palude, ruscello, abbazia, fontana, crateri, tronchi)
+    costano 2 punti d'ingresso invece di 1, dimezzando gli hex percorsi in un
+    impulse (un MUST_MOVE_2 che entra in un bosco fa 1 hex). Vale la regola del
+    "minimo un hex". Tabella Move.DIFFICULT_MOVE + Move.terrain_move_cost,
+    budget di punti-movimento in Move.move_character (fanteria; i veicoli usano
+    il loro modello). Test _test_move_cost.
+  - Search raccoglie i documenti (SR13): l'ordine Search ora risolve l'esca con
+    lo stesso dummy_roll dello spotting (TurnSequence._do_search -> _reveal_dummy);
+    i documenti trovati danno +5 VP a fine scenario (state.documents_found,
+    chiave vp "documents" in intro2). Test _test_documents.
+  - Fuoco di reazione / Guard (Rule 9.9): un'unita' con ordine Guard "veglia" e
+    spara UNA volta per turno al primo avversario che si muove nella sua
+    LOS/gittata (TurnSequence.reaction_fire, agganciata a _do_move e allo step
+    interattivo del giocatore). Guard e' ora un vero ordine di overwatch per il
+    giocatore armato (oltre alla sorveglianza dei prigionieri). Micro-AI:
+    un nemico in copertura, armato, con un ordine di fuoco ma senza bersaglio
+    visibile e un Friendly individuato nei paraggi passa a Guard/overwatch.
+    Test _test_guard_reaction.
+- Dummy markers: gia' implementati (esche nella Coppa, rivelate da spotting/
+  Search); corretto il commento stale in Scenario.gd.
+
 v0.86 — 2026-06-17
 - UI ordini: filtri context-aware in TurnSequence.legal_orders per ridurre il
   pannello ordini ai soli ordini sensati in quel momento:

@@ -180,6 +180,26 @@ static func advances(order: int) -> bool:
 	return order in TOWARD_ORDERS
 
 
+# Costi di movimento per terreno (Rule 13). I terreni "difficili" costano 2
+# punti d'ingresso invece di 1: di fatto dimezzano il numero di hex percorsi
+# in un impulse (un MUST_MOVE_2 che entra in un bosco fa 1 hex, non 2). Vale
+# per la fanteria; i veicoli usano il loro modello (vehicle_hexes) e sono gia'
+# bloccati dai terreni proibiti (VehicleCombat.VEHICLE_BLOCKED). Vale sempre la
+# regola del "minimo un hex": chi ha ancora punti puo' fare almeno un passo.
+# I valori esatti vengono dai chart del repo privato; qui usiamo la convenzione
+# standard difficile=2 (rifinibile se servono costi per-terreno piu' fini).
+const DIFFICULT_MOVE := {
+	D.Terrain.ROCKS: 2, D.Terrain.TREES: 2, D.Terrain.MARSH: 2,
+	D.Terrain.STREAM: 2, D.Terrain.LOGS: 2, D.Terrain.RUBBLE: 2,
+	D.Terrain.CRATER: 2, D.Terrain.BUILDING: 2, D.Terrain.FORTIFIED_BUILDING: 2,
+	D.Terrain.FOUNTAIN: 2, D.Terrain.ABBEY_EXTERIOR: 2, D.Terrain.ABBEY_INTERIOR: 2,
+}
+
+
+static func terrain_move_cost(terrain: int) -> int:
+	return int(DIFFICULT_MOVE.get(terrain, 1))
+
+
 # Avversario vivo piu' vicino (riferimento per verso/fuga).
 static func nearest_enemy(state: GameState, mover: Character) -> Character:
 	var best: Character = null
@@ -320,7 +340,10 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 		return 0
 	var away := not advances(mover.order)
 	var moved := 0
-	for i in range(hexes):
+	# Budget di punti-movimento dell'impulse: i terreni difficili (Rule 13)
+	# costano 2, gli altri 1. Si parte sempre potendo fare almeno un passo.
+	var budget := hexes
+	while budget > 0:
 		var from := mover.position
 		if use_compass:
 			var res := compass_step(state, mover, dirs)
@@ -334,6 +357,13 @@ static func move_character(state: GameState, mover: Character, hexes: int) -> in
 			if not step(state, mover, target.position, away):
 				break
 		moved += 1
+		# Rule 13: scala il costo del terreno entrato (solo fanteria).
+		var step_cost := 1
+		if not mover.is_vehicle:
+			var dh := state.hex_at(mover.position.x, mover.position.y)
+			if dh != null:
+				step_cost = terrain_move_cost(dh.terrain)
+		budget -= step_cost
 		# Scavalcare un BOCAGE (argine alto) esaurisce il movimento.
 		if state.hexside_between(from, mover.position) == D.Terrain.BOCAGE:
 			break
