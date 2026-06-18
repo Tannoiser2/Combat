@@ -83,6 +83,13 @@ MANUAL_LEVELS = {
 }
 
 
+# Mappe su cui NON applicare la conversione lati->esagoni (fold_edges_to_hexes):
+# il classificatore vede i bordi dei boschetti come "siepi" e su mappe boschive
+# senza siepi vere questo crea esagoni-siepe spuri. Si aggiungono qui le mappe
+# man mano che si rivedono (revisione visiva). woods: nessuna siepe vera.
+SKIP_EDGE_FOLD = {"woods"}
+
+
 def apply_manual(name, result):
     """Sovrascrive la classificazione automatica con i terreni speciali
     marcati a mano per la mappa `name`."""
@@ -171,8 +178,11 @@ def main():
         result = clf.classify_all()
         apply_manual(name, result)
         # Rule 11.05/11.06: siepi/muri/bocage rilevati sui bordi -> esagoni.
-        feats = clf.edge_features()
-        added = fold_edges_to_hexes(result, feats)
+        # Saltata sulle mappe boschive senza siepi vere (SKIP_EDGE_FOLD).
+        added = 0
+        if name not in SKIP_EDGE_FOLD:
+            feats = clf.edge_features()
+            added = fold_edges_to_hexes(result, feats)
         print(name, Counter(result.values()), "| lati->hex siepe/muro:", added)
         save_overlay(clf, result, "/tmp/overlay_%s.png" % name, {})
         lines.append('\t"%s": {' % name)
