@@ -1389,14 +1389,42 @@ func _editor_act(local_pos: Vector2) -> void:
 		if not state.map.has(key):
 			return
 		if editor_brush >= 0:
-			state.map[key].terrain = editor_brush
+			# Pennello Open: mantieni l'elevazione esistente (allinea OPEN_LEVEL_n
+			# al livello dell'hex, non azzerarlo a L0).
+			state.map[key].terrain = _open_for_level(state.map[key].level) \
+				if _is_open(editor_brush) else editor_brush
 		if editor_level >= 0:
 			state.map[key].level = editor_level
 		if editor_wire >= 0:
 			state.map[key].wire = editor_wire == 1
 		map_view.queue_redraw()
 	else:
-		hint_label.text = "Editor: scegli una tessera dalla tavolozza"
+		# Nessun pennello selezionato = pennello "Open": cancella il terreno
+		# precedente riportando l'hex a Open, MANTENENDO l'elevazione (.level).
+		var hex := map_view.pick_hex(local_pos)
+		if hex.x <= -99:
+			return
+		var key := GameState.hex_key(hex.x, hex.y)
+		if not state.map.has(key):
+			return
+		state.map[key].terrain = _open_for_level(state.map[key].level)
+		map_view.queue_redraw()
+
+
+# Terreno Open corrispondente a un livello di elevazione (mantiene la quota
+# quando si "pulisce" un hex: l'enum OPEN_LEVEL_n riflette il livello reale).
+func _open_for_level(level: int) -> int:
+	match level:
+		1: return Domain.Terrain.OPEN_LEVEL_1
+		2: return Domain.Terrain.OPEN_LEVEL_2
+		3: return Domain.Terrain.OPEN_LEVEL_3
+		_: return Domain.Terrain.OPEN_LEVEL_0
+
+
+# Vero se il terreno e' una delle varianti Open (per livello).
+func _is_open(t: int) -> bool:
+	return t in [Domain.Terrain.OPEN_LEVEL_0, Domain.Terrain.OPEN_LEVEL_1,
+		Domain.Terrain.OPEN_LEVEL_2, Domain.Terrain.OPEN_LEVEL_3]
 
 
 func _pick_hexside(local_pos: Vector2) -> String:
@@ -1918,7 +1946,7 @@ func _build_hud() -> void:
 		editor_wire = m)
 	ep_box.add_child(pal)
 	var pal_hint := Label.new()
-	pal_hint.text = "Clicca una tessera (ciano=posa). Riclicca la stessa per la gomma (rosso=cancella, torna Open), terza per deselezionare. Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
+	pal_hint.text = "Clicca una tessera (ciano=posa). Riclicca la stessa per la gomma (rosso=cancella, torna Open), terza per deselezionare. Nessuna tessera selezionata = pennello Open (cancella il terreno, mantiene l'elevazione). Elevazione=giallo · Filo: verde=posa, rosso=rimuovi"
 	pal_hint.add_theme_font_size_override("font_size", 10)
 	pal_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pal_hint.custom_minimum_size = Vector2(560.0, 0)

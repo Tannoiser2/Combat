@@ -1,3 +1,10 @@
+v0.90 — 2026-06-18
+- Editor mappe: con NESSUNA tessera selezionata nella tavolozza il clic ora
+  dipinge terreno "Open", cancellando il terreno precedente ma MANTENENDO
+  l'elevazione (Main._editor_act + _open_for_level/_is_open). Anche la gomma e
+  il pennello Open allineano l'enum OPEN_LEVEL_n al livello dell'hex invece di
+  azzerarlo a L0. Hint della tavolozza aggiornato.
+
 v0.89 — 2026-06-18
 - UI pedine: il morale non e' piu' un pallino in alto a sinistra (che copriva
   il nome) ma un BORDO colorato arrotondato attorno alla pedina (MapView.
