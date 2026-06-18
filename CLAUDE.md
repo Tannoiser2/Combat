@@ -74,6 +74,30 @@ carica con can_enter), morale a 7 stati, granate mirate dal giocatore
 e nemiche, scenari intro1-3 e s1-s9, replay continuo, suoni per
 arma/esito.
 
+FINE SESSIONE (giugno 2026, v0.94) — il gioco e' considerato COMPLETO e
+giocabile (Vol.1 + Vol.2). Lavori chiusi in questa sessione:
+- Mappe: TUTTE e 10 le board rifinite a mano nell'editor (farmhouse, hill,
+  town, ridge, hedgerows2, abbey, woods, hamlet, village, hedgerows). Gli
+  export dell'editor (tools/map_exports/<board>.txt) sono la FONTE DI VERITA':
+  il classificatore a colori viene SALTATO per le board rifinite (terreno +
+  quote dall'export). MANUAL_LEVELS in tools/generate_boards.py per le quote.
+- LOS: indicatore dell'esagono che blocca (anello + X sull'ostacolo, non piu'
+  al punto medio) e suggerimento che nomina terreno+quota del bloccante; quando
+  e' un limite di visibilita' il testo distingue notte ("oltre 5 hex", Rule
+  18.1) vs meteo ("oltre N hex", Rule 28.1). LOS.analyze ritorna "reason".
+  Verificato col flowchart ufficiale (Player AID): H>=T -> bloccata.
+- Fix esche (Dummy): l'esca rivelata e' gia' "removed" nel motore ma MapView la
+  disegnava come "Enemy KIA" (is_dead() e' vero per i removed). Ora il
+  passaggio dei marker KIA salta i removed -> l'esca sparisce senza corpo.
+- Versione: lo splash legge la prima riga di changelog.txt; ricordarsi di
+  bumparla a ogni release (ora v0.94) o il deploy sembra "fermo".
+
+RIMANE DA FARE (basso rendimento di gioco, opzionale; nessun bug noto aperto):
+veicoli Fase 4 (archi LOS per ruolo/boccaporto, Target/Observed Target), Fase 5
+(AI per-crew con Vehicle Order Matrix completa), cupola Halftrack 360 + fuoco
+passeggeri per lato (resto Fase 6). Fuori scope: editor di scenari, OOB
+ufficiale Vol.2 (non esiste nei materiali: setup attuali sono scelte di design).
+
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
 terreno (Rule 13: difficili=2, Move.DIFFICULT_MOVE/terrain_move_cost,
 budget in move_character); Search raccoglie i documenti (SR13:
@@ -90,8 +114,9 @@ PARZIALE (sbarco passeggeri + fuoco passeggeri da mezzo scoperto, Rule 31.9.3).
 Vedi punto 8 della roadmap. RESTANO fuori (alto sforzo, basso rendimento di
 gioco): LOS per ruolo/boccaporto e Target Marker/Observed Target (Fase 4), AI
 per-crew con Vehicle Order Matrix completa (Fase 5), cupola Halftrack 360 e
-fuoco per lato. Fuori scope anche: revisione visiva mappe non annotate
-(woods/hamlet/hedgerows2/ridge), editor di scenari.
+fuoco per lato. Fuori scope anche: editor di scenari. (NOTA: la revisione
+visiva di tutte e 10 le mappe e' ora FATTA, v0.92 — vedi "FINE SESSIONE".)
+
 
 ## Prossimi passi — Volume 2 (regole e asset in Tabelle_Materiali/COMBAT!,
 vedi sezione "Regolamenti e materiali" sopra)
