@@ -19,19 +19,26 @@ const D := preload("res://engine/Domain.gd")
 
 # Calibrazione delle 4 mappe (dal buildFile del modulo Vassal: HexGrid
 # dx/dy/x0/y0). origin = centro dell'hex 01.00; cell = passo (dx, dy).
+# Passo della griglia (centro-centro) in pixel della scansione. Le 4 board
+# Vol.1 sono larghe 5480 px; le 6 board Vol.2 sono larghe 5500 px (~0.46% piu'
+# grandi anche in altezza), quindi hanno un passo proprio (WIDE_CELL). Valori
+# calibrati sui pallini-centro stampati (rms < 0.5 px); l'origin "origin" e' il
+# centro dell'hex 01,00 in pixel. Senza queste correzioni la griglia derivava
+# rispetto all'immagine, in modo crescente verso l'angolo lontano.
 const CELL := Vector2(156.30026487501547, 180.48)
+const WIDE_CELL := Vector2(157.076, 181.376)
 const BOARDS := {
 	"farmhouse": {"file": "res://assets/maps/farmhouse.jpg", "origin": Vector2(72, 106)},
 	"hill": {"file": "res://assets/maps/hill.jpg", "origin": Vector2(73, 109)},
 	"village": {"file": "res://assets/maps/village.jpg", "origin": Vector2(77, 110)},
 	"hedgerows": {"file": "res://assets/maps/hedgerows.jpg", "origin": Vector2(70, 110)},
-	# Vol. 2 — mappe 5-10
-	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(76, 109)},
-	"town":       {"file": "res://assets/maps/town.jpg",       "origin": Vector2(73, 104)},
-	"abbey":      {"file": "res://assets/maps/abbey.jpg",      "origin": Vector2(73, 104)},
-	"hamlet":     {"file": "res://assets/maps/hamlet.jpg",     "origin": Vector2(73, 105)},
-	"hedgerows2": {"file": "res://assets/maps/hedgerows2.jpg", "origin": Vector2(73, 104)},
-	"ridge":      {"file": "res://assets/maps/ridge.jpg",      "origin": Vector2(73, 104)},
+	# Vol. 2 — board larghe 5500 px: origin calibrato + WIDE_CELL.
+	"woods":      {"file": "res://assets/maps/woods.jpg",      "origin": Vector2(66.1, 102.9), "cell": WIDE_CELL},
+	"town":       {"file": "res://assets/maps/town.jpg",       "origin": Vector2(73.3, 104.4), "cell": WIDE_CELL},
+	"abbey":      {"file": "res://assets/maps/abbey.jpg",      "origin": Vector2(73.3, 104.3), "cell": WIDE_CELL},
+	"hamlet":     {"file": "res://assets/maps/hamlet.jpg",     "origin": Vector2(74.0, 104.3), "cell": WIDE_CELL},
+	"hedgerows2": {"file": "res://assets/maps/hedgerows2.jpg", "origin": Vector2(73.3, 104.3), "cell": WIDE_CELL},
+	"ridge":      {"file": "res://assets/maps/ridge.jpg",      "origin": Vector2(73.3, 104.3), "cell": WIDE_CELL},
 }
 
 # Modalita' procedurale (nessuna texture)
@@ -336,7 +343,7 @@ func load_board(board_name: String) -> bool:
 		return false
 	board = load(info["file"])
 	origin = info["origin"]
-	cell = CELL
+	cell = info.get("cell", CELL)
 	return true
 
 
@@ -538,9 +545,14 @@ func _draw() -> void:
 		draw_circle(los_tool["to"], radius * 0.38, lt_col)
 		draw_circle(los_tool["to"], radius * 0.18, Color(1.0, 1.0, 1.0, 0.9))
 		if not los_tool["clear"]:
-			var mid: Vector2 = (los_tool["from"] + los_tool["to"]) * 0.5
-			draw_line(mid + Vector2(-1, -1) * radius * 0.3, mid + Vector2(1, 1) * radius * 0.3, lt_col, radius * 0.1)
-			draw_line(mid + Vector2(-1, 1) * radius * 0.3, mid + Vector2(1, -1) * radius * 0.3, lt_col, radius * 0.1)
+			# La X marca l'esagono-ostacolo (se noto), altrimenti il punto medio.
+			var mark: Vector2 = los_tool["blocker"] if los_tool.has("blocker") \
+				else (los_tool["from"] + los_tool["to"]) * 0.5
+			if los_tool.has("blocker"):
+				# Anello attorno all'hex che interrompe la LOS.
+				draw_arc(mark, radius * 0.85, 0, TAU, 24, lt_col, radius * 0.12)
+			draw_line(mark + Vector2(-1, -1) * radius * 0.3, mark + Vector2(1, 1) * radius * 0.3, lt_col, radius * 0.16)
+			draw_line(mark + Vector2(-1, 1) * radius * 0.3, mark + Vector2(1, -1) * radius * 0.3, lt_col, radius * 0.16)
 	# Linee di vista dall'unita' selezionata: verde tratteggiata = LOS
 	# libera, rossa = bloccata (con una x sul punto di arrivo).
 	if selected != null and not los_lines.is_empty():

@@ -160,15 +160,31 @@ static func clear_hexes(state: GameState, a: Vector2i, b: Vector2i) -> bool:
 		_hex_level2_at(state, a), _hex_level2_at(state, b), false)
 
 
+# Come clear_hexes ma ritorna anche l'esagono che blocca (per lo strumento UI).
+static func clear_hexes_info(state: GameState, a: Vector2i, b: Vector2i) -> Dictionary:
+	return analyze(state, a, b,
+		_hex_level2_at(state, a), _hex_level2_at(state, b), false)
+
+
 static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 		l1: int, l2: int, low_active: bool) -> bool:
+	return analyze(state, a, b, l1, l2, low_active)["clear"]
+
+
+# Come clear_positions ma ritorna anche l'esagono che blocca la LOS (per lo
+# strumento di verifica): { "clear": bool, "blocker": Vector2i }. blocker =
+# (-99,-99) se la LOS e' libera o se il blocco non e' un ostacolo-terreno
+# specifico (limite meteo/notte).
+static func analyze(state: GameState, a: Vector2i, b: Vector2i,
+		l1: int, l2: int, low_active: bool) -> Dictionary:
+	const NONE := Vector2i(-99, -99)
 	# Limite di visibilita' del meteo (Rule 28.1): oltre il raggio, niente LOS.
 	if state.max_los > 0 and Spotting.hex_distance(a, b) > state.max_los:
-		return false
+		return {"clear": false, "blocker": NONE}
 	# Notte (Rule 18.1): LOS max 5 hex fuori dalla luce.
 	if state.night and Spotting.hex_distance(a, b) > NIGHT_LOS_MAX:
 		if not Area.illuminated(state, a) and not Area.illuminated(state, b):
-			return false
+			return {"clear": false, "blocker": NONE}
 	var between := hexes_between(a, b)
 	# Abbazia (Rule 27.5): tra due hex d'abbazia i muri non bloccano la LOS.
 	var ha := state.hex_at(a.x, a.y)
@@ -190,18 +206,22 @@ static func clear_positions(state: GameState, a: Vector2i, b: Vector2i,
 			h2 = hh
 			h_pos = pos
 	if between.is_empty():
-		return true  # adiacenti: nessun esagono interposto, niente blocco
+		return {"clear": true, "blocker": NONE}  # adiacenti: niente blocco
 	if l1 == l2:
-		return l1 >= h2
+		if l1 >= h2:
+			return {"clear": true, "blocker": NONE}
+		return {"clear": false, "blocker": h_pos}
 	if h2 >= t2:
-		return false
+		return {"clear": false, "blocker": h_pos}
 	if s2 >= h2:
-		return true
+		return {"clear": true, "blocker": NONE}
 	# Blind hexes = (H-S)/(T-H) + D
 	var dist_th := Spotting.hex_distance(taller_pos, h_pos)
 	var extra_d := maxi(0, int((dist_th - 1) / 5.0))
 	var blind := int(floor(float(h2 - s2) / float(t2 - h2))) + extra_d
-	return Spotting.hex_distance(h_pos, shorter_pos) > blind
+	if Spotting.hex_distance(h_pos, shorter_pos) > blind:
+		return {"clear": true, "blocker": NONE}
+	return {"clear": false, "blocker": h_pos}
 
 
 # Nota Depression: un soldato in Depression con ordine "low" e' fuori

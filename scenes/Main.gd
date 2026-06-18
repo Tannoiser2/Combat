@@ -1070,15 +1070,28 @@ func _los_show_anchor() -> void:
 func _los_update() -> void:
 	if los_hex_a.x <= -99 or los_hex_b.x <= -99:
 		return
-	var free := LOS.clear_hexes(state, los_hex_a, los_hex_b)
+	var info := LOS.clear_hexes_info(state, los_hex_a, los_hex_b)
+	var free: bool = info["clear"]
+	var blocker: Vector2i = info["blocker"]
 	map_view.los_tool = {
 		"from": map_view.hex_center(los_hex_a.x, los_hex_a.y),
 		"to": map_view.hex_center(los_hex_b.x, los_hex_b.y),
 		"clear": free,
 	}
-	hint_label.text = "LOS %02d.%02d → %02d.%02d: %s" % [
-		los_hex_a.x, los_hex_a.y, los_hex_b.x, los_hex_b.y,
-		"LIBERA" if free else "BLOCCATA"]
+	var head := "LOS %02d.%02d → %02d.%02d: " % [
+		los_hex_a.x, los_hex_a.y, los_hex_b.x, los_hex_b.y]
+	if free:
+		hint_label.text = head + "LIBERA"
+	elif blocker.x > -99:
+		# Evidenzia l'esagono che interrompe la LOS e nominane il terreno.
+		map_view.los_tool["blocker"] = map_view.hex_center(blocker.x, blocker.y)
+		var bh := state.hex_at(blocker.x, blocker.y)
+		var tname: String = Domain.TERRAIN_NAMES.get(bh.terrain, "?") if bh != null else "?"
+		if bh != null and bh.level > 0:
+			tname += " (L%d)" % bh.level
+		hint_label.text = head + "BLOCCATA da %s a %02d.%02d" % [tname, blocker.x, blocker.y]
+	else:
+		hint_label.text = head + "BLOCCATA (fuori portata/notte)"
 	map_view.queue_redraw()
 
 
