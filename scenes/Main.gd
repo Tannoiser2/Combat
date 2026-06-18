@@ -1090,8 +1090,12 @@ func _los_update() -> void:
 		if bh != null and bh.level > 0:
 			tname += " (L%d)" % bh.level
 		hint_label.text = head + "BLOCCATA da %s a %02d.%02d" % [tname, blocker.x, blocker.y]
+	elif info.get("reason", "") == "night":
+		hint_label.text = head + "BLOCCATA: notte, oltre %d hex (Rule 18.1)" % LOS.NIGHT_LOS_MAX
+	elif info.get("reason", "") == "weather":
+		hint_label.text = head + "BLOCCATA: oltre la visibilita' meteo (%d hex)" % state.max_los
 	else:
-		hint_label.text = head + "BLOCCATA (fuori portata/notte)"
+		hint_label.text = head + "BLOCCATA (fuori portata)"
 	map_view.queue_redraw()
 
 
