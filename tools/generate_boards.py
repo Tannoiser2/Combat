@@ -71,12 +71,38 @@ MANUAL = {
 }
 
 
+# Elevazione marcata A MANO: i terreni erbosi in quota sfuggono al
+# classificatore a colori (vedi nota sulla Hill/Ridge), quindi la quota del
+# crinale va indicata qui. Per mappa: {"col,row": livello}. Applicata in fill()
+# DOPO il terreno (vince sulla quota dedotta da OPEN_LEVEL_1/2). Riempire con
+# l'export dell'editor (sezione MANUAL_LEVELS del file map_export_<mappa>.txt).
+MANUAL_LEVELS = {
+    # "ridge": {"12,5": 1, "13,5": 2, ...},
+}
+
+
 def apply_manual(name, result):
     """Sovrascrive la classificazione automatica con i terreni speciali
     marcati a mano per la mappa `name`."""
     for tname, hexes in MANUAL.get(name, {}).items():
         for h in hexes:
             result[h] = tname
+
+
+def emit_levels(lines, name):
+    """Tabella LEVELS[<mappa>] = { 'c,r': livello } dai MANUAL_LEVELS."""
+    lvl = MANUAL_LEVELS.get(name, {})
+    lines.append('\t"%s": {' % name)
+    line = "\t\t"
+    for k in sorted(lvl, key=hex_sort_key):
+        q = '"%s": %d, ' % (k, int(lvl[k]))
+        if len(line) + len(q) > 76:
+            lines.append(line.rstrip())
+            line = "\t\t"
+        line += q
+    if line.strip():
+        lines.append(line.rstrip())
+    lines.append("\t},")
 
 
 def hex_sort_key(k):
@@ -150,6 +176,14 @@ def main():
         lines.append("\t},")
     lines.append("}")
     lines.append("")
+    lines.append("# Elevazione marcata a mano (col,row -> livello): i terreni in quota che")
+    lines.append("# il classificatore a colori vede come L0. Applicata in fill() dopo il")
+    lines.append("# terreno. Sorgente: MANUAL_LEVELS in tools/generate_boards.py.")
+    lines.append("const LEVELS := {")
+    for name in MAPS:
+        emit_levels(lines, name)
+    lines.append("}")
+    lines.append("")
     lines.append("const HEXSIDES := {")
     for name in MAPS:
         lines.append('\t"%s": [' % name)
@@ -173,6 +207,10 @@ def main():
     lines.append("\t\t\tmatch terrain:")
     lines.append("\t\t\t\tD.Terrain.OPEN_LEVEL_1: hex.level = 1")
     lines.append("\t\t\t\tD.Terrain.OPEN_LEVEL_2: hex.level = 2")
+    lines.append("\t# Elevazione marcata a mano (vince sulla quota dedotta dal terreno).")
+    lines.append("\tfor lkey in LEVELS.get(board_name, {}):")
+    lines.append("\t\tif state.map.has(lkey):")
+    lines.append("\t\t\tstate.map[lkey].level = int(LEVELS[board_name][lkey])")
     lines.append("\t# Hexside: siepi/bocage/muri sui bordi.")
     lines.append('\t_fill_hexsides(state, HEXSIDES[board_name])')
     lines.append("")

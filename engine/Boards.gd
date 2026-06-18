@@ -540,6 +540,32 @@ const TERRAIN := {
 	},
 }
 
+# Elevazione marcata a mano (col,row -> livello): i terreni in quota che
+# il classificatore a colori vede come L0. Applicata in fill() dopo il
+# terreno. Sorgente: MANUAL_LEVELS in tools/generate_boards.py.
+const LEVELS := {
+	"farmhouse": {
+	},
+	"hill": {
+	},
+	"village": {
+	},
+	"hedgerows": {
+	},
+	"woods": {
+	},
+	"town": {
+	},
+	"abbey": {
+	},
+	"hamlet": {
+	},
+	"hedgerows2": {
+	},
+	"ridge": {
+	},
+}
+
 const HEXSIDES := {
 	"farmhouse": [
 		"10,0|11,1|H", "10,10|10,11|H", "10,11|11,11|H", "10,11|11,12|H",
@@ -891,6 +917,10 @@ static func fill(state: GameState, board_name: String) -> void:
 			match terrain:
 				D.Terrain.OPEN_LEVEL_1: hex.level = 1
 				D.Terrain.OPEN_LEVEL_2: hex.level = 2
+	# Elevazione marcata a mano (vince sulla quota dedotta dal terreno).
+	for lkey in LEVELS.get(board_name, {}):
+		if state.map.has(lkey):
+			state.map[lkey].level = int(LEVELS[board_name][lkey])
 	# Hexside: siepi/bocage/muri sui bordi.
 	_fill_hexsides(state, HEXSIDES[board_name])
 

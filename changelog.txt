@@ -1,3 +1,21 @@
+v0.90 — 2026-06-18
+- Editor mappe: con NESSUNA tessera selezionata nella tavolozza il clic ora
+  dipinge terreno "Open", cancellando il terreno precedente ma MANTENENDO
+  l'elevazione (Main._editor_act + _open_for_level/_is_open). Anche la gomma e
+  il pennello Open allineano l'enum OPEN_LEVEL_n al livello dell'hex invece di
+  azzerarlo a L0. Hint della tavolozza aggiornato.
+- Editor mappe, export elevazione: "Esporta dati mappa" ora include anche la
+  quota (ogni hex con .level > 0), nel formato pronto per MANUAL_LEVELS di
+  generate_boards.py. Prima il pennello livello impostava .level senza cambiare
+  il terreno e la quota andava persa nell'export (problema chiave per la mappa
+  Ridge). Boards.gd ha ora una tabella LEVELS (elevazione marcata a mano,
+  applicata in fill() dopo il terreno) e generate_boards.py un dizionario
+  MANUAL_LEVELS che la alimenta: cosi' le quote dei crinali che il
+  classificatore a colori vede come L0 sopravvivono alla rigenerazione.
+- Aiuto revisione mappe: tools/generate_boards.py (via classify_terrain.
+  save_overlay) salva /tmp/overlay_<mappa>.png con la classificazione del
+  terreno sovrapposta alla scansione, per il confronto visivo.
+
 v0.89 — 2026-06-18
 - UI pedine: il morale non e' piu' un pallino in alto a sinistra (che copriva
   il nome) ma un BORDO colorato arrotondato attorno alla pedina (MapView.
