@@ -180,11 +180,11 @@ static func analyze(state: GameState, a: Vector2i, b: Vector2i,
 	const NONE := Vector2i(-99, -99)
 	# Limite di visibilita' del meteo (Rule 28.1): oltre il raggio, niente LOS.
 	if state.max_los > 0 and Spotting.hex_distance(a, b) > state.max_los:
-		return {"clear": false, "blocker": NONE}
+		return {"clear": false, "blocker": NONE, "reason": "weather"}
 	# Notte (Rule 18.1): LOS max 5 hex fuori dalla luce.
 	if state.night and Spotting.hex_distance(a, b) > NIGHT_LOS_MAX:
 		if not Area.illuminated(state, a) and not Area.illuminated(state, b):
-			return {"clear": false, "blocker": NONE}
+			return {"clear": false, "blocker": NONE, "reason": "night"}
 	var between := hexes_between(a, b)
 	# Abbazia (Rule 27.5): tra due hex d'abbazia i muri non bloccano la LOS.
 	var ha := state.hex_at(a.x, a.y)

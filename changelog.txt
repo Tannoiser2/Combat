@@ -1,3 +1,10 @@
+v0.93 — 2026-06-18
+- Strumento LOS: quando la linea di vista e' bloccata da un LIMITE DI
+  VISIBILITA' (non da terreno), il suggerimento ora distingue il motivo:
+  "BLOCCATA: notte, oltre 5 hex (Rule 18.1)" oppure "BLOCCATA: oltre la
+  visibilita' meteo (N hex)", invece del generico "fuori portata/notte".
+  LOS.analyze restituisce una chiave "reason" (night/weather). Selftest OK.
+
 v0.92 — 2026-06-18
 - Revisione completa delle mappe: tutte e 10 le board (farmhouse, hill, town,
   ridge, hedgerows2, abbey, woods, hamlet, village, hedgerows) sono state
