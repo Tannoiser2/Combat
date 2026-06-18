@@ -1486,6 +1486,23 @@ func _export_map_data() -> void:
 		for e in hs_entries:
 			lines.append(e + ",")
 		lines.append("],")
+	# Elevazione: ogni hex con quota > 0 (il pennello livello imposta .level
+	# senza cambiare il terreno, quindi va esportato a parte). Formato pronto per
+	# MANUAL_LEVELS["<mappa>"] di tools/generate_boards.py.
+	var lv_entries: Array[String] = []
+	for key in state.map:
+		var h: GameState.MapHex = state.map[key]
+		if h.level > 0:
+			lv_entries.append('\t"%s": %d' % [key, h.level])
+	lv_entries.sort()
+	var n_lv := lv_entries.size()
+	if n_lv > 0:
+		lines.append("")
+		lines.append("# Livelli per \"%s\" — incolla in MANUAL_LEVELS[\"%s\"] di generate_boards.py:" % [map_name, map_name])
+		lines.append('"%s": {' % map_name)
+		for e in lv_entries:
+			lines.append(e + ",")
+		lines.append("},")
 	var text := "\n".join(lines)
 	var fname := "map_export_%s.txt" % map_name
 	var n_hex := by_terrain.size()
@@ -1504,14 +1521,14 @@ func _export_map_data() -> void:
 	setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
 })();
 """ % [js_content, fname])
-		hint_label.text = "Download: %s (%d terreni, %d hexside)" % [fname, n_hex, n_hs]
+		hint_label.text = "Download: %s (%d terreni, %d hexside, %d quote)" % [fname, n_hex, n_hs, n_lv]
 	else:
 		var path := "/tmp/%s" % fname
 		var f := FileAccess.open(path, FileAccess.WRITE)
 		if f != null:
 			f.store_string(text)
 			f.close()
-			hint_label.text = "Esportato in %s (%d terreni, %d hexside)" % [path, n_hex, n_hs]
+			hint_label.text = "Esportato in %s (%d terreni, %d hexside, %d quote)" % [path, n_hex, n_hs, n_lv]
 		else:
 			hint_label.text = "Errore scrittura %s" % path
 
