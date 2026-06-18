@@ -1,3 +1,11 @@
+v0.94 — 2026-06-18
+- Fix esche (Dummy): quando un'esca viene rivelata (spotting/Search/area) il
+  motore la marca gia' come "removed" (rimossa dal gioco), ma la mappa la
+  disegnava come "Enemy KIA" perche' is_dead() e' vero anche per i removed.
+  Ora il primo passaggio dei marker KIA salta i personaggi removed
+  (MapView): l'esca rivelata sparisce dalla mappa, senza lasciare un corpo
+  nemico. Vale anche per chi e' uscito/sfilato dalla board. Selftest OK.
+
 v0.93 — 2026-06-18
 - Strumento LOS: quando la linea di vista e' bloccata da un LIMITE DI
   VISIBILITA' (non da terreno), il suggerimento ora distingue il motivo:
