@@ -92,9 +92,7 @@ static func range_modifier(dist: int) -> int:
 	return -1 - int((dist - 11) / 10.0)
 
 
-# Modificatore del bersaglio: terreno x gruppo di ordini. Se l'osservatore
-# guarda attraverso un hexside (siepe/muro) sul bordo del bersaglio, vale
-# il modificatore piu' protettivo.
+# Modificatore del bersaglio: terreno (del suo hex) x gruppo di ordini.
 static func target_modifier(state: GameState, target: Character, spotter: Character = null) -> int:
 	var hex := state.hex_at(target.position.x, target.position.y)
 	var terrain: int = hex.terrain if hex != null else D.Terrain.OPEN_LEVEL_0
@@ -105,12 +103,7 @@ static func target_modifier(state: GameState, target: Character, spotter: Charac
 	if D.is_abbey(terrain):
 		var inside := spotter != null and Fire._in_abbey(state, spotter.position)
 		return (ABBEY_SPOT_INSIDE if inside else ABBEY_SPOT_OUTSIDE)[group]
-	var mod: int = TERRAIN_MOD[terrain][group]
-	if spotter != null:
-		var side := Fire._entry_hexside(state, spotter.position, target.position)
-		if side >= 0:
-			mod = mini(mod, TERRAIN_MOD[side][group])
-	return mod
+	return TERRAIN_MOD[terrain][group]
 
 
 # Tentativo di spotting. Applica l'esito (Known/Spotted) e ritorna

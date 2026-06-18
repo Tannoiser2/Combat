@@ -108,8 +108,8 @@ var cue_color := Color(0.95, 0.85, 0.2, 0.9)
 var fire_lines_source := Vector2i(-99, -99)
 # Linee di vista dall'unita' selezionata: [{to: Vector2, clear: bool}]
 var los_lines: Array = []
-# Overlay di verifica del terreno (tasto T): tinte + hexside sopra la
-# scansione, per confrontare la classificazione con la mappa vera.
+# Overlay di verifica del terreno (tasto T): tinte sopra la scansione,
+# per confrontare la classificazione con la mappa vera.
 var debug_terrain := false
 # Editor di mappa: modalita' pittura terreno (tasto E).
 var editor_mode := false
@@ -436,10 +436,6 @@ func _draw() -> void:
 			_draw_terrain_overlay(radius)
 	else:
 		_draw_procedural_terrain(font, radius)
-	# Hexside (siepi/bocage/muri): sempre in procedurale, col debug sulla
-	# scansione (la scansione li ha gia' disegnati).
-	if board == null or debug_terrain:
-		_draw_hexsides(radius)
 	# Cannoni obiettivo (intro3/s9): cerchio scuro, X rossa se distrutti.
 	if not state.scenario_id.is_empty():
 		for gun in Scenario.SCENARIOS[state.scenario_id].get("gun_hexes", []):
@@ -1027,29 +1023,6 @@ func _draw_grass(center: Vector2, radius: float, rng: RandomNumberGenerator) -> 
 static func _key_to_cell(key: String) -> Vector2i:
 	var p := key.split(",")
 	return Vector2i(int(p[0]), int(p[1]))
-
-
-# Hexside: segmento spesso sul bordo condiviso tra i due hex.
-const HEXSIDE_COLORS := {
-	D.Terrain.HEDGEROW: Color(0.10, 0.45, 0.12),
-	D.Terrain.BOCAGE: Color(0.06, 0.28, 0.08),
-	D.Terrain.WALL: Color(0.55, 0.53, 0.48),
-}
-
-
-func _draw_hexsides(radius: float) -> void:
-	for key in state.hexsides:
-		var parts: PackedStringArray = String(key).split("|")
-		var p1: PackedStringArray = parts[0].split(",")
-		var p2: PackedStringArray = parts[1].split(",")
-		var c1 := hex_center(int(p1[0]), int(p1[1]))
-		var c2 := hex_center(int(p2[0]), int(p2[1]))
-		var mid := (c1 + c2) * 0.5
-		var dir := (c2 - c1).normalized()
-		var perp := Vector2(-dir.y, dir.x)
-		var col: Color = HEXSIDE_COLORS.get(state.hexsides[key], Color.MAGENTA)
-		draw_line(mid - perp * radius * 0.5, mid + perp * radius * 0.5,
-			col, radius * 0.18)
 
 
 # Tinte dell'overlay di verifica (tasto T), usate anche per la legenda.

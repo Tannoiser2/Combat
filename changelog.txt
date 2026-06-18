@@ -1,3 +1,18 @@
+v0.91 — 2026-06-18
+- Terreno = solo ESAGONI (Rule 11): RIMOSSO il sistema "hexside" (siepi/muri/
+  bocage sui BORDI). Il regolamento (Combat! Vol.1, cap. 11.05/11.06) li descrive
+  come ESAGONI ("Questi esagoni sono..."), e "hexside" non compare: il sistema
+  di bordo era un artefatto di modellazione. Ora siepe/muro/bocage sono
+  terreno-hex a tutti gli effetti (copertura Domain.COVER_TERRAINS, fuoco
+  Fire.WS_MOD, spotting Spotting.TERRAIN_MOD, blocco/altezza LOS.HEIGHT2,
+  movimento accidentato Move.DIFFICULT_MOVE=2). Rimossi: GameState.hexsides/
+  hexside_between/hex_has_hexside, il blocco LOS sui lati, Fire._entry_hexside,
+  il malus spotting "attraverso il bordo", lo stop su bocage in Move/Main, il
+  disegno hexside in MapView e l'editor hexside (gia' irraggiungibile). Boards.gd
+  rigenerato senza HEXSIDES; generate_boards.fold_edges_to_hexes converte i bordi
+  rilevati dal classificatore in esagoni adiacenti (rifinibili in editor).
+  Selftest OK.
+
 v0.90 — 2026-06-18
 - Editor mappe: con NESSUNA tessera selezionata nella tavolozza il clic ora
   dipinge terreno "Open", cancellando il terreno precedente ma MANTENENDO
