@@ -728,8 +728,6 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 		side: int, team: String, hidden: bool, morale: int, order: int,
 		name: String, is_selected: bool, order_move: String = "",
 		facing: int = 0) -> void:
-	if is_selected:
-		draw_circle(center, radius * 0.62, Color(1.0, 1.0, 0.3, 0.85))
 	# Segnalino vero se disponibile (dummy se nemico non identificato),
 	# altrimenti cerchietto di ripiego (build web senza i PNG).
 	var counter_id: String = DUMMY_BY_TEAM.get(team, "GE-RedTeam-Dummy-1") if hidden else counter
@@ -737,6 +735,14 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 	if tex != null:
 		var s := radius * 1.5
 		draw_texture_rect(tex, Rect2(center - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+		# Bordo colorato = morale, attorno alla pedina (sostituisce il vecchio
+		# pallino in alto a sinistra, che copriva il nome). Piu' spesso + alone
+		# bianco/giallo quando la pedina e' selezionata. I nemici non identificati
+		# non hanno morale noto: niente bordo, salvo l'alone di selezione (neutro).
+		if not hidden:
+			_draw_counter_border(center, radius, MORALE_COLORS[morale], is_selected)
+		elif is_selected:
+			_draw_counter_border(center, radius, Color(0.82, 0.82, 0.82), true)
 	else:
 		draw_circle(center, radius * 0.45,
 			Color(0.30, 0.30, 0.30) if hidden else SIDE_COLORS[side])
@@ -744,11 +750,11 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 		draw_string(font, center + Vector2(-radius * 0.15, radius * 0.15),
 			"?" if hidden else name.substr(0, 1),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.42), Color.WHITE)
-	# Pallino del morale (alto a sinistra), bordato per leggibilita'.
-	if not hidden:
-		var mc := center + Vector2(-radius * 0.52, -radius * 0.52)
-		draw_circle(mc, radius * 0.17, MORALE_COLORS[morale])
-		draw_circle(mc, radius * 0.17, Color(0, 0, 0, 0.8), false, radius * 0.03)
+		# Ripiego (nessun PNG): anello morale + anello di selezione attorno al cerchietto.
+		if is_selected:
+			draw_arc(center, radius * 0.60, 0, TAU, 32, Color(1.0, 0.95, 0.5, 0.9), radius * 0.06)
+		if not hidden:
+			draw_arc(center, radius * 0.50, 0, TAU, 32, MORALE_COLORS[morale], radius * 0.08)
 	# Ordine: segnalino-ordine vero (con impulse track) come badge in
 	# basso a destra; ripiego a etichetta per gli ordini senza marker.
 	if order >= 0 and not hidden:
@@ -764,6 +770,34 @@ func _draw_unit(font: Font, radius: float, center: Vector2, counter: String,
 			draw_string(font, center + Vector2(-radius * 0.9, radius * 0.92),
 				label, HORIZONTAL_ALIGNMENT_LEFT, -1, int(radius * 0.3),
 				Color(0.95, 0.95, 0.2))
+
+
+# Bordo arrotondato colorato attorno alla pedina, in sostituzione del pallino
+# del morale. Spessore maggiore + alone bianco/giallo quando e' selezionata.
+# Usa uno StyleBoxFlat (angoli arrotondati nativi, come la pedina reale).
+func _draw_counter_border(center: Vector2, radius: float, col: Color, is_selected: bool) -> void:
+	var s := radius * 1.5
+	var ccr := radius * 0.16          # raggio d'angolo della pedina
+	var bw := radius * (0.12 if is_selected else 0.055)
+	if is_selected:
+		# Alone di selezione: giallo sfumato (esterno) + bianco (vicino al bordo).
+		_border_box(center, s, bw + radius * 0.15, radius * 0.11, ccr + bw + radius * 0.10,
+			Color(1.0, 0.9, 0.35, 0.40))
+		_border_box(center, s, bw + radius * 0.02, radius * 0.05, ccr + bw,
+			Color(1.0, 1.0, 1.0, 0.90))
+	_border_box(center, s, bw, bw, ccr + bw, col)
+
+
+# Cornice (StyleBoxFlat senza centro) di spessore `bw` e raggio d'angolo `cr`,
+# con l'orlo esterno a `grow` px oltre il lato della pedina.
+func _border_box(center: Vector2, s: float, grow: float, bw: float, cr: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.draw_center = false
+	sb.border_color = col
+	sb.set_border_width_all(maxi(1, int(round(bw))))
+	sb.set_corner_radius_all(maxi(0, int(round(cr))))
+	var half := s * 0.5 + grow
+	draw_style_box(sb, Rect2(center - Vector2(half, half), Vector2(half * 2.0, half * 2.0)))
 
 
 # Overlay per veicoli: freccia del facing dello scafo (orientamento armatura,
