@@ -1,9 +1,19 @@
 # Genera engine/Boards.gd classificando le scansioni in assets/maps/.
 # Uso: python3 tools/generate_boards.py   (dalla radice del progetto)
-import sys, os
+import sys, os, re
 sys.path.insert(0, os.path.dirname(__file__))
 from collections import Counter, defaultdict
 from classify_terrain import Classifier, save_overlay
+
+# Export dell'editor (FONTE DI VERITA'): se esiste tools/map_exports/<mappa>.txt
+# (la mappa ridisegnata a mano nell'editor), il generatore lo usa VERBATIM e
+# SALTA del tutto la classificazione automatica a colori per quella mappa. Cosi'
+# la rifinitura manuale non viene mai sovrascritta da una rigenerazione. Gli hex
+# non elencati nell'export sono Open Level 0 (incluse le strade: in Combat! la
+# strada NON e' un terreno della Terrain Effects Chart, resta Open e visibile
+# solo perche' MapView disegna l'immagine della board sotto).
+MAP_EXPORTS_DIR = os.path.join(os.path.dirname(__file__), "map_exports")
+EXPORT_LEVELS = {}  # popolato da load_export: name -> { "c,r": livello }
 
 # Origini (dal buildFile Vassal):
 #   farmhouse 72,106 - hill 73,109 - village 77,110 - hedgerows 70,110
@@ -90,6 +100,57 @@ MANUAL_LEVELS = {
 SKIP_EDGE_FOLD = {"woods", "hamlet", "ridge"}
 
 
+def _check_bounds(name, hexes):
+    """Verifica che gli hex dell'export stiano nella griglia (col 1..35,
+    riga 0..19 dispari / 0..18 pari). Solleva su un hex fuori griglia (typo)."""
+    for h in hexes:
+        c, r = (int(x) for x in h.split(","))
+        last = 19 if c % 2 == 1 else 18
+        if not (1 <= c <= 35 and 0 <= r <= last):
+            raise ValueError("%s: hex fuori griglia nell'export: %s" % (name, h))
+
+
+def load_export(name):
+    """Legge tools/map_exports/<name>.txt (export dell'editor). Ritorna
+    (by_enum, levels) con by_enum = {NOME_ENUM: [hex]} e levels = {"c,r": liv},
+    oppure None se non esiste. Il terreno arriva dai blocchi D.Terrain.X: [...];
+    l'eventuale quota da una sezione MANUAL_LEVELS con coppie "c,r": N."""
+    path = os.path.join(MAP_EXPORTS_DIR, name + ".txt")
+    if not os.path.exists(path):
+        return None
+    text = open(path, encoding="utf-8").read()
+    by_enum = {}
+    for m in re.finditer(r"D\.Terrain\.(\w+):\s*\[(.*?)\]", text, re.S):
+        hexes = re.findall(r'"(\d+,\d+)"', m.group(2))
+        if hexes:
+            by_enum.setdefault(m.group(1), []).extend(hexes)
+    levels = {}
+    ml = re.search(r"MANUAL_LEVELS.*?\{(.*?)\}", text, re.S)
+    if ml:
+        for hm in re.finditer(r'"(\d+,\d+)"\s*:\s*(\d+)', ml.group(1)):
+            levels[hm.group(1)] = int(hm.group(2))
+    for hexes in by_enum.values():
+        _check_bounds(name, hexes)
+    _check_bounds(name, list(levels.keys()))
+    return by_enum, levels
+
+
+def emit_table_enum(lines, by_enum):
+    """Come emit_table ma i valori sono gia' nomi di Domain.Terrain (export)."""
+    for ename in sorted(by_enum):
+        hexes = sorted(set(by_enum[ename]), key=hex_sort_key)
+        lines.append("\t\tD.Terrain.%s: [" % ename)
+        line = "\t\t\t"
+        for k in hexes:
+            q = '"%s",' % k
+            if len(line) + len(q) > 76:
+                lines.append(line.rstrip())
+                line = "\t\t\t"
+            line += q + " "
+        lines.append(line.rstrip())
+        lines.append("\t\t],")
+
+
 def apply_manual(name, result):
     """Sovrascrive la classificazione automatica con i terreni speciali
     marcati a mano per la mappa `name`."""
@@ -99,8 +160,10 @@ def apply_manual(name, result):
 
 
 def emit_levels(lines, name):
-    """Tabella LEVELS[<mappa>] = { 'c,r': livello } dai MANUAL_LEVELS."""
-    lvl = MANUAL_LEVELS.get(name, {})
+    """Tabella LEVELS[<mappa>] = { 'c,r': livello } dai MANUAL_LEVELS e
+    dall'eventuale export dell'editor (EXPORT_LEVELS)."""
+    lvl = dict(MANUAL_LEVELS.get(name, {}))
+    lvl.update(EXPORT_LEVELS.get(name, {}))
     lines.append('\t"%s": {' % name)
     line = "\t\t"
     for k in sorted(lvl, key=hex_sort_key):
@@ -174,6 +237,16 @@ def main():
     lines.append("")
     lines.append("const TERRAIN := {")
     for name, (path, x0, y0, tan_l1) in MAPS.items():
+        export = load_export(name)
+        if export is not None:
+            by_enum, levels = export
+            EXPORT_LEVELS[name] = levels
+            counts = {k: len(set(v)) for k, v in sorted(by_enum.items())}
+            print(name, "EDITOR EXPORT (classificatore saltato):", counts)
+            lines.append('\t"%s": {' % name)
+            emit_table_enum(lines, by_enum)
+            lines.append("\t},")
+            continue
         clf = Classifier(path, x0, y0, tan_l1)
         result = clf.classify_all()
         apply_manual(name, result)
