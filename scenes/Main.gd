@@ -991,50 +991,54 @@ func _fit_map() -> void:
 	camera.zoom = Vector2(z, z)
 
 
-# Strumento LOS: ON mostra due estremita' trascinabili con LOS in tempo reale.
+# Strumento LOS: ON azzera tutto; il primo click fissa un'estremita', il
+# secondo genera la linea, poi si trascinano i cerchi. Nessun click sposta la
+# linea in automatico: a linea completa un click lontano inizia una nuova misura.
 func _on_los_toggled(on: bool) -> void:
 	los_mode = on
 	los_dragging = -1
 	map_view.los_tool = {}
 	next_button.disabled = on
-	if on and state != null and not state.map.is_empty():
-		# Posiziona le estremita' agli estremi della mappa (angolo top-left / bottom-right).
-		var mn := Vector2i(9999, 9999)
-		var mx := Vector2i(-9999, -9999)
-		for key in state.map:
-			var parts: PackedStringArray = (key as String).split(",")
-			var h := Vector2i(int(parts[0]), int(parts[1]))
-			if h.x < mn.x or (h.x == mn.x and h.y < mn.y): mn = h
-			if h.x > mx.x or (h.x == mx.x and h.y > mx.y): mx = h
-		los_hex_a = mn
-		los_hex_b = mx
-		_los_update()
-		hint_label.text = "LOS: trascina i cerchi — %02d.%02d → %02d.%02d" % [mn.x, mn.y, mx.x, mx.y]
+	los_hex_a = Vector2i(-99, -99)
+	los_hex_b = Vector2i(-99, -99)
+	if on:
+		hint_label.text = "LOS: clicca il primo hex, poi il secondo (trascina i cerchi per spostarli)"
 	else:
-		los_hex_a = Vector2i(-99, -99)
-		los_hex_b = Vector2i(-99, -99)
 		hint_label.text = "Strumento LOS chiuso"
 	map_view.queue_redraw()
 
 
 func _los_handle_press(local_pos: Vector2) -> void:
 	var snap := MapView.HEX_SIZE * 0.9
-	var pa := map_view.hex_center(los_hex_a.x, los_hex_a.y)
-	var pb := map_view.hex_center(los_hex_b.x, los_hex_b.y)
-	if local_pos.distance_to(pa) <= snap:
+	# 1) Trascinamento di un'estremita' gia' piazzata: ha la priorita'.
+	if los_hex_a.x > -99 \
+			and local_pos.distance_to(map_view.hex_center(los_hex_a.x, los_hex_a.y)) <= snap:
 		los_dragging = 0
-	elif local_pos.distance_to(pb) <= snap:
+		return
+	if los_hex_b.x > -99 \
+			and local_pos.distance_to(map_view.hex_center(los_hex_b.x, los_hex_b.y)) <= snap:
 		los_dragging = 1
-	else:
-		# Click lontano: sposta l'estremita' piu' vicina a quell'hex.
-		var hex := map_view.pick_hex(local_pos)
-		if hex.x <= -99:
-			return
-		if local_pos.distance_to(pa) <= local_pos.distance_to(pb):
-			los_hex_a = hex
-		else:
-			los_hex_b = hex
+		return
+	# 2) Click di piazzamento.
+	var hex := map_view.pick_hex(local_pos)
+	if hex.x <= -99:
+		return
+	if los_hex_a.x <= -99:
+		# Primo click: prima estremita' (ancora nessuna linea).
+		los_hex_a = hex
+		los_hex_b = Vector2i(-99, -99)
+		_los_show_anchor()
+		hint_label.text = "LOS: primo hex %02d.%02d — clicca il secondo" % [hex.x, hex.y]
+	elif los_hex_b.x <= -99:
+		# Secondo click: genera la linea.
+		los_hex_b = hex
 		_los_update()
+	else:
+		# Linea completa: un click lontano inizia una nuova misura da qui.
+		los_hex_a = hex
+		los_hex_b = Vector2i(-99, -99)
+		_los_show_anchor()
+		hint_label.text = "LOS: primo hex %02d.%02d — clicca il secondo" % [hex.x, hex.y]
 
 
 func _los_drag_update(local_pos: Vector2) -> void:
@@ -1045,7 +1049,19 @@ func _los_drag_update(local_pos: Vector2) -> void:
 		los_hex_a = hex
 	else:
 		los_hex_b = hex
-	_los_update()
+	if los_hex_a.x > -99 and los_hex_b.x > -99:
+		_los_update()
+	else:
+		_los_show_anchor()
+
+
+# Mostra solo la prima estremita' (cerchio singolo) finche' manca la seconda.
+func _los_show_anchor() -> void:
+	if los_hex_a.x <= -99:
+		map_view.los_tool = {}
+	else:
+		map_view.los_tool = {"anchor": map_view.hex_center(los_hex_a.x, los_hex_a.y)}
+	map_view.queue_redraw()
 
 
 func _los_update() -> void:
