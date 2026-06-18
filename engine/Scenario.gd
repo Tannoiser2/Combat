@@ -313,8 +313,9 @@ const SCENARIOS := {
 			{"name": "Pvt Douglas", "role": "US Rifleman", "team": "Charlie",
 				"pos": "21,18", "counter": "US-Charlie-Pvt-Douglas"},
 		],
-		# La "Coppa": personaggi reali mescolati e piazzati coperti nei
-		# 12 hex di setup (i Dummy del libro sono un TODO).
+		# La "Coppa": personaggi reali + pedine-esca (chiave "dummies"),
+		# mescolati e piazzati coperti nei 12 hex di setup. Le esche si
+		# rivelano con spotting o Search (TurnSequence._reveal_dummy).
 		"enemy_cup": [
 			{"name": "Soldat Abbas", "role": "Recruit", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Abbas"},
 			{"name": "Soldat Abend", "role": "Recruit", "team": "Blue", "counter": "GE-BlueTeam-Soldat-Abend"},
@@ -404,7 +405,7 @@ const SCENARIOS := {
 		# Vittoria a VP (chiesa = 24.06/24.07).
 		"vp": {"enemy_killed": 1, "friendly_killed": -2, "friendly_wounded": -1,
 			"church_hexes": ["24,6", "24,7"], "church_each": 3,
-			"no_enemy_in_building": 5},
+			"no_enemy_in_building": 5, "documents": 5},
 	},
 
 	"intro3": {
@@ -1506,6 +1507,10 @@ static func victory(state: GameState, scenario_id: String) -> Dictionary:
 		if not _enemy_in_building(state):
 			vp += int(vp_rules["no_enemy_in_building"])
 			parts.append("edifici liberi")
+	# Documenti recuperati (SR13, intro2).
+	if vp_rules.has("documents") and state.documents_found:
+		vp += int(vp_rules["documents"])
+		parts.append("documenti recuperati")
 	# Punti di ricognizione (s6).
 	if vp_rules.has("objective_each"):
 		vp += state.visited_objectives.size() * int(vp_rules["objective_each"])

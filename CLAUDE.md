@@ -58,6 +58,19 @@ carica con can_enter), morale a 7 stati, granate mirate dal giocatore
 e nemiche, scenari intro1-3 e s1-s9, replay continuo, suoni per
 arma/esito.
 
+AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
+terreno (Rule 13: difficili=2, Move.DIFFICULT_MOVE/terrain_move_cost,
+budget in move_character); Search raccoglie i documenti (SR13:
+_do_search->_reveal_dummy, state.documents_found, +5 VP); fuoco di
+reazione/Guard (Rule 9.9: TurnSequence.reaction_fire da _do_move e dallo
+step UI, Guard come overwatch del giocatore + micro-AI nemica che mette
+in Guard chi e' in copertura senza bersaglio). Dummy markers: gia'
+implementati (esche nella Coppa, rivelate da spotting/Search). Test:
+_test_move_cost, _test_documents, _test_guard_reaction. RESTANO fuori
+(scelta di design): modello equipaggio veicoli completo (docs/
+veicoli_roadmap.md, Fasi 4-7), revisione visiva mappe non annotate
+(woods/hamlet/hedgerows2/ridge), editor di scenari.
+
 ## Prossimi passi — Volume 2 (regole in riferimenti/Combat2Rules.pdf,
 gia' lette; asset nel repo privato combat-riferimenti)
 

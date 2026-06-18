@@ -109,6 +109,7 @@ var panzerfaust_level: int = 0
 var panzerfaust_type: String = "Panzerfaust 60"
 var guns_destroyed: Array = []  # hex (chiavi) dei cannoni saltati
 var visited_objectives: Array = []  # punti di ricognizione raggiunti
+var documents_found: bool = false  # SR13: documenti recuperati da un'esca
 
 # Modificatori della carta giocata, validi per il turno (azzerati in End
 # Phase). Es. ws_all, ws_team{team:mod}, ws_cover_self, no_impulse1,

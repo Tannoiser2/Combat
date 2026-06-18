@@ -1262,6 +1262,9 @@ func _handle_action_click(hex: Vector2i) -> void:
 			return
 		if acting.is_vehicle:
 			_play_sfx("vehicle")
+		# Rule 9.9: i nemici in Guard reagiscono al passaggio del giocatore.
+		TurnSequence.reaction_fire(state, acting)
+		_consume_audio_events()
 		moves_left -= 1
 		# Scavalcare un BOCAGE esaurisce il movimento dell'impulse.
 		if state.hexside_between(from, hex) == Domain.Terrain.BOCAGE:
@@ -3560,6 +3563,114 @@ func _test_rules() -> int:
 	fails += _test_vehicle_ai()
 	fails += _test_bazooka()
 	fails += _test_order_filters()
+	fails += _test_documents()
+	fails += _test_move_cost()
+	fails += _test_guard_reaction()
+	return fails
+
+
+# Fuoco di reazione (Rule 9.9): un'unita' in Guard spara a chi le passa nella
+# LOS, una sola volta per turno; chi non e' in Guard non reagisce.
+func _test_guard_reaction() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 11
+	for r in range(5):
+		st.map[GameState.hex_key(0, r)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	# Mover friendly individuato (spotted) che avanza verso il nemico.
+	var m := Character.new("m", "M", Domain.Side.FRIENDLY, "Able")
+	m.troop_quality = 6
+	m.weapon_skills = {"M1 Garand": 5}
+	m.position = Vector2i(0, 0)
+	m.spotted = true
+	m.set_order(Domain.Order.SPRINT)
+	# Guard nemico armato e allertato, con LOS/gittata sul percorso.
+	var g := Character.new("g", "G", Domain.Side.ENEMY, "Red")
+	g.troop_quality = 7
+	g.weapon_skills = {"M1 Garand": 6}
+	g.position = Vector2i(0, 3)
+	g.alerted = true
+	g.known = true
+	g.set_order(Domain.Order.GUARD)
+	# Secondo nemico NON in Guard: non deve reagire.
+	var g2 := Character.new("g2", "G2", Domain.Side.ENEMY, "Red")
+	g2.troop_quality = 7
+	g2.weapon_skills = {"M1 Garand": 6}
+	g2.position = Vector2i(0, 4)
+	g2.alerted = true
+	g2.known = true
+	g2.set_order(Domain.Order.AIMED_FIRE)
+	st.characters = [m, g, g2]
+	Move.move_character(st, m, 1)  # avanza di 1 hex verso il nemico
+	TurnSequence.reaction_fire(st, m)
+	if not g.guard_reacted:
+		print("TEST guard reaction: il Guard armato doveva reagire")
+		fails += 1
+	if g2.guard_reacted:
+		print("TEST guard reaction: chi non e' in Guard non deve reagire")
+		fails += 1
+	return fails
+
+
+# Costi di movimento per terreno (Rule 13): i terreni difficili costano 2,
+# dimezzando gli hex percorsi nell'impulse.
+func _test_move_cost() -> int:
+	var fails := 0
+	# Corridoio verticale di 4 hex (colonna 0): adiacenti in even-q.
+	# Caso A: tutto aperto, un MUST_MOVE_2 (2 hex) percorre 2 hex.
+	var st := GameState.new()
+	for r in range(4):
+		st.map[GameState.hex_key(0, r)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	var m := Character.new("m", "M", Domain.Side.FRIENDLY, "Able")
+	m.position = Vector2i(0, 0)
+	m.set_order(Domain.Order.SPRINT)
+	var tgt := Character.new("t", "T", Domain.Side.ENEMY, "Red")
+	tgt.troop_quality = 5
+	tgt.position = Vector2i(0, 3)
+	st.characters = [m, tgt]
+	var moved_open := Move.move_character(st, m, 2)
+	if moved_open != 2:
+		print("TEST move cost: aperto dovrebbe fare 2 hex, fatti %d" % moved_open)
+		fails += 1
+	# Caso B: bosco (TREES) sul primo hex -> costa 2, ne percorre solo 1.
+	var st2 := GameState.new()
+	for r in range(4):
+		st2.map[GameState.hex_key(0, r)] = GameState.MapHex.new(Domain.Terrain.OPEN_LEVEL_0)
+	st2.map[GameState.hex_key(0, 1)] = GameState.MapHex.new(Domain.Terrain.TREES)
+	var m2 := Character.new("m2", "M2", Domain.Side.FRIENDLY, "Able")
+	m2.position = Vector2i(0, 0)
+	m2.set_order(Domain.Order.SPRINT)
+	var tgt2 := Character.new("t2", "T2", Domain.Side.ENEMY, "Red")
+	tgt2.troop_quality = 5
+	tgt2.position = Vector2i(0, 3)
+	st2.characters = [m2, tgt2]
+	var moved_woods := Move.move_character(st2, m2, 2)
+	if moved_woods != 1 or m2.position != Vector2i(0, 1):
+		print("TEST move cost: bosco dovrebbe fermare a 1 hex, fatti %d pos %s" % [
+			moved_woods, str(m2.position)])
+		fails += 1
+	if Move.terrain_move_cost(Domain.Terrain.TREES) != 2 \
+			or Move.terrain_move_cost(Domain.Terrain.OPEN_LEVEL_0) != 1:
+		print("TEST move cost: terrain_move_cost errato")
+		fails += 1
+	return fails
+
+
+# Documenti recuperati da un'esca (SR13, intro2): +5 VP a fine scenario.
+func _test_documents() -> int:
+	var fails := 0
+	var st := GameState.new()
+	st.rng.seed = 7
+	Scenario.build(st, "intro2")
+	var base: int = int(Scenario.victory(st, "intro2").get("vp", 0))
+	st.documents_found = true
+	var v := Scenario.victory(st, "intro2")
+	if int(v.get("vp", 0)) != base + 5:
+		print("DOCUMENTI: VP atteso %d, ottenuto %d" % [base + 5, int(v.get("vp", 0))])
+		fails += 1
+	if not ("documenti recuperati" in String(v.get("detail", ""))):
+		print("DOCUMENTI: manca la voce nel dettaglio dell'esito")
+		fails += 1
 	return fails
 
 
@@ -3870,9 +3981,10 @@ func _test_order_filters() -> int:
 	if Domain.Order.RIFLE_GRENADE in orders:
 		print("TEST filtri ordini: Rifle Grenade non deve apparire senza M7 Grenade Launcher")
 		fails += 1
-	# Guard senza prigionieri vicini.
-	if Domain.Order.GUARD in orders:
-		print("TEST filtri ordini: Guard non deve apparire senza prigionieri vicini")
+	# Guard: ora e' overwatch (Rule 9.9), disponibile a un'unita' armata
+	# anche senza prigionieri vicini.
+	if Domain.Order.GUARD not in orders:
+		print("TEST filtri ordini: Guard (overwatch) deve apparire per un'unita' armata")
 		fails += 1
 	# Carry/Drag senza alleati incapacitati vicini.
 	if Domain.Order.CARRY_DRAG in orders:

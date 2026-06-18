@@ -670,6 +670,19 @@ static func _assign_enemy_order(state: GameState, c: Character, serial: int) -> 
 		elif entry["grenade"] and Checks.troop_quality_check(c, state.rng)["passed"]:
 			order = Domain.Order.GRENADE
 			grenade = true
+	# Rule 9.9 (overwatch): un nemico in copertura, armato, con un ordine di
+	# fuoco ma SENZA un bersaglio ingaggiabile ora, mentre un Friendly individuato
+	# e' nei paraggi (8 hex), "veglia" la sua LOS (Guard) e reagisce a chi avanza,
+	# invece di restare in Aimed Fire a vuoto. Niente conversione se ha un
+	# bersaglio (resta aggressivo) o se non e' in copertura.
+	if order in [Domain.Order.AIMED_FIRE, Domain.Order.RAPID_FIRE,
+			Domain.Order.SUPPRESSIVE_FIRE] and in_cover and not grenade and not charge \
+			and not c.weapon_skills.is_empty() \
+			and valid_fire_targets(state, c).is_empty() \
+			and _spotted_friendly_within(state, c, 8):
+		order = Domain.Order.GUARD
+		move = ""
+		state.log_event("%s si apposta in vigilanza (Guard/overwatch)" % c.display_name)
 	_set_enemy_order(state, c, order, move, grenade, charge)
 	var extra := "" if c.order_move.is_empty() else " " + c.order_move
 	if grenade:
@@ -976,8 +989,9 @@ static func _do_search(state: GameState, searcher: Character) -> void:
 		if Spotting.hex_distance(searcher.position, e.position) <= 1:
 			e.known = true
 			if e.is_dummy:
-				e.removed = true
-				state.log_event("%s scopre un'esca cercando" % searcher.display_name)
+				# Stessa risoluzione dello spotting (SR13: dummy_roll ->
+				# documenti / uomo disperso / niente).
+				_reveal_dummy(state, searcher, e)
 			else:
 				state.log_event("%s scopre %s cercando" % [
 					searcher.display_name, e.display_name])
@@ -1189,7 +1203,9 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 		if o == Domain.Order.RIFLE_GRENADE \
 				and not c.weapon_skills.has("M7 Grenade Launcher"):
 			continue
-		# Guard (Rule 15.5): solo con un prigioniero (is_prisoner) vicino.
+		# Guard: overwatch (Rule 9.9) per un'unita' armata che reagisce a chi entra
+		# nella sua LOS, oppure sorveglianza di un prigioniero adiacente (Rule 15.5).
+		# Nascosto solo a chi non e' armato e non ha un prigioniero da vigilare.
 		if o == Domain.Order.GUARD:
 			var _has_prisoner := false
 			for _rival in state.characters:
@@ -1197,7 +1213,7 @@ static func legal_orders(state: GameState, c: Character) -> Array[int]:
 						and Spotting.hex_distance(c.position, _rival.position) <= 1:
 					_has_prisoner = true
 					break
-			if not _has_prisoner:
+			if c.weapon_skills.is_empty() and not _has_prisoner:
 				continue
 		# Carry/Drag (Rule 13.3): solo se c'e' un alleato incapacitato vicino.
 		if o == Domain.Order.CARRY_DRAG:
@@ -1289,6 +1305,37 @@ static func _do_move(state: GameState, c: Character, hexes: int) -> void:
 		# Rule 9.4: un nemico che entra in terreno coperto con LOS a un Friendly
 		# Spotted puo' buttarsi al riparo (Duck Back).
 		_enter_terrain_duck_back(state, c)
+		# Rule 9.9: chi e' in Guard reagisce al passaggio del mover nella sua LOS.
+		reaction_fire(state, c)
+
+
+# Fuoco di reazione (Rule 9.9): un personaggio con ordine Guard "veglia" e spara
+# UNA volta per turno al primo avversario che si muove nella sua LOS/gittata.
+# Va chiamata dopo ogni movimento (sia il _do_move automatico, sia lo step
+# interattivo del giocatore in Main.gd). Il guard ingaggia il mover solo se
+# questo e' un suo bersaglio valido (visto, in gittata, LOS) e non ha gia'
+# reagito nel turno. I veicoli non fanno fuoco di reazione (modello a parte).
+static func reaction_fire(state: GameState, mover: Character) -> void:
+	if mover == null or mover.is_dead():
+		return
+	for g in state.characters:
+		if g == mover or g.is_dead() or g.is_vehicle:
+			continue
+		if not g.has_order or g.order != Domain.Order.GUARD or g.guard_reacted:
+			continue
+		if g.side == mover.side:
+			continue
+		# Un nemico in Guard reagisce solo se allertato (sa che c'e' battaglia).
+		if g.side == Domain.Side.ENEMY and not g.alerted:
+			continue
+		if mover not in valid_fire_targets(state, g):
+			continue
+		g.guard_reacted = true
+		state.log_event("%s reagisce dalla vigilanza: fuoco su %s (Rule 9.9)" % [
+			g.display_name, mover.display_name])
+		Fire.fire_action(state, g, mover, g.weapon_skills.keys()[0])
+		if mover.is_dead():
+			return
 
 
 # Terreni "Aperti" (Rule 11): non innescano il Duck Back d'ingresso (Rule 9.4).
@@ -1485,8 +1532,11 @@ static func _reveal_dummy(state: GameState, spotter: Character, dummy: Character
 		return
 	var roll := Checks.roll_d10(state.rng)
 	if roll == 0:
-		# Documenti: +5 VP se raccolti (TODO raccolta con Search; per ora log).
-		state.log_event("%s trova dei DOCUMENTI in %02d.%02d!" % [
+		# SR13: chi rivela l'esca recupera i documenti sul posto (+5 VP a fine
+		# scenario via vp_rules["documents"]). Lo spotter e' vicino per averli
+		# individuati, quindi qui "trovati" = "raccolti".
+		state.documents_found = true
+		state.log_event("%s recupera dei DOCUMENTI in %02d.%02d! (+5 VP)" % [
 			spotter.display_name, dummy.position.x, dummy.position.y])
 	elif roll <= 6:
 		var names := ["Cpl Thomas", "Pvt Stubbs", "Pvt Templeman",
