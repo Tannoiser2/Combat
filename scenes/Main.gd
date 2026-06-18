@@ -2237,6 +2237,24 @@ func _show_vehicle_display(vehicle: Character) -> void:
 			hint.add_theme_font_size_override("font_size", 10)
 			hint.modulate = Color(0.65, 0.65, 0.6)
 			box.add_child(hint)
+	# Rule 31.9.3: passeggeri imbarcati (saliti con Mount Up). Non hanno una
+	# casella sul mat: strip cliccabile per fuoco/sbarco sui mezzi amici.
+	var pax: Array = VehicleCombat.embarked_passengers(vehicle)
+	if not pax.is_empty():
+		box.add_child(HSeparator.new())
+		box.add_child(_section_label("PASSEGGERI"))
+		for p in pax:
+			var pb := Button.new()
+			var act := " — spara" if (p.has_order and VehicleCombat.passengers_can_fire(vehicle)) else ""
+			pb.text = "%s%s" % [p.display_name, act]
+			pb.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			pb.custom_minimum_size = Vector2(200, 0)
+			if vehicle.side == Domain.Side.FRIENDLY:
+				var pp: Character = p
+				pb.pressed.connect(func() -> void: _open_crew_order_panel(vehicle, pp))
+			else:
+				pb.disabled = true
+			box.add_child(pb)
 	box.add_child(HSeparator.new())
 	var close := Button.new()
 	close.text = "Chiudi"
@@ -2741,6 +2759,44 @@ func _open_crew_order_panel(vehicle: Character, cm: Character) -> void:
 			info_cmd.text = "Dirige l'avvistamento del mezzo."
 			info_cmd.add_theme_color_override("font_color", Color(0.75, 0.85, 0.95))
 			order_list.add_child(info_cmd)
+		"Passenger":
+			# Rule 31.9.3: il passeggero spara l'arma leggera (solo mezzi scoperti)
+			# e puo' scendere dal mezzo.
+			if VehicleCombat.passengers_can_fire(vehicle):
+				var firing: bool = cm.has_order and cm.order in [
+					Domain.Order.AIMED_FIRE, Domain.Order.SUPPRESSIVE_FIRE,
+					Domain.Order.RAPID_FIRE]
+				_add_crew_fire_btn(order_list, order_desc, "Non spara", not firing,
+					_crew_order_desc("Non spara", "",
+						"Il passeggero non apre il fuoco questo impulso."),
+					func() -> void:
+						cm.clear_order()
+						_update_orders_button()
+						_open_crew_order_panel(vehicle, cm))
+				_add_crew_fire_btn(order_list, order_desc, "Spara (Aimed)", firing,
+					_crew_order_desc("Fuoco arma leggera",
+						"%s%s-Fire-Marker-f.png" % [base, side],
+						"Spara la propria arma leggera dall'hex del mezzo scoperto, agli impulsi 2 e 4 (Rule 31.9.3).",
+						Domain.Order.AIMED_FIRE),
+					func() -> void:
+						cm.set_order(Domain.Order.AIMED_FIRE)
+						_update_orders_button()
+						_open_crew_order_panel(vehicle, cm))
+			else:
+				var info_pax := Label.new()
+				info_pax.text = "Non puo' sparare da un mezzo chiuso."
+				info_pax.add_theme_color_override("font_color", Color(0.65, 0.65, 0.6))
+				order_list.add_child(info_pax)
+			_add_crew_fire_btn(order_list, order_desc, "Scendi dal mezzo", false,
+				_crew_order_desc("Scendi dal mezzo",
+					"%s%s-Bail-Out-Marker-f.png" % [base, side],
+					"Il passeggero scende nell'hex del veicolo (o adiacente) e torna fanteria. Nessuna penalita' di morale."),
+				func() -> void:
+					VehicleCombat.dismount(state, vehicle, cm)
+					order_panel.hide()
+					_update_orders_button()
+					_refresh()
+					_refresh_vehicle_display())
 	var cancel := Button.new()
 	cancel.text = "Annulla"
 	cancel.modulate = Color(0.85, 0.7, 0.7)
@@ -5789,6 +5845,93 @@ func _test_vehicles() -> int:
 	var th_open: int = Spotting.attempt(sps, spv, tgS)["threshold"]
 	if th_open - th_closed != 2:
 		print("TEST boccaporto: chiuso deve dare -2 allo spotting (%d vs %d)" % [th_closed, th_open])
+		fails += 1
+
+	# --- Rule 31.10.7 / 31.10.11: esplosione/granata vs equipaggio esposto ---
+	var ex := GameState.new()
+	ex.rng.seed = 1
+	Boards.fill(ex, "farmhouse")
+	var jeepE := VehicleCombat.make_vehicle("Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(8, 8))
+	# Mezzo scoperto: l'esplosione nell'hex investe l'equipaggio.
+	if not VehicleCombat.explosion_hits_crew(ex, jeepE, true):
+		print("TEST esplosione: la Jeep scoperta deve esporre l'equipaggio")
+		fails += 1
+	# AFV chiuso: equipaggio al riparo (niente effetto).
+	var shE := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(9, 9), 3)
+	if VehicleCombat.explosion_hits_crew(ex, shE, true):
+		print("TEST esplosione: un AFV chiuso non espone l'equipaggio")
+		fails += 1
+	# Boccaporto aperto: equipaggio vulnerabile.
+	shE.is_buttoned_up = false
+	if not VehicleCombat.explosion_hits_crew(ex, shE, true):
+		print("TEST esplosione: AFV col boccaporto aperto espone l'equipaggio")
+		fails += 1
+	# Granata reale via Area: nell'hex di un mezzo scoperto colpisce l'equipaggio,
+	# non infligge ferite da fante allo scafo.
+	var jeepG := VehicleCombat.make_vehicle("Jeep", Domain.Side.FRIENDLY, "Able", Vector2i(10, 10))
+	ex.characters = [jeepG]
+	ex.rng.seed = 0
+	Area._explode(ex, {"type": Area.Type.GRENADE, "hex": Vector2i(10, 10),
+		"thrower_ws": 9, "placed_turn": ex.turn})
+	if jeepG.hull_damage != 0:
+		print("TEST esplosione: la granata non deve danneggiare lo scafo (solo l'equipaggio)")
+		fails += 1
+
+	# --- Rule 31.9.3: Mount Up + sbarco (dismount) ---
+	var du := GameState.new()
+	du.rng.seed = 0
+	Boards.fill(du, "farmhouse")
+	var htD := VehicleCombat.make_vehicle("M3A1 Halftrack", Domain.Side.FRIENDLY, "Able", Vector2i(7, 7))
+	var paxD := Character.new("paxD", "Pvt Rossi", Domain.Side.FRIENDLY, "Able")
+	paxD.troop_quality = 6
+	paxD.weapon_skills = {"M1 Garand": 6}
+	paxD.position = Vector2i(7, 7)
+	du.characters = [htD, paxD]
+	VehicleCombat.mount_up(du, paxD, htD)
+	if not paxD.embarked or VehicleCombat.embarked_passengers(htD).size() != 1:
+		print("TEST passeggeri: mount_up non imbarca il passeggero")
+		fails += 1
+	var n_before: int = du.characters.size()
+	VehicleCombat.dismount(du, htD, paxD)
+	if paxD.embarked or du.characters.size() != n_before:
+		print("TEST passeggeri: dismount deve far scendere senza duplicare (%d)" % du.characters.size())
+		fails += 1
+	if VehicleCombat.embarked_passengers(htD).size() != 0:
+		print("TEST passeggeri: dopo lo sbarco non ci sono piu' passeggeri a bordo")
+		fails += 1
+
+	# --- Rule 31.9.3: fuoco passeggeri da mezzo scoperto ---
+	var pf := GameState.new()
+	pf.rng.seed = 0
+	Boards.fill(pf, "farmhouse")
+	var htF := VehicleCombat.make_vehicle("M3A1 Halftrack", Domain.Side.FRIENDLY, "Able", Vector2i(8, 5))
+	var paxF := Character.new("paxF", "Pvt Bianchi", Domain.Side.FRIENDLY, "Able")
+	paxF.troop_quality = 6
+	paxF.weapon_skills = {"M1 Garand": 6}
+	paxF.position = Vector2i(8, 5)
+	var enF := Character.new("enF", "Schutze", Domain.Side.ENEMY, "Red")
+	enF.troop_quality = 5
+	enF.weapon_skills = {"KAR 98K": 5}
+	enF.position = Vector2i(8, 6)   # adiacente
+	enF.known = true
+	pf.characters = [htF, paxF, enF]
+	VehicleCombat.mount_up(pf, paxF, htF)
+	if not VehicleCombat.passengers_can_fire(htF):
+		print("TEST passeggeri: l'Halftrack scoperto deve permettere il fuoco passeggeri")
+		fails += 1
+	# Un AFV chiuso non lo permette (controllo del gate).
+	var shClosedP := VehicleCombat.make_vehicle("M4A3 Sherman", Domain.Side.FRIENDLY, "Able", Vector2i(2, 2), 3)
+	if VehicleCombat.passengers_can_fire(shClosedP):
+		print("TEST passeggeri: un AFV chiuso non permette il fuoco passeggeri")
+		fails += 1
+	paxF.set_order(Domain.Order.AIMED_FIRE)
+	htF.clear_order()
+	pf.impulse = 2
+	var shots_pf: int = pf.shots.size()
+	pf.rng.seed = 0
+	TurnSequence.resolve_action(pf, htF)
+	if pf.shots.size() == shots_pf:
+		print("TEST passeggeri: il passeggero deve sparare durante l'attivazione del mezzo")
 		fails += 1
 	return fails
 

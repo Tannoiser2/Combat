@@ -348,6 +348,14 @@ static func _resolve_vehicle_action(state: GameState, v: Character) -> void:
 				and Orders.impulse_action(codriver.order, state.impulse) \
 					== Domain.ImpulseAction.MAY_FIRE:
 			_fire_crew_weapon(state, v, codriver, bow)
+	# Rule 31.9.3: i passeggeri di un mezzo scoperto sparano le proprie armi
+	# leggere dall'hex del veicolo (arma e azione separate dal mezzo).
+	if VehicleCombat.passengers_can_fire(v):
+		for p in VehicleCombat.embarked_passengers(v):
+			if p.has_order and not p.weapon_skills.is_empty() \
+					and Orders.impulse_action(p.order, state.impulse) \
+						== Domain.ImpulseAction.MAY_FIRE:
+				_fire_crew_weapon(state, v, p, p.weapon_skills.keys()[0])
 
 
 # Il Gunner spara: la MG coassiale (Rule 31.9.4c, se fires_coax e il veicolo
@@ -402,7 +410,7 @@ static func _fire_crew_weapon(state: GameState, vehicle: Character,
 	var best: Character = null
 	var best_d := 9999
 	for t in state.characters:
-		if t.side == crew.side or t.is_dead():
+		if t.side == crew.side or t.is_dead() or t.embarked:
 			continue
 		if t.side == Domain.Side.ENEMY and not t.known:
 			continue
@@ -569,6 +577,14 @@ static func _assign_vehicle_order(state: GameState, c: Character) -> void:
 		codriver.set_order(Domain.Order.AIMED_FIRE)
 	elif codriver != null:
 		codriver.clear_order()
+	# Rule 31.9.3: i passeggeri di un mezzo scoperto sparano se c'e' LOS ed e'
+	# a portata d'arma leggera.
+	if VehicleCombat.passengers_can_fire(c):
+		for p in VehicleCombat.embarked_passengers(c):
+			if los and dist <= 12 and not p.weapon_skills.is_empty():
+				p.set_order(Domain.Order.AIMED_FIRE)
+			else:
+				p.clear_order()
 	# Rule 31.6 Emergency Stop: se il carro si muoverebbe ma c'e' una minaccia
 	# AT visibile, il Driver fa un TQC. Se passa, si ferma per questo turno.
 	var would_move := not (los and dist <= 12)

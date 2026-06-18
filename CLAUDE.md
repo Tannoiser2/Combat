@@ -66,9 +66,15 @@ reazione/Guard (Rule 9.9: TurnSequence.reaction_fire da _do_move e dallo
 step UI, Guard come overwatch del giocatore + micro-AI nemica che mette
 in Guard chi e' in copertura senza bersaglio). Dummy markers: gia'
 implementati (esche nella Coppa, rivelate da spotting/Search). Test:
-_test_move_cost, _test_documents, _test_guard_reaction. RESTANO fuori
-(scelta di design): modello equipaggio veicoli completo (docs/
-veicoli_roadmap.md, Fasi 4-7), revisione visiva mappe non annotate
+_test_move_cost, _test_documents, _test_guard_reaction.
+
+VEICOLI v0.88 (Fasi 6-7 della roadmap, le piu' semplici): Fase 7 FATTA
+(granata nel boccaporto/perdite passeggeri, Rule 31.10.7/31.10.11) e Fase 6
+PARZIALE (sbarco passeggeri + fuoco passeggeri da mezzo scoperto, Rule 31.9.3).
+Vedi punto 8 della roadmap. RESTANO fuori (alto sforzo, basso rendimento di
+gioco): LOS per ruolo/boccaporto e Target Marker/Observed Target (Fase 4), AI
+per-crew con Vehicle Order Matrix completa (Fase 5), cupola Halftrack 360 e
+fuoco per lato. Fuori scope anche: revisione visiva mappe non annotate
 (woods/hamlet/hedgerows2/ridge), editor di scenari.
 
 ## Prossimi passi — Volume 2 (regole in riferimenti/Combat2Rules.pdf,
@@ -309,6 +315,26 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    Main._build_vehicle_schematic/_add_crew_token: bordo colorato per stato,
    badge dell'azione, bottone cliccabile per Gunner/Co-Driver sui mezzi amici
    (_cycle_crew_action). Ripiego testuale (_crew_text_list) se manca il mat.
+   FATTO (v0.88, Fase 7 - perdite da esplosione): granata/mortaio/artiglieria/HE
+   NELL'hex (o adiacente) di un veicolo a equipaggio ESPOSTO (mezzo scoperto o
+   AFV col boccaporto aperto) investe equipaggio e passeggeri
+   (VehicleCombat.explosion_hits_crew: nell'hex = una perdita per membro via
+   _apply_casualty, adiacente = solo morale check; boccaporto chiuso = al riparo).
+   Area._explode/_explode_grenade instradano i veicoli a questo modello invece di
+   trattarli come fanteria. Rule 31.10.7/31.10.11. Test _test_vehicles.
+   FATTO (v0.88, Fase 6 - passeggeri): sbarco volontario (VehicleCombat.dismount:
+   un passeggero scende e torna fanteria, senza il -1 morale del Bail Out) e
+   fuoco passeggeri da mezzo SCOPERTO (Jeep/Truck/Half-Track): i Character saliti
+   con mount_up (crew_role "Passenger") sparano la propria arma leggera dall'hex
+   del veicolo durante l'attivazione del mezzo (TurnSequence._resolve_vehicle_action,
+   gate VehicleCombat.passengers_can_fire; AI in _assign_vehicle_order). UI: strip
+   "PASSEGGERI" nel Vehicle Display (_show_vehicle_display) + caso "Passenger" in
+   _open_crew_order_panel (Spara/Non spara/Scendi). NOTA: i passeggeri saliti con
+   mount_up RESTANO in state.characters (indici del replay) con embarked=true;
+   characters_of_team/character_at li escludono come attori/bersagli sulla mappa,
+   e bail_out/dismount NON li ri-aggiungono (guard state.characters.has). DA FARE
+   Fase 6: cupola Halftrack 360 e fuoco passeggeri per lato (pos. dispari/pari).
+   Rule 31.9.3. Test _test_vehicles.
 9. FATTO (v0.30): Scia di fumo (Rule 18). Ogni esplosione (granata, mortaio,
    artiglieria, C4, bombardamento iniziale) lascia un SMOKE marker nell'hex:
    granata -> fading (turns_left=1), tutto il resto -> pieno (turns_left=2).

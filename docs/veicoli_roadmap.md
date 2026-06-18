@@ -100,14 +100,24 @@ ogni colpo lo svuota, la ricarica consuma un impulso (gate in
 DA FARE col modello per-membro: la ricarica come ordine **esplicito** del
 Loader (Load/Spot) anziche' automatica nell'attivazione del veicolo.
 
-### E. Morale e perdite per membro (31.10.6 / 31.10.9 / 31.10.11)
-Gia' parziale (morale check individuali sullo striscio). Da completare: esiti
-per singolo membro, **passeggeri** colpiti (31.10.11), **granata nel boccaporto
-aperto** (31.10.7).
+### E. Morale e perdite per membro (31.10.6 / 31.10.9 / 31.10.11) — PARZIALE (v0.88)
+Gia' parziale (morale check individuali sullo striscio). FATTO (v0.88):
+**passeggeri/equipaggio colpiti da esplosione** (31.10.11) e **granata nel
+boccaporto aperto** (31.10.7) -> `VehicleCombat.explosion_hits_crew`, chiamata
+da `Area._explode`/`_explode_grenade` quando l'esplosione e' nell'hex (o
+adiacente) di un veicolo a equipaggio esposto. Da completare: esiti dettagliati
+per singolo membro oltre alla pesca della Friendly Card.
 
-### F. Passeggeri (31.3, 31.9.3)
-Caricamento/sbarco passeggeri, fuoco dei passeggeri (Halftrack), nessun
-passeggero **sopra** gli AFV (vietato in Combat!2). **Mancante.**
+### F. Passeggeri (31.3, 31.9.3) — PARZIALE (v0.88)
+FATTO: caricamento (`mount_up`, gia' presente) e **sbarco volontario**
+(`VehicleCombat.dismount`, torna fanteria senza penalita' di morale); **fuoco
+dei passeggeri** da mezzo scoperto (Jeep/Truck/Half-Track): sparano la propria
+arma leggera dall'hex del veicolo durante l'attivazione del mezzo
+(`TurnSequence._resolve_vehicle_action`, AI in `_assign_vehicle_order`, gate
+`VehicleCombat.passengers_can_fire`). UI: strip "PASSEGGERI" nel Vehicle Display
+con pannello fuoco/sbarco. Nessun passeggero **sopra** gli AFV (non modellato:
+mount_up e' pensato per i mezzi da trasporto). DA FARE: cupola Halftrack 360 e
+fuoco per lato (pos. dispari = sinistra, pari = destra).
 
 ### G. AI nemica per-crew (31.11) + Vehicle Order Matrix
 Assegnazione ordini ai veicoli nemici **per crew member** usando la Vehicle
@@ -125,15 +135,15 @@ generici che ereditano la TQ del mezzo.
 
 ## 3. Roadmap consigliata (a fasi, dal fondamento)
 
-| Fase | Contenuto | Sblocca | Sforzo |
-|---|---|---|---|
-| 1. Crew attori + ordini per membro (A) | ogni crew attivabile con ordine proprio nell'impulso del veicolo | tutto il resto | Alto |
-| 2. Load state + Loader (D) | flag cannone carico, ordini Load/Spot | fuoco cannone fedele | Basso |
-| 3. Armi multiple AFV (B) | bow MG (Co-Driver, -3 TQ), coax (Gunner, TQ), small arms boccaporto | cuore del fuoco AFV | Medio |
-| 4. LOS/spotting per ruolo + boccaporto + Target Marker (C) | archi per ruolo, hatch aperto/chiuso, Observed Target, modificatori | spotting fedele e gating del fuoco | Alto |
-| 5. AI per-crew + Vehicle Order Matrix (G) | ordini nemici per membro, Commander->Gunner | AFV nemici fedeli | Medio |
-| 6. Halftrack cupola/passeggeri + passeggeri (B,F) | cupola 360, fuoco passeggeri per lato, load/unload | Halftrack/trasporti | Medio |
-| 7. Granata nel boccaporto + perdite passeggeri (E) | 31.10.7, 31.10.11 | dettagli di combattimento | Basso |
+| Fase | Contenuto | Sblocca | Sforzo | Stato |
+|---|---|---|---|---|
+| 1. Crew attori + ordini per membro (A) | ogni crew attivabile con ordine proprio nell'impulso del veicolo | tutto il resto | Alto | PARZIALE (v0.51-52) |
+| 2. Load state + Loader (D) | flag cannone carico, ordini Load/Spot | fuoco cannone fedele | Basso | FATTO (v0.50) |
+| 3. Armi multiple AFV (B) | bow MG (Co-Driver, -3 TQ), coax (Gunner, TQ), small arms boccaporto | cuore del fuoco AFV | Medio | FATTO (v0.53-54) |
+| 4. LOS/spotting per ruolo + boccaporto + Target Marker (C) | archi per ruolo, hatch aperto/chiuso, Observed Target, modificatori | spotting fedele e gating del fuoco | Alto | PARZIALE (v0.55, hatch) — resto a basso rendimento |
+| 5. AI per-crew + Vehicle Order Matrix (G) | ordini nemici per membro, Commander->Gunner | AFV nemici fedeli | Medio | DA FARE |
+| 6. Halftrack cupola/passeggeri + passeggeri (B,F) | cupola 360, fuoco passeggeri per lato, load/unload | Halftrack/trasporti | Medio | PARZIALE (v0.88): load/unload + fuoco passeggeri da mezzo scoperto; resta cupola 360 e fuoco per lato |
+| 7. Granata nel boccaporto + perdite passeggeri (E) | 31.10.7, 31.10.11 | dettagli di combattimento | Basso | FATTO (v0.88) |
 
 ## 4. Nota architetturale
 

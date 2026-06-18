@@ -404,6 +404,12 @@ static func _crew_casualty(state: GameState, vehicle: Character) -> void:
 	if alive.is_empty():
 		return
 	var victim: Character = alive[state.rng.randi_range(0, alive.size() - 1)]
+	_apply_casualty(state, victim)
+
+
+# Applica una perdita a un dato membro d'equipaggio/passeggero (pesca una
+# Friendly Card per la gravita', come la fanteria).
+static func _apply_casualty(state: GameState, victim: Character) -> void:
 	var serial := state.draw_friendly_card()
 	state.friendly_discard.append(serial)
 	var wound: int = FriendlyCards.wound_of(serial)
@@ -421,6 +427,29 @@ static func _crew_casualty(state: GameState, vehicle: Character) -> void:
 			if victim.is_dead():
 				_kill(victim)
 				state.log_event("  le ferite uccidono %s" % victim.display_name)
+
+
+# Rule 31.10.7 / 31.10.11: un'esplosione nell'hex di un veicolo a equipaggio
+# ESPOSTO (mezzo scoperto, o AFV col boccaporto aperto) investe equipaggio e
+# passeggeri a bordo. severe = granata entrata dal boccaporto / esplosione
+# potente NELL'hex (ogni membro a bordo rischia una perdita); altrimenti
+# (schegge da adiacente) solo morale check. Col boccaporto chiuso / mezzo
+# blindato l'equipaggio e' al riparo: nessun effetto. Ritorna true se ha
+# colpito l'equipaggio esposto.
+static func explosion_hits_crew(state: GameState, vehicle: Character, severe: bool) -> bool:
+	if not vehicle.is_vehicle or not crew_exposed(vehicle):
+		return false
+	var alive := _embarked_alive(vehicle)
+	if alive.is_empty():
+		return false
+	if severe:
+		state.log_event("  L'esplosione investe l'equipaggio esposto del %s!" % vehicle.display_name)
+		for cm in alive:
+			_apply_casualty(state, cm)
+	else:
+		# Schegge di striscio (adiacenza): solo morale check individuali.
+		_crew_morale_checks(state, vehicle)
+	return true
 
 
 # Uccide tutti i crew ancora a bordo (esplosione/distruzione, Rule 31.10.8
@@ -449,10 +478,49 @@ static func mount_up(state: GameState, passenger: Character, vehicle: Character)
 	passenger.embarked = true
 	passenger.position = vehicle.position
 	passenger.clear_order()
-	vehicle.crew.append(passenger)
+	if not vehicle.crew.has(passenger):
+		vehicle.crew.append(passenger)
 	state.log_event("%s sale sul %s in %02d.%02d" % [
 		passenger.display_name, vehicle.display_name,
 		vehicle.position.x, vehicle.position.y])
+
+
+# Sbarco volontario (Rule 31.9.3): un singolo passeggero scende dal mezzo e
+# torna fanteria normale nell'hex del veicolo (o adiacente). A differenza del
+# Bail Out non perde morale (scende con calma, non sotto il fuoco).
+static func dismount(state: GameState, vehicle: Character, passenger: Character) -> void:
+	if not passenger.embarked or passenger.is_dead():
+		return
+	passenger.embarked = false
+	passenger.position = _free_hex_near(state, vehicle.position)
+	passenger.clear_order()
+	if passenger.side == D.Side.ENEMY:
+		passenger.known = true
+		passenger.alerted = true
+	else:
+		passenger.spotted = true
+	# I passeggeri saliti con mount_up restano in state.characters (per gli indici
+	# del replay), quindi aggiungili solo se mancano (crew "nativi" di populate_crew).
+	if not state.characters.has(passenger):
+		state.characters.append(passenger)
+	state.log_event("%s scende dal %s su %02d.%02d" % [
+		passenger.display_name, vehicle.display_name,
+		passenger.position.x, passenger.position.y])
+
+
+# Passeggeri vivi ancora a bordo (saliti con mount_up; ruolo "Passenger").
+static func embarked_passengers(vehicle: Character) -> Array:
+	var out: Array = []
+	for cm in vehicle.crew:
+		if cm.crew_role == "Passenger" and cm.embarked and not cm.is_dead():
+			out.append(cm)
+	return out
+
+
+# Rule 31.9.3: i passeggeri possono sparare le armi leggere solo da un mezzo
+# SCOPERTO (Jeep/Truck/Half-Track), mai da dentro un AFV chiuso.
+static func passengers_can_fire(vehicle: Character) -> bool:
+	return vehicle.is_vehicle and crew_exposed(vehicle) and not has_turret(vehicle)
 
 
 # Bail Out (Rule 31.9.3): i crew vivi a bordo scendono nell'hex del mezzo
@@ -471,7 +539,9 @@ static func bail_out(state: GameState, vehicle: Character) -> void:
 			cm.alerted = true
 		else:
 			cm.spotted = true
-		state.characters.append(cm)
+		# I passeggeri saliti con mount_up sono gia' in state.characters.
+		if not state.characters.has(cm):
+			state.characters.append(cm)
 		state.log_event("%s abbandona il %s su %02d.%02d" % [
 			cm.display_name, vehicle.display_name, cm.position.x, cm.position.y])
 
