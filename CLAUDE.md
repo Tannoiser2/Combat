@@ -146,11 +146,20 @@ CONVIVENZA 2D/3D: il 2D e l'engine NON sono toccati (le mie modifiche 3D stanno
 solo in ui/Map3DView.gd + ~40 righe isolate di Main.gd + nota qui). Il gioco
 parte sempre in 2D. NIENTE split di repo (si condividono engine+asset).
 
-DA FARE — GIOCARE IN 3D (richiesta utente: scelta 2D/3D a inizio partita):
-e' il lavoro grosso multi-sessione = porting di input(raycast)/overlay/LOS/
-cue hexes/editor/replay da MapView 2D alla vista 3D. L'anteprima F3 e' il primo
-mattone (mostra gia' lo stato vivo). Marker d'area (fumo/fuoco/mortaio/illum)
-non ancora disegnati in 3D: vanno aggiunti come le pedine quando si vorra'.
+VERSO IL 3D GIOCABILE (richiesta utente: scelta 2D/3D a inizio partita). E' un
+porting multi-sessione. Avanzamento:
+- FASE 1 PICKING (FATTO): raycast dal mouse all'hex (Map3DView._pick_at). Il
+  top_mesh ha create_trimesh_collision; il raycast (PhysicsRayQueryParameters3D)
+  colpisce il terreno, il punto-mondo torna in pixel (x*PX, z*PX) e
+  _pick_hex_from_px (inverso di _hex_center_px, stessa soglia di MapView.pick_hex)
+  da' (col,row). Evidenziazione: esagono giallo semitrasparente (_update_highlight)
+  sopra la faccia; lettura terreno/quota/unita' in _info_label. Pick su clic
+  sinistro e in hover (non durante orbita/pan). Validato headless (pick al centro
+  schermo in _grab_screenshot).
+- DA FARE: selezione pedina + pannello ordini agganciato (Fase 2/3), cue hexes
+  (mosse/bersagli) come overlay 3D, LOS/traccianti/replay, scelta 2D/3D nel menu.
+- Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
+  aggiunti come le pedine quando si vorra'.
 
 
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per

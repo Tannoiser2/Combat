@@ -40,6 +40,12 @@ var _home_distance := 60.0
 var _orbiting := false
 var _panning := false
 
+# --- Picking 3D (Fase 1: base per giocare in 3D) ---
+var _picked := Vector2i(-99, -99)   # hex attualmente evidenziato
+var _highlight: MeshInstance3D      # evidenziazione dell'hex
+var _info_label: Label              # lettura terreno/quota/unita'
+var _top_mesh: MeshInstance3D       # mesh facce superiori (per il raycast)
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -71,6 +77,8 @@ func _ready() -> void:
 var _shot_path := ""
 
 func _grab_screenshot() -> void:
+	# Pick al centro schermo: valida l'intera pipeline di picking nell'immagine.
+	_pick_at(get_viewport().get_visible_rect().size * 0.5)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(_shot_path)
@@ -201,6 +209,8 @@ func _build_terrain() -> void:
 	top_mat.roughness = 1.0
 	top_mesh.material_override = top_mat
 	add_child(top_mesh)
+	_top_mesh = top_mesh
+	top_mesh.create_trimesh_collision()  # corpo statico per il raycast del picking
 
 	# Mesh pareti (colore terra/cliff).
 	var wall_mesh := MeshInstance3D.new()
@@ -380,6 +390,96 @@ func _update_camera() -> void:
 	_camera.look_at(_pivot, Vector3.UP)
 
 
+# Raycast dal mouse sul terreno -> hex (col,row), come pick_hex in 3D.
+func _pick_at(screen_pos: Vector2) -> void:
+	if _camera == null:
+		return
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return
+	var from := _camera.project_ray_origin(screen_pos)
+	var dir := _camera.project_ray_normal(screen_pos)
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 10000.0)
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return
+	var p: Vector3 = hit["position"]
+	var hex := _pick_hex_from_px(Vector2(p.x * PX_PER_UNIT, p.z * PX_PER_UNIT))
+	if hex == _picked:
+		return
+	_picked = hex
+	_update_highlight(hex)
+	_update_info(hex)
+
+
+# Inverso di _hex_center_px: il pixel piu' vicino a un centro di hex valido.
+func _pick_hex_from_px(px: Vector2) -> Vector2i:
+	var best := Vector2i(-99, -99)
+	var best_d := INF
+	var col_guess := int(round((px.x - _origin.x) / _cell.x)) + _first_col
+	for col in range(col_guess - 1, col_guess + 2):
+		var row_guess := int(round((px.y - _origin.y) / _cell.y \
+			- (0.5 if col % 2 == 0 else 0.0)))
+		for row in range(row_guess - 1, row_guess + 2):
+			if not state.map.has(GameState.hex_key(col, row)):
+				continue
+			var d := _hex_center_px(col, row).distance_to(px)
+			if d < best_d:
+				best_d = d
+				best = Vector2i(col, row)
+	return best if best_d <= _cell.x / 1.5 * 1.05 else Vector2i(-99, -99)
+
+
+# Evidenziazione: un esagono semitrasparente sopra la faccia dell'hex scelto.
+func _update_highlight(hex: Vector2i) -> void:
+	if _highlight == null or not is_instance_valid(_highlight):
+		_highlight = MeshInstance3D.new()
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.albedo_color = Color(1.0, 0.95, 0.2, 0.45)
+		_highlight.material_override = m
+		_highlight.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_highlight)
+	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
+		_highlight.visible = false
+		return
+	var lv: int = state.map[GameState.hex_key(hex.x, hex.y)].level
+	var center := _world_center(hex.x, hex.y, lv) + Vector3(0, 0.04, 0)
+	var radius := _cell.x / 1.5 / PX_PER_UNIT * 1.01
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var verts: Array[Vector3] = []
+	for i in range(6):
+		var ang := PI / 3.0 * i
+		verts.append(center + Vector3(cos(ang) * radius, 0, sin(ang) * radius))
+	for i in range(6):
+		var j := (i + 1) % 6
+		st.set_normal(Vector3.UP); st.add_vertex(center)
+		st.set_normal(Vector3.UP); st.add_vertex(verts[i])
+		st.set_normal(Vector3.UP); st.add_vertex(verts[j])
+	_highlight.mesh = st.commit()
+	_highlight.visible = true
+
+
+func _update_info(hex: Vector2i) -> void:
+	if _info_label == null:
+		return
+	if not state.map.has(GameState.hex_key(hex.x, hex.y)):
+		_info_label.text = "(fuori mappa)"
+		return
+	var h: GameState.MapHex = state.map[GameState.hex_key(hex.x, hex.y)]
+	var tname: String = D.Terrain.keys()[h.terrain]
+	var txt := "Hex %02d,%02d — %s (quota %d)" % [hex.x, hex.y, tname, h.level]
+	var c := state.character_at(hex.x, hex.y)
+	if c != null and not c.is_dead():
+		var who: String = c.display_name if c.side == D.Side.FRIENDLY or c.known \
+			else "nemico non identificato"
+		txt += "  •  " + who
+	_info_label.text = txt
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -392,6 +492,14 @@ func _build_hud() -> void:
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 4)
 	layer.add_child(label)
+	# Lettura dell'hex sotto il puntatore (picking 3D, Fase 1).
+	_info_label = Label.new()
+	_info_label.text = "(passa il mouse / clicca un esagono)"
+	_info_label.position = Vector2(12, 92)
+	_info_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
+	_info_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_info_label.add_theme_constant_override("outline_size", 4)
+	layer.add_child(_info_label)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -407,6 +515,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_update_camera()
 			MOUSE_BUTTON_LEFT:
 				_orbiting = event.pressed
+				if event.pressed:
+					_pick_at(event.position)  # clic = evidenzia l'hex
 			MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 				_panning = event.pressed
 	elif event is InputEventMouseMotion:
@@ -415,7 +525,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_pitch = clampf(_pitch + event.relative.y * 0.008,
 				deg_to_rad(8.0), deg_to_rad(89.0))
 			_update_camera()
-		elif _panning:
+		elif not _panning:
+			_pick_at(event.position)  # hover = evidenzia l'hex sotto il mouse
+		if _panning:
 			# Pan nel piano orizzontale relativo all'orientamento camera.
 			var right := _camera.global_transform.basis.x
 			var fwd := Vector3(sin(_yaw), 0, cos(_yaw))
@@ -439,6 +551,8 @@ func _rebuild() -> void:
 	for child in get_children():
 		if child is MeshInstance3D or child is Sprite3D:
 			child.queue_free()
+	_highlight = null
+	_picked = Vector2i(-99, -99)
 	_build_terrain()
 	_build_units()
 	_update_camera()
