@@ -19,6 +19,8 @@ enum Phase { DEPLOY, CARD, ORDERS, ENEMY, ACTION, END_TURN, GAME_OVER }
 var state: GameState
 var map_view: MapView
 var camera: Camera2D
+var game_hud: CanvasLayer = null        # HUD di gioco (nascosto nell'anteprima 3D)
+var map3d_preview: Map3DView = null     # anteprima 3D attiva (F3), o null
 var phase: int = Phase.CARD
 var impulse_next := 1
 var auto_play := false
@@ -177,6 +179,35 @@ func _show_map3d() -> void:
 		view.state = state
 		view.board_name = Scenario.SCENARIOS[sid]["map"]
 	add_child(view)
+
+
+# Anteprima 3D in partita (F3 / pulsante "3D"): apre la vista 3D della
+# situazione CORRENTE (stato vivo) sopra il 2D, e la richiude. Il gioco non
+# viene toccato: e' solo un visualizzatore del rilievo (orbita/zoom/pan).
+func _toggle_map3d_preview() -> void:
+	if map3d_preview != null:
+		map3d_preview.queue_free()
+		map3d_preview = null
+		if map_view != null:
+			map_view.visible = true
+		if game_hud != null:
+			game_hud.visible = true
+		if camera != null:
+			camera.make_current()
+		if hint_label != null:
+			hint_label.text = "Anteprima 3D chiusa (F3 per riaprire)"
+		return
+	if state.scenario_id.is_empty() or not Scenario.SCENARIOS.has(state.scenario_id):
+		return
+	var view := Map3DView.new()
+	view.board_name = Scenario.SCENARIOS[state.scenario_id]["map"]
+	view.state = state
+	map3d_preview = view
+	add_child(view)
+	if map_view != null:
+		map_view.visible = false
+	if game_hud != null:
+		game_hud.visible = false
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.
@@ -910,6 +941,19 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Tasto F3: anteprima 3D della situazione corrente (apre/chiude). E' un
+	# VISUALIZZATORE: il gioco resta in 2D, qui si guarda solo il rilievo.
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F3 \
+			and state != null:
+		_toggle_map3d_preview()
+		get_viewport().set_input_as_handled()
+		return
+	# Se l'anteprima 3D e' aperta, ESC la chiude e basta.
+	if map3d_preview != null:
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_toggle_map3d_preview()
+			get_viewport().set_input_as_handled()
+		return
 	# Tasto F: adatta la vista all'intera mappa.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F \
 			and map_view != null:
@@ -1541,6 +1585,7 @@ func _export_map_data() -> void:
 
 func _build_hud() -> void:
 	var hud := CanvasLayer.new()
+	game_hud = hud
 	add_child(hud)
 	# Radice Control a tutto schermo: i figli ereditano il tema.
 	var root := Control.new()
@@ -1571,6 +1616,12 @@ func _build_hud() -> void:
 	los_button.custom_minimum_size = Vector2(70, 40)
 	los_button.toggled.connect(_on_los_toggled)
 	top_box.add_child(los_button)
+	var view3d_button := Button.new()
+	view3d_button.text = "3D"
+	view3d_button.tooltip_text = "Anteprima 3D (F3): guarda il rilievo della\nsituazione corrente. Il gioco resta in 2D."
+	view3d_button.custom_minimum_size = Vector2(56, 40)
+	view3d_button.pressed.connect(_toggle_map3d_preview)
+	top_box.add_child(view3d_button)
 	editor_button = Button.new()
 	editor_button.text = "Mappa"
 	editor_button.toggle_mode = true

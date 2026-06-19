@@ -129,10 +129,28 @@ colonna sono in Map3DView._neighbors (flat-top, colonne PARI shiftate giu' di
 mezzo passo). Screenshot di validazione headless: COMBAT_MAP3D_SHOT=path (+
 COMBAT_MAP3D_ZOOM/_YAW/_PITCH per inquadrare), reso sotto xvfb con Mesa llvmpipe
 (il container non ha GPU: il 3D NON si vede in headless puro, serve xvfb).
-DA FARE (prossimi passi, se la resa piace): unita'/marker piazzati meglio
-(ora billboard grezzi), pareti texturizzate campionando i pixel di bordo invece
-del colore piatto, e — se si vuole giocare in 3D — il porting di input/overlay/
-LOS/editor/replay da MapView 2D (grande, multi-sessione: vedi discussione).
+RIFINITURE FATTE: facce superiori texturizzate dalla scansione; pareti/cliff
+con UV "colate" (scansione stirata sul fianco, leggermente scurita); pedine
+come CHIT FISICI (BoxMesh con spessore, bordo cartoncino scuro sottile, art
+sopra, OMBRA proiettata); nemici non rivelati ed esche col token-esca del team
+(MapView.DUMMY_BY_TEAM, come la 2D); ombre piu' nette (ambient bassa). I
+billboard sono stati abbandonati in favore dei chit con spessore.
+
+ANTEPRIMA 3D IN PARTITA (FATTO): tasto F3 o pulsante "3D" nella barra HUD
+aprono Map3DView sullo STATO VIVO della partita (Main._toggle_map3d_preview):
+nasconde map_view + game_hud, mostra il 3D (orbita/zoom/pan), F3/ESC richiude e
+torna al 2D. E' solo un VISUALIZZATORE: il gioco resta in 2D, nessuna logica
+toccata. game_hud e map3d_preview sono nuove var membro di Main.
+
+CONVIVENZA 2D/3D: il 2D e l'engine NON sono toccati (le mie modifiche 3D stanno
+solo in ui/Map3DView.gd + ~40 righe isolate di Main.gd + nota qui). Il gioco
+parte sempre in 2D. NIENTE split di repo (si condividono engine+asset).
+
+DA FARE — GIOCARE IN 3D (richiesta utente: scelta 2D/3D a inizio partita):
+e' il lavoro grosso multi-sessione = porting di input(raycast)/overlay/LOS/
+cue hexes/editor/replay da MapView 2D alla vista 3D. L'anteprima F3 e' il primo
+mattone (mostra gia' lo stato vivo). Marker d'area (fumo/fuoco/mortaio/illum)
+non ancora disegnati in 3D: vanno aggiunti come le pedine quando si vorra'.
 
 
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
