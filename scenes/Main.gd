@@ -206,24 +206,40 @@ func _toggle_map3d_preview() -> void:
 	view.board_name = Scenario.SCENARIOS[state.scenario_id]["map"]
 	view.state = state
 	view.unit_activated.connect(_on_map3d_unit)
+	view.hex_clicked.connect(_on_map3d_hex)
 	map3d_preview = view
 	add_child(view)
 	if map_view != null:
 		map_view.visible = false
-	if game_hud != null:
-		game_hud.visible = false  # peek pulito: l'HUD compare al clic su una pedina
+	# L'HUD resta visibile sopra il 3D: serve a giocare (Avanti/Passa, pannello
+	# ordini, cue). Il 3D si vede dietro; solo la mappa 2D piatta e' nascosta.
+	_sync_map3d()
 
 
-# Clic su una pedina amica nell'anteprima 3D (Fase 3): in fase Ordini svela
-# l'HUD e apre il pannello ordini di quella pedina (la stessa UI del 2D).
+# Clic su una pedina amica nell'anteprima 3D (Fase 3): in fase Ordini apre il
+# pannello ordini di quella pedina (la stessa UI del 2D).
 func _on_map3d_unit(c: Character) -> void:
 	if c == null or c.side != Domain.Side.FRIENDLY or c.is_dead():
 		return
 	if phase != Phase.ORDERS:
 		return
-	if game_hud != null:
-		game_hud.visible = true
 	_open_order_panel(c)
+
+
+# Clic su un hex nell'anteprima 3D (Fase 4): se una pedina sta agendo, l'hex e'
+# il bersaglio/destinazione dell'azione (riusa _handle_action_click del 2D).
+func _on_map3d_hex(hex: Vector2i) -> void:
+	if acting == null or hex.x <= -99:
+		return
+	_handle_action_click(hex)
+	_sync_map3d()
+
+
+# Rinfresca pedine + cue nel 3D dallo stato corrente (se il preview e' attivo).
+func _sync_map3d() -> void:
+	if map3d_preview == null or map_view == null:
+		return
+	map3d_preview.refresh_dynamic(map_view.cue_hexes, map_view.cue_color)
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.
@@ -3423,6 +3439,7 @@ func _refresh() -> void:
 			log_text.append_text(_format_log_line(line) + "\n")
 		print(line)
 	map_view.queue_redraw()
+	_sync_map3d()  # tiene il 3D allineato allo stato (se il preview e' attivo)
 	_maybe_screenshot()
 
 

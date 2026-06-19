@@ -22,6 +22,7 @@ const PX_PER_UNIT := 100.0     # scala scansione->mondo (1 unita' = 100 px)
 const LEVEL_HEIGHT := 0.55     # altezza in unita'-mondo per livello di quota
 
 signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
+signal hex_clicked(hex: Vector2i)    # emesso al clic su un hex (Fase 4: azione)
 
 var board_name := "hill"
 var state: GameState = null    # opzionale: per disegnare le pedine
@@ -53,6 +54,10 @@ var _selected: Character = null     # pedina selezionata (clic)
 var _sel_ring: MeshInstance3D       # cornice di selezione attorno al chit
 var _unit_pos := {}                 # Character -> posizione mondo del chit
 
+# --- Azione dal 3D (Fase 4) ---
+var _units_root: Node3D             # contenitore pedine (rinfrescabile)
+var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -65,6 +70,10 @@ func _ready() -> void:
 		_board_tex = load(info["file"])
 	_build_environment()
 	_build_terrain()
+	_units_root = Node3D.new()
+	add_child(_units_root)
+	_cue_root = Node3D.new()
+	add_child(_cue_root)
 	_build_units()
 	_build_camera()
 	_build_hud()
@@ -96,6 +105,12 @@ func _grab_screenshot() -> void:
 		_update_highlight(hx)
 		_update_info(hx)
 		_select_in_hex(hx)
+		# Validazione cue: mostra i 6 vicini come hex-mossa (verde).
+		var cues: Array = []
+		for nb in _neighbors(hx.x, hx.y):
+			if state.map.has(GameState.hex_key(nb.x, nb.y)):
+				cues.append(nb)
+		set_cues(cues, Color(0.3, 0.9, 0.3))
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	await RenderingServer.frame_post_draw
@@ -266,6 +281,9 @@ func _build_units() -> void:
 	const TOKEN_T := 0.10    # spessore del cartoncino
 	var seen := {}           # conteggio per hex (stacking)
 	_unit_pos = {}
+	if _units_root != null:
+		for ch in _units_root.get_children():
+			ch.queue_free()
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
 			continue
@@ -306,7 +324,7 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 	bmat.roughness = 0.95
 	body.material_override = bmat
 	body.position = base + Vector3(0, t * 0.5 + 0.02, 0)
-	add_child(body)
+	_units_root.add_child(body)
 
 	var top := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -321,7 +339,7 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 	top.position = base + Vector3(0, t + 0.03, 0)
 	# Niente ombra dalla faccia piatta: l'ombra la getta il corpo.
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(top)
+	_units_root.add_child(top)
 
 	# Cornice del morale attorno al chit (convenzione 2D), se nota: sottile,
 	# arrotondata e "soft" (semitrasparente).
@@ -338,7 +356,7 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 		fr.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		fr.mesh = _rounded_frame_mesh(base + Vector3(0, t + 0.05, 0),
 			w * 0.52, w * 0.49, 0.12)
-		add_child(fr)
+		_units_root.add_child(fr)
 
 
 func _counter_tex(counter_id: String) -> Texture2D:
@@ -454,6 +472,7 @@ func _pick_at(screen_pos: Vector2, select: bool = false) -> void:
 	_update_highlight(hex)
 	_update_info(hex)
 	if select:
+		hex_clicked.emit(hex)   # Fase 4: Main lo usa come bersaglio se 'acting'
 		_select_in_hex(hex)
 
 
@@ -573,7 +592,12 @@ func _update_highlight(hex: Vector2i) -> void:
 		return
 	var lv: int = state.map[GameState.hex_key(hex.x, hex.y)].level
 	var center := _world_center(hex.x, hex.y, lv) + Vector3(0, 0.04, 0)
-	var radius := _cell.x / 1.5 / PX_PER_UNIT * 1.01
+	_highlight.mesh = _hex_fan_mesh(center, _cell.x / 1.5 / PX_PER_UNIT * 1.01)
+	_highlight.visible = true
+
+
+# Ventaglio esagonale orizzontale (faccia in su) centrato in 'center'.
+func _hex_fan_mesh(center: Vector3, radius: float) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var verts: Array[Vector3] = []
@@ -585,8 +609,41 @@ func _update_highlight(hex: Vector2i) -> void:
 		st.set_normal(Vector3.UP); st.add_vertex(center)
 		st.set_normal(Vector3.UP); st.add_vertex(verts[i])
 		st.set_normal(Vector3.UP); st.add_vertex(verts[j])
-	_highlight.mesh = st.commit()
-	_highlight.visible = true
+	return st.commit()
+
+
+# Disegna i cue hexes (mosse/bersagli) come esagoni semitrasparenti (Fase 4).
+func set_cues(hexes: Array, color: Color) -> void:
+	if _cue_root == null:
+		return
+	for ch in _cue_root.get_children():
+		ch.queue_free()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var cc := color
+	cc.a = 0.45
+	mat.albedo_color = cc
+	var radius := _cell.x / 1.5 / PX_PER_UNIT * 0.9
+	for h in hexes:
+		var hx: Vector2i = h
+		if not state.map.has(GameState.hex_key(hx.x, hx.y)):
+			continue
+		var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+		var mi := MeshInstance3D.new()
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.mesh = _hex_fan_mesh(_world_center(hx.x, hx.y, lv) + Vector3(0, 0.07, 0), radius)
+		_cue_root.add_child(mi)
+
+
+# Rinfresca pedine + cue + selezione dopo un'azione (Fase 4), senza ricostruire
+# il terreno. Chiamato da Main quando il preview e' attivo e lo stato cambia.
+func refresh_dynamic(cues: Array, color: Color) -> void:
+	_build_units()
+	set_cues(cues, color)
+	_update_sel_ring()
 
 
 func _update_info(hex: Vector2i) -> void:
@@ -680,6 +737,9 @@ func _rebuild() -> void:
 	_highlight = null
 	_sel_ring = null
 	_picked = Vector2i(-99, -99)
+	if _cue_root != null:
+		for ch in _cue_root.get_children():
+			ch.queue_free()
 	_build_terrain()
 	_build_units()
 	if _selected != null:

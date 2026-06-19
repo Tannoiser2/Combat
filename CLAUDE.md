@@ -170,8 +170,20 @@ porting multi-sessione. Avanzamento:
   destinazione si risolvono in Action Phase via click sulla mappa, che in 3D
   arrivera' con la Fase 4 (cue/target picking). Validato headless: selftest +
   smoke; il pannello sopra il 3D va provato dal vivo (non screenshot-abile qui).
-- DA FARE: Fase 4 cue hexes (mosse/bersagli) come overlay 3D + risoluzione
-  azione dal 3D; LOS/traccianti/replay; scelta 2D/3D nel menu.
+- FASE 4 AZIONE DAL 3D (FATTO, base): cue hexes (mosse/bersagli) disegnati in
+  3D (Map3DView.set_cues, esagoni semitrasparenti del colore cue di map_view);
+  refresh_dynamic ricostruisce pedine+cue+selezione senza rifare il terreno
+  (pedine/cue in contenitori _units_root/_cue_root). Map3DView emette
+  hex_clicked(hex) al clic; Main._on_map3d_hex, se c'e' 'acting', usa l'hex come
+  bersaglio/destinazione via _handle_action_click (la stessa risoluzione 2D).
+  _sync_map3d() in _refresh tiene il 3D allineato dopo ogni cambiamento. Durante
+  il preview l'HUD resta VISIBILE (serve Avanti/Passa/pannello): il 3D si vede
+  dietro, solo la mappa 2D piatta e' nascosta. Validato: cue renderizzati
+  (screenshot), selftest+smoke; il loop d'azione completo va provato dal vivo.
+  NB: cambia il peek F3 (ora l'HUD resta sopra il 3D). Se si vuole un peek
+  pulito separato dal "gioca in 3D", si puo' splittare in seguito.
+- DA FARE: Fase 5 LOS/traccianti/replay in 3D; scelta 2D/3D nel menu a inizio
+  partita; marker d'area (fumo/fuoco/mortaio/illum) in 3D.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 
