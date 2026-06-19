@@ -19,6 +19,8 @@ enum Phase { DEPLOY, CARD, ORDERS, ENEMY, ACTION, END_TURN, GAME_OVER }
 var state: GameState
 var map_view: MapView
 var camera: Camera2D
+var game_hud: CanvasLayer = null        # HUD di gioco (nascosto nell'anteprima 3D)
+var map3d_preview: Map3DView = null     # anteprima 3D attiva (F3), o null
 var phase: int = Phase.CARD
 var impulse_next := 1
 var auto_play := false
@@ -143,6 +145,9 @@ func _ready() -> void:
 	if not OS.get_environment("COMBAT_BALANCE").is_empty():
 		_balance_test()
 		return
+	if not OS.get_environment("COMBAT_MAP3D").is_empty():
+		_show_map3d()
+		return
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 	if auto_play:
 		# Modalita' test: parte subito (scenario da env, default intro1).
@@ -155,6 +160,86 @@ func _ready() -> void:
 		timer.start()
 	else:
 		_show_scenario_menu()
+
+
+# Prototipo MAPPA 3D (COMBAT_MAP3D=1): mostra una board estrusa in 3D, fuori
+# dal gioco. Board da COMBAT_BOARD (default "hill"); se c'e' COMBAT_SCENARIO
+# carica anche le pedine di quello scenario sopra il terreno.
+func _show_map3d() -> void:
+	var board_name := OS.get_environment("COMBAT_BOARD")
+	var sid := OS.get_environment("COMBAT_SCENARIO")
+	var view := Map3DView.new()
+	if board_name.is_empty() and not sid.is_empty() and Scenario.SCENARIOS.has(sid):
+		board_name = Scenario.SCENARIOS[sid]["map"]
+	view.board_name = board_name if not board_name.is_empty() else "hill"
+	if not sid.is_empty() and Scenario.SCENARIOS.has(sid):
+		state = GameState.new()
+		state.rng.seed = hash("map3d")
+		Scenario.build(state, sid)
+		view.state = state
+		view.board_name = Scenario.SCENARIOS[sid]["map"]
+	add_child(view)
+
+
+# Anteprima 3D in partita (F3 / pulsante "3D"): apre la vista 3D della
+# situazione CORRENTE (stato vivo) sopra il 2D, e la richiude. Il gioco non
+# viene toccato: e' solo un visualizzatore del rilievo (orbita/zoom/pan).
+func _toggle_map3d_preview() -> void:
+	if map3d_preview != null:
+		map3d_preview.queue_free()
+		map3d_preview = null
+		acting = null
+		if order_panel != null:
+			order_panel.hide()
+		if map_view != null:
+			map_view.visible = true
+		if game_hud != null:
+			game_hud.visible = true
+		if camera != null:
+			camera.make_current()
+		if hint_label != null:
+			hint_label.text = "Anteprima 3D chiusa (F3 per riaprire)"
+		return
+	if state.scenario_id.is_empty() or not Scenario.SCENARIOS.has(state.scenario_id):
+		return
+	var view := Map3DView.new()
+	view.board_name = Scenario.SCENARIOS[state.scenario_id]["map"]
+	view.state = state
+	view.unit_activated.connect(_on_map3d_unit)
+	view.hex_clicked.connect(_on_map3d_hex)
+	map3d_preview = view
+	add_child(view)
+	if map_view != null:
+		map_view.visible = false
+	# L'HUD resta visibile sopra il 3D: serve a giocare (Avanti/Passa, pannello
+	# ordini, cue). Il 3D si vede dietro; solo la mappa 2D piatta e' nascosta.
+	_sync_map3d()
+
+
+# Clic su una pedina amica nell'anteprima 3D (Fase 3): in fase Ordini apre il
+# pannello ordini di quella pedina (la stessa UI del 2D).
+func _on_map3d_unit(c: Character) -> void:
+	if c == null or c.side != Domain.Side.FRIENDLY or c.is_dead():
+		return
+	if phase != Phase.ORDERS:
+		return
+	_open_order_panel(c)
+
+
+# Clic su un hex nell'anteprima 3D (Fase 4): se una pedina sta agendo, l'hex e'
+# il bersaglio/destinazione dell'azione (riusa _handle_action_click del 2D).
+func _on_map3d_hex(hex: Vector2i) -> void:
+	if acting == null or hex.x <= -99:
+		return
+	_handle_action_click(hex)
+	_sync_map3d()
+
+
+# Rinfresca pedine + cue nel 3D dallo stato corrente (se il preview e' attivo).
+func _sync_map3d() -> void:
+	if map3d_preview == null or map_view == null:
+		return
+	map3d_preview.refresh_dynamic(map_view.cue_hexes, map_view.cue_color)
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.
@@ -860,6 +945,17 @@ func _end_replay() -> void:
 # Gestione touch (iPad/mobile): intercetta i gesti PRIMA dei nodi figli.
 # _input ha priorita' massima: i Control della HUD non possono consumare questi eventi.
 func _input(event: InputEvent) -> void:
+	# Hotkey F3 (priorita' massima, prima dei Control): apre/chiude l'anteprima
+	# 3D. ESC chiude il preview se aperto.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F3 and state != null:
+			_toggle_map3d_preview()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_ESCAPE and map3d_preview != null:
+			_toggle_map3d_preview()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_touch_points[event.index] = event.position
@@ -888,6 +984,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Anteprima 3D attiva: i tasti/click di gioco 2D sono sospesi (F3/ESC sono
+	# gestiti in _input). Il 3D ha i suoi controlli (orbita/zoom/pan/clic).
+	if map3d_preview != null:
+		return
 	# Tasto F: adatta la vista all'intera mappa.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F \
 			and map_view != null:
@@ -1519,6 +1619,7 @@ func _export_map_data() -> void:
 
 func _build_hud() -> void:
 	var hud := CanvasLayer.new()
+	game_hud = hud
 	add_child(hud)
 	# Radice Control a tutto schermo: i figli ereditano il tema.
 	var root := Control.new()
@@ -1549,6 +1650,12 @@ func _build_hud() -> void:
 	los_button.custom_minimum_size = Vector2(70, 40)
 	los_button.toggled.connect(_on_los_toggled)
 	top_box.add_child(los_button)
+	var view3d_button := Button.new()
+	view3d_button.text = "3D"
+	view3d_button.tooltip_text = "Anteprima 3D (F3): guarda il rilievo della\nsituazione corrente. Il gioco resta in 2D."
+	view3d_button.custom_minimum_size = Vector2(56, 40)
+	view3d_button.pressed.connect(_toggle_map3d_preview)
+	top_box.add_child(view3d_button)
 	editor_button = Button.new()
 	editor_button.text = "Mappa"
 	editor_button.toggle_mode = true
@@ -3334,6 +3441,7 @@ func _refresh() -> void:
 			log_text.append_text(_format_log_line(line) + "\n")
 		print(line)
 	map_view.queue_redraw()
+	_sync_map3d()  # tiene il 3D allineato allo stato (se il preview e' attivo)
 	_maybe_screenshot()
 
 

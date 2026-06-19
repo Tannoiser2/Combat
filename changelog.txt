@@ -1,3 +1,18 @@
+v0.95 — 2026-06-19
+- Mappa 3D (nuovo): visualizzatore con la board estrusa a quote reali e le
+  facce superiori texturizzate dalla scansione vera; pareti/cliff dove il
+  vicino e' piu' basso. Pedine come chit fisici con spessore e ombra; cornice
+  del morale (come in 2D) e cornice di selezione. Camera orbitale
+  (trascina sx = orbita, rotella = zoom, trascina dx = pan, R = reset,
+  1/2/3 = scala quote).
+- Anteprima in partita: pulsante "3D" nella barra (o F3 su desktop) apre la
+  vista 3D dello stato corrente; ESC/3D per tornare al 2D. NB: nel browser usa
+  il PULSANTE 3D (F3 e' riservato al browser).
+- Verso il 3D giocabile: clic = picking dell'hex e selezione pedina; in fase
+  Ordini il clic apre il pannello ordini; cue di mossa/bersaglio disegnati in
+  3D e azione risolta col clic (stessa logica del 2D). Lavoro in corso.
+- Il gioco 2D e l'engine NON sono toccati: il 3D e' additivo e isolato.
+
 v0.94 — 2026-06-18
 - Fix esche (Dummy): quando un'esca viene rivelata (spotting/Search/area) il
   motore la marca gia' come "removed" (rimossa dal gioco), ma la mappa la

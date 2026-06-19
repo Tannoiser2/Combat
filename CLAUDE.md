@@ -112,6 +112,81 @@ delle board e' un'IMMAGINE PIATTA scansionata, quindi un vero 3D litiga con
 l'art; meglio l'opzione (a), oppure (b) applicato con parsimonia. Da decidere
 con l'utente quale resa preferisce prima di implementare.
 
+SCELTA UTENTE (giugno 2026): NON (a) ne' (b) ma MAPPA 3D VERA — mappare il PNG
+della board sulla geometria ed ESTRUDERE gli esagoni a quote diverse
+(hex.level 0..3). PROTOTIPO FATTO (ui/Map3DView.gd, class_name Map3DView,
+Node3D): costruisce una mesh di prismi esagonali; le FACCE SUPERIORI sono
+texturizzate con la scansione vera (UV = pixel/dimensione_immagine, riusando la
+calibrazione origin/cell di MapView -> art piatta intatta in cima, anche i
+numeri degli hex), le PARETI/cliff (colore terra) scendono solo dove il vicino
+e' piu' basso. Camera orbitale (trascina sx = orbita, rotella = zoom, trascina
+dx = pan, R = reset, 1/2/3 = scala quote x1/x2/x3). SOLO grafica/camera: nessuna
+logica di gioco toccata, niente input di gioco (e' un VISUALIZZATORE separato).
+Lancio: COMBAT_MAP3D=1 (board da COMBAT_BOARD, default "hill"); con
+COMBAT_SCENARIO=<id> carica anche le pedine come billboard. Agganciato in
+Main._show_map3d (ramo COMBAT_MAP3D in _ready). I 6 vicini per parita' di
+colonna sono in Map3DView._neighbors (flat-top, colonne PARI shiftate giu' di
+mezzo passo). Screenshot di validazione headless: COMBAT_MAP3D_SHOT=path (+
+COMBAT_MAP3D_ZOOM/_YAW/_PITCH per inquadrare), reso sotto xvfb con Mesa llvmpipe
+(il container non ha GPU: il 3D NON si vede in headless puro, serve xvfb).
+RIFINITURE FATTE: facce superiori texturizzate dalla scansione; pareti/cliff
+con UV "colate" (scansione stirata sul fianco, leggermente scurita); pedine
+come CHIT FISICI (BoxMesh con spessore, bordo cartoncino scuro sottile, art
+sopra, OMBRA proiettata); nemici non rivelati ed esche col token-esca del team
+(MapView.DUMMY_BY_TEAM, come la 2D); ombre piu' nette (ambient bassa). I
+billboard sono stati abbandonati in favore dei chit con spessore.
+
+ANTEPRIMA 3D IN PARTITA (FATTO): tasto F3 o pulsante "3D" nella barra HUD
+aprono Map3DView sullo STATO VIVO della partita (Main._toggle_map3d_preview):
+nasconde map_view + game_hud, mostra il 3D (orbita/zoom/pan), F3/ESC richiude e
+torna al 2D. E' solo un VISUALIZZATORE: il gioco resta in 2D, nessuna logica
+toccata. game_hud e map3d_preview sono nuove var membro di Main.
+
+CONVIVENZA 2D/3D: il 2D e l'engine NON sono toccati (le mie modifiche 3D stanno
+solo in ui/Map3DView.gd + ~40 righe isolate di Main.gd + nota qui). Il gioco
+parte sempre in 2D. NIENTE split di repo (si condividono engine+asset).
+
+VERSO IL 3D GIOCABILE (richiesta utente: scelta 2D/3D a inizio partita). E' un
+porting multi-sessione. Avanzamento:
+- FASE 1 PICKING (FATTO): raycast dal mouse all'hex (Map3DView._pick_at). Il
+  top_mesh ha create_trimesh_collision; il raycast (PhysicsRayQueryParameters3D)
+  colpisce il terreno, il punto-mondo torna in pixel (x*PX, z*PX) e
+  _pick_hex_from_px (inverso di _hex_center_px, stessa soglia di MapView.pick_hex)
+  da' (col,row). Evidenziazione: esagono giallo semitrasparente (_update_highlight)
+  sopra la faccia; lettura terreno/quota/unita' in _info_label. Pick su clic
+  sinistro e in hover (non durante orbita/pan). Validato headless (pick al centro
+  schermo in _grab_screenshot).
+- FASE 2 SELEZIONE (FATTO): clic su una pedina amica la seleziona
+  (Map3DView._select_in_hex), ri-clic sullo stesso hex cicla le pile (Rule 8).
+  Cornice ciano attorno al chit (_update_sel_ring, riquadro cavo), info unita'
+  (nome/morale/ordine) in _info_label. _unit_pos mappa Character->posizione del
+  chit. Validato headless con COMBAT_MAP3D_PICK="col,row" (inquadra+seleziona).
+- FASE 3 PANNELLO ORDINI (FATTO, in fase Ordini): Map3DView emette
+  unit_activated(c) al clic su una pedina amica; Main._on_map3d_unit svela l'HUD
+  e apre _open_order_panel(c) (LA STESSA UI del 2D). Il peek F3 resta pulito
+  (HUD nascosto) finche' non clicchi una pedina. Chiudendo il preview: order_panel
+  nascosto, acting=null, 2D ripristinato. Funziona per ASSEGNARE l'ordine (in
+  Order Phase non serve click sulla mappa). NB: gli ordini con bersaglio/
+  destinazione si risolvono in Action Phase via click sulla mappa, che in 3D
+  arrivera' con la Fase 4 (cue/target picking). Validato headless: selftest +
+  smoke; il pannello sopra il 3D va provato dal vivo (non screenshot-abile qui).
+- FASE 4 AZIONE DAL 3D (FATTO, base): cue hexes (mosse/bersagli) disegnati in
+  3D (Map3DView.set_cues, esagoni semitrasparenti del colore cue di map_view);
+  refresh_dynamic ricostruisce pedine+cue+selezione senza rifare il terreno
+  (pedine/cue in contenitori _units_root/_cue_root). Map3DView emette
+  hex_clicked(hex) al clic; Main._on_map3d_hex, se c'e' 'acting', usa l'hex come
+  bersaglio/destinazione via _handle_action_click (la stessa risoluzione 2D).
+  _sync_map3d() in _refresh tiene il 3D allineato dopo ogni cambiamento. Durante
+  il preview l'HUD resta VISIBILE (serve Avanti/Passa/pannello): il 3D si vede
+  dietro, solo la mappa 2D piatta e' nascosta. Validato: cue renderizzati
+  (screenshot), selftest+smoke; il loop d'azione completo va provato dal vivo.
+  NB: cambia il peek F3 (ora l'HUD resta sopra il 3D). Se si vuole un peek
+  pulito separato dal "gioca in 3D", si puo' splittare in seguito.
+- DA FARE: Fase 5 LOS/traccianti/replay in 3D; scelta 2D/3D nel menu a inizio
+  partita; marker d'area (fumo/fuoco/mortaio/illum) in 3D.
+- Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
+  aggiunti come le pedine quando si vorra'.
+
 
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
 terreno (Rule 13: difficili=2, Move.DIFFICULT_MOVE/terrain_move_cost,
