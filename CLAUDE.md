@@ -156,8 +156,14 @@ porting multi-sessione. Avanzamento:
   sopra la faccia; lettura terreno/quota/unita' in _info_label. Pick su clic
   sinistro e in hover (non durante orbita/pan). Validato headless (pick al centro
   schermo in _grab_screenshot).
-- DA FARE: selezione pedina + pannello ordini agganciato (Fase 2/3), cue hexes
-  (mosse/bersagli) come overlay 3D, LOS/traccianti/replay, scelta 2D/3D nel menu.
+- FASE 2 SELEZIONE (FATTO): clic su una pedina amica la seleziona
+  (Map3DView._select_in_hex), ri-clic sullo stesso hex cicla le pile (Rule 8).
+  Cornice ciano attorno al chit (_update_sel_ring, riquadro cavo), info unita'
+  (nome/morale/ordine) in _info_label. _unit_pos mappa Character->posizione del
+  chit. Validato headless con COMBAT_MAP3D_PICK="col,row" (inquadra+seleziona).
+- DA FARE: pannello ordini agganciato alla pedina selezionata (Fase 3, riusa la
+  UI esistente), cue hexes (mosse/bersagli) come overlay 3D, LOS/traccianti/
+  replay, scelta 2D/3D nel menu.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

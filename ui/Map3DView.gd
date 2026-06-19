@@ -46,6 +46,11 @@ var _highlight: MeshInstance3D      # evidenziazione dell'hex
 var _info_label: Label              # lettura terreno/quota/unita'
 var _top_mesh: MeshInstance3D       # mesh facce superiori (per il raycast)
 
+# --- Selezione pedina (Fase 2) ---
+var _selected: Character = null     # pedina selezionata (clic)
+var _sel_ring: MeshInstance3D       # cornice di selezione attorno al chit
+var _unit_pos := {}                 # Character -> posizione mondo del chit
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -77,8 +82,20 @@ func _ready() -> void:
 var _shot_path := ""
 
 func _grab_screenshot() -> void:
-	# Pick al centro schermo: valida l'intera pipeline di picking nell'immagine.
-	_pick_at(get_viewport().get_visible_rect().size * 0.5)
+	# COMBAT_MAP3D_PICK="col,row": inquadra e seleziona quell'hex (validazione
+	# del picking/selezione); altrimenti pick al centro schermo.
+	var pk := OS.get_environment("COMBAT_MAP3D_PICK").split(",")
+	if pk.size() == 2 and state.map.has(GameState.hex_key(int(pk[0]), int(pk[1]))):
+		var hx := Vector2i(int(pk[0]), int(pk[1]))
+		_pivot = _world_center(hx.x, hx.y, state.map[GameState.hex_key(hx.x, hx.y)].level)
+		_distance = 6.0  # ravvicinato per vedere il chit e la cornice
+		_update_camera()
+		_picked = hx
+		_update_highlight(hx)
+		_update_info(hx)
+		_select_in_hex(hx)
+	else:
+		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(_shot_path)
@@ -246,6 +263,7 @@ func _build_units() -> void:
 	const TOKEN_W := 1.35    # lato segnalino in unita'-mondo (~ un hex)
 	const TOKEN_T := 0.10    # spessore del cartoncino
 	var seen := {}           # conteggio per hex (stacking)
+	_unit_pos = {}
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
 			continue
@@ -266,6 +284,7 @@ func _build_units() -> void:
 		var top_tex: Texture2D = tex if tex != null else _token_tex(fb)
 		# Scostamento a cascata per le pile (Rule 8): si impilano in altezza.
 		var off := Vector3(0.22 * idx, idx * TOKEN_T, 0.14 * idx)
+		_unit_pos[c] = surface + off
 		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex)
 
 
@@ -391,7 +410,8 @@ func _update_camera() -> void:
 
 
 # Raycast dal mouse sul terreno -> hex (col,row), come pick_hex in 3D.
-func _pick_at(screen_pos: Vector2) -> void:
+# select=true (clic): seleziona la pedina amica nell'hex (cicla sulle pile).
+func _pick_at(screen_pos: Vector2, select: bool = false) -> void:
 	if _camera == null:
 		return
 	var space := get_world_3d().direct_space_state
@@ -405,11 +425,72 @@ func _pick_at(screen_pos: Vector2) -> void:
 		return
 	var p: Vector3 = hit["position"]
 	var hex := _pick_hex_from_px(Vector2(p.x * PX_PER_UNIT, p.z * PX_PER_UNIT))
-	if hex == _picked:
+	if not select and hex == _picked:
 		return
 	_picked = hex
 	_update_highlight(hex)
 	_update_info(hex)
+	if select:
+		_select_in_hex(hex)
+
+
+# Seleziona una pedina amica nell'hex; ri-cliccando lo stesso hex cicla tra le
+# unita' impilate (Rule 8). Aggiorna cornice di selezione e info.
+func _select_in_hex(hex: Vector2i) -> void:
+	var units: Array = []
+	for c in state.characters:
+		if c == null or c.is_dead() or c.embarked:
+			continue
+		if c.position == hex and c.side == D.Side.FRIENDLY:
+			units.append(c)
+	if units.is_empty():
+		return
+	var i := 0
+	if _selected != null and _selected in units:
+		i = (units.find(_selected) + 1) % units.size()
+	_selected = units[i]
+	_update_sel_ring()
+	var ms: String = D.Morale.keys()[_selected.morale]
+	var txt := "Selezionato: %s — morale %s" % [_selected.display_name, ms]
+	if _selected.has_order:
+		txt += " — ordine %s" % D.ORDER_NAMES[_selected.order]
+	if units.size() > 1:
+		txt += "  (%d/%d nell'hex, ri-clicca per ciclare)" % [i + 1, units.size()]
+	_info_label.text = txt
+
+
+# Cornice di selezione: un riquadro luminoso attorno al chit selezionato.
+func _update_sel_ring() -> void:
+	if _sel_ring == null or not is_instance_valid(_sel_ring):
+		_sel_ring = MeshInstance3D.new()
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.albedo_color = Color(0.2, 0.95, 1.0, 0.9)  # ciano = selezione
+		_sel_ring.material_override = m
+		_sel_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_sel_ring)
+	if _selected == null or not _unit_pos.has(_selected):
+		_sel_ring.visible = false
+		return
+	var base: Vector3 = _unit_pos[_selected]
+	var c := base + Vector3(0, 0.20, 0)  # appena sopra il chit
+	# Riquadro cavo (annulus quadrato) attorno al segnalino.
+	var outer := 0.82
+	var inner := 0.70
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var o := [Vector3(-outer, 0, -outer), Vector3(outer, 0, -outer),
+		Vector3(outer, 0, outer), Vector3(-outer, 0, outer)]
+	var ii := [Vector3(-inner, 0, -inner), Vector3(inner, 0, -inner),
+		Vector3(inner, 0, inner), Vector3(-inner, 0, inner)]
+	for k in range(4):
+		var k2 := (k + 1) % 4
+		for v in [o[k], o[k2], ii[k2], o[k], ii[k2], ii[k]]:
+			st.set_normal(Vector3.UP); st.add_vertex(c + v)
+	_sel_ring.mesh = st.commit()
+	_sel_ring.visible = true
 
 
 # Inverso di _hex_center_px: il pixel piu' vicino a un centro di hex valido.
@@ -516,7 +597,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_LEFT:
 				_orbiting = event.pressed
 				if event.pressed:
-					_pick_at(event.position)  # clic = evidenzia l'hex
+					_pick_at(event.position, true)  # clic = seleziona
 			MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 				_panning = event.pressed
 	elif event is InputEventMouseMotion:
@@ -552,7 +633,10 @@ func _rebuild() -> void:
 		if child is MeshInstance3D or child is Sprite3D:
 			child.queue_free()
 	_highlight = null
+	_sel_ring = null
 	_picked = Vector2i(-99, -99)
 	_build_terrain()
 	_build_units()
+	if _selected != null:
+		_update_sel_ring()  # ricrea la cornice sulla pedina ancora selezionata
 	_update_camera()
