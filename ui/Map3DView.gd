@@ -68,6 +68,13 @@ var _seen_shots3d := 0               # shots gia' animati
 var _seen_arcs3d := 0                # granate gia' animate
 var _seen_marks3d := 0               # marker gia' visti (per le bombe dall'alto)
 
+# --- Replay in 3D (Fase 5) ---
+var _replay_active := false
+var _replay_units := {}              # idx -> snapshot (vedi Replay.gd)
+var _replay_paths := {}              # idx -> Array di Vector2i
+var replay_progress := 0.0
+var _ghosts := {}                    # idx -> Node3D (chit fantasma)
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -131,6 +138,11 @@ func _grab_screenshot() -> void:
 				cues.append(nb)
 		set_cues(cues, Color(0.3, 0.9, 0.3))
 		_draw_fire_lines(hx, cues, Color(0.95, 0.55, 0.05))  # valida le linee
+		# Valida il segnalino-ordine: assegna un ordine al selezionato e ricostruisce.
+		if _selected != null:
+			_selected.set_order(D.Order.AIMED_FIRE)
+			_build_units()
+			_update_sel_ring()
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	# Validazione proiettili: COMBAT_MAP3D_FX -> spawn demo a meta' volo.
@@ -146,6 +158,22 @@ func _grab_screenshot() -> void:
 			p["t"] = 0.5
 			p["delay"] = 0.0
 		_advance_projectiles(0.0)
+	# Validazione replay: frame sintetico con un percorso, fantasmi a meta' corsa.
+	if not OS.get_environment("COMBAT_MAP3D_REPLAY").is_empty():
+		var units := {}
+		var paths := {}
+		for i in state.characters.size():
+			var c: Character = state.characters[i]
+			if c.is_dead():
+				continue
+			units[i] = {"pos": c.position, "counter": c.counter, "side": c.side,
+				"team": c.team, "morale": c.morale, "name": c.display_name,
+				"hidden": c.side == D.Side.ENEMY and not c.known}
+			if paths.is_empty() and c.side == D.Side.FRIENDLY:
+				paths[i] = [c.position, c.position + Vector2i(1, 0),
+					c.position + Vector2i(2, 1)]
+		set_replay_frame(units, paths)
+		update_replay_progress(0.5)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(_shot_path)
@@ -341,13 +369,22 @@ func _build_units() -> void:
 		# Cornice del MORALE come in 2D (MapView.MORALE_COLORS); i nemici non
 		# identificati non hanno morale noto -> nessuna cornice (come la 2D).
 		var morale_col = null if hidden else MapView.MORALE_COLORS.get(c.morale, Color.WHITE)
-		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex, morale_col)
+		# Segnalino-ordine sopra la pedina (come in 2D), se ha un ordine e non e' nascosta.
+		var order_tex: Texture2D = null
+		if c.has_order and not hidden:
+			var pref := "US" if c.side == D.Side.FRIENDLY else "GE"
+			order_tex = _tex_named("ord-%s-%s" % [pref, D.Order.keys()[c.order]])
+		var spotted: bool = c.side == D.Side.FRIENDLY and c.spotted
+		var facing: int = c.facing if (c.is_vehicle and not hidden) else 0
+		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex, morale_col,
+			order_tex, spotted, facing)
 
 
 # Un segnalino fisico: corpo con spessore (bordi cartoncino, proietta ombra)
 # + faccia superiore con l'art della pedina. Appoggiato a 'base' (superficie hex).
 func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
-		border_color = null) -> void:
+		border_color = null, order_tex: Texture2D = null,
+		spotted: bool = false, facing: int = 0) -> void:
 	var body := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(w, t, w)
@@ -390,6 +427,62 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 		fr.mesh = _rounded_frame_mesh(base + Vector3(0, t + 0.05, 0),
 			w * 0.52, w * 0.49, 0.12)
 		_units_root.add_child(fr)
+
+	# Segnalino-ordine (come in 2D): quad piatto nell'angolo basso-destra, sopra l'art.
+	if order_tex != null:
+		var ob := MeshInstance3D.new()
+		var opm := PlaneMesh.new()
+		opm.size = Vector2(w * 0.52, w * 0.52)
+		ob.mesh = opm
+		var omat := StandardMaterial3D.new()
+		omat.albedo_texture = order_tex
+		omat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		omat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		ob.material_override = omat
+		ob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ob.position = base + Vector3(w * 0.28, t + 0.07, w * 0.28)
+		_units_root.add_child(ob)
+
+	# Pallino "spotted" (rosso) come in 2D, angolo alto-destra.
+	if spotted:
+		var sd := MeshInstance3D.new()
+		var ssm := SphereMesh.new()
+		ssm.radius = 0.09
+		ssm.height = 0.18
+		sd.mesh = ssm
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.albedo_color = Color(0.9, 0.15, 0.15)
+		sd.material_override = smat
+		sd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		sd.position = base + Vector3(w * 0.34, t + 0.12, -w * 0.34)
+		_units_root.add_child(sd)
+
+	# Freccia di facing del veicolo (verso il vicino nella direzione di marcia).
+	if facing >= 1:
+		var dir := _facing_dir(facing)
+		var ar := MeshInstance3D.new()
+		var prism := BoxMesh.new()
+		prism.size = Vector3(0.12, 0.06, w * 0.5)
+		ar.mesh = prism
+		var amat := StandardMaterial3D.new()
+		amat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		amat.albedo_color = Color(1.0, 0.95, 0.3)
+		ar.material_override = amat
+		ar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var c := base + Vector3(0, t + 0.08, 0)
+		ar.position = c + dir * (w * 0.32)
+		if dir.length() > 0.001:
+			ar.look_at_from_position(ar.position, ar.position + dir, Vector3.UP)
+		_units_root.add_child(ar)
+
+
+# Direzione mondo (XZ) del facing 1..6 verso il vicino corrispondente.
+func _facing_dir(facing: int) -> Vector3:
+	# I 6 vicini in ordine di EDGE (30,90,...330 gradi). facing 1..6 -> indice.
+	var ang := deg_to_rad(30.0 + 60.0 * ((facing - 1) % 6))
+	return Vector3(cos(ang), 0, sin(ang)).normalized()
 
 
 func _counter_tex(counter_id: String) -> Texture2D:
@@ -673,8 +766,128 @@ func set_cues(hexes: Array, color: Color) -> void:
 
 # Rinfresca pedine + cue + selezione dopo un'azione (Fase 4), senza ricostruire
 # il terreno. Chiamato da Main quando il preview e' attivo e lo stato cambia.
+# ---- Replay in 3D: fantasmi lungo i percorsi + traccianti/bombe ----
+
+func set_replay_frame(units: Dictionary, paths: Dictionary) -> void:
+	_replay_active = true
+	_replay_units = units
+	_replay_paths = paths
+	replay_progress = 0.0
+	for ch in _units_root.get_children():
+		ch.queue_free()
+	_ghosts = {}
+	for idx in units:
+		var g := _make_ghost(units[idx])
+		_units_root.add_child(g)
+		_ghosts[idx] = g
+	if _cue_root != null:
+		for ch in _cue_root.get_children():
+			ch.queue_free()
+	if _sel_ring != null and is_instance_valid(_sel_ring):
+		_sel_ring.visible = false
+	_position_ghosts()
+
+
+func update_replay_progress(p: float) -> void:
+	replay_progress = p
+	_position_ghosts()
+
+
+func end_replay() -> void:
+	_replay_active = false
+	_ghosts = {}
+	_replay_units = {}
+	_replay_paths = {}
+	_build_units()
+
+
+func replay_shot(s: Dictionary) -> void:
+	_spawn_gunfire(s)
+
+
+func replay_boom(hex: Vector2i, type: int) -> void:
+	if type in [Area.Type.MORTAR_60, Area.Type.MORTAR_81, Area.Type.ARTILLERY_105]:
+		_spawn_bomb(hex)
+	else:
+		_spawn_flash(_hex_top(hex) + Vector3(0, 0.2, 0), 1.4)
+
+
+func _position_ghosts() -> void:
+	for idx in _ghosts:
+		_ghosts[idx].position = _replay_world(idx)
+
+
+# Posizione mondo del fantasma idx: interpolata lungo il percorso (replay_progress).
+func _replay_world(idx) -> Vector3:
+	if _replay_paths.has(idx):
+		var path: Array = _replay_paths[idx]
+		if path.size() >= 2:
+			var s: float = replay_progress * (path.size() - 1)
+			var i: int = mini(int(s), path.size() - 2)
+			var frac: float = s - i
+			return _hex_top(path[i]).lerp(_hex_top(path[i + 1]), frac)
+	return _hex_top(_replay_units[idx]["pos"])
+
+
+# Chit fantasma (corpo + faccia) a origine locale: lo si sposta col replay.
+func _make_ghost(u: Dictionary) -> Node3D:
+	var w := 1.35
+	var t := 0.10
+	var node := Node3D.new()
+	var body := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(w, t, w)
+	body.mesh = bm
+	var bmat := StandardMaterial3D.new()
+	bmat.albedo_color = Color(0.34, 0.31, 0.27)
+	bmat.roughness = 0.95
+	body.material_override = bmat
+	body.position = Vector3(0, t * 0.5 + 0.02, 0)
+	node.add_child(body)
+	var hidden := bool(u.get("hidden", false))
+	var tex: Texture2D = _counter_tex(MapView.DUMMY_BY_TEAM.get(u.get("team", ""),
+		"GE-RedTeam-Dummy-1")) if hidden else _counter_tex(u.get("counter", ""))
+	var fb := Color(0.25, 0.50, 0.95) if int(u["side"]) == D.Side.FRIENDLY \
+		else Color(0.70, 0.32, 0.28)
+	var top := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(w * 0.98, w * 0.98)
+	top.mesh = pm
+	var tmat := StandardMaterial3D.new()
+	tmat.albedo_texture = tex if tex != null else _token_tex(fb)
+	tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	top.material_override = tmat
+	top.position = Vector3(0, t + 0.03, 0)
+	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(top)
+	# Segnalino-ordine sul fantasma (come in 2D durante il replay).
+	var ordv: int = int(u.get("order", -1))
+	if ordv >= 0 and not hidden:
+		var pref := "US" if int(u["side"]) == D.Side.FRIENDLY else "GE"
+		var otex := _tex_named("ord-%s-%s" % [pref, D.Order.keys()[ordv]])
+		if otex != null:
+			var ob := MeshInstance3D.new()
+			var opm := PlaneMesh.new()
+			opm.size = Vector2(w * 0.52, w * 0.52)
+			ob.mesh = opm
+			var omat := StandardMaterial3D.new()
+			omat.albedo_texture = otex
+			omat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			omat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			ob.material_override = omat
+			ob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			ob.position = Vector3(w * 0.28, t + 0.07, w * 0.28)
+			node.add_child(ob)
+	return node
+
+
 func refresh_dynamic(cues: Array, color: Color,
 		fire_src: Vector2i = Vector2i(-99, -99)) -> void:
+	if _replay_active:
+		return  # durante il replay i fantasmi gestiscono le pedine
 	_build_units()
 	_build_markers()
 	set_cues(cues, color)
@@ -921,25 +1134,58 @@ func _build_markers() -> void:
 				tname = "US-81mmMortar-Marker-1-f"
 			Area.Type.C4:
 				tname = "marker-C4"
-		var tex := _tex_named(tname)
-		if tex == null:
-			continue
-		var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
-		var mi := MeshInstance3D.new()
-		var pm := PlaneMesh.new()
-		pm.size = Vector2(1.55, 1.55)
-		mi.mesh = pm
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = tex
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(1, 1, 1, alpha)
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		# Sopra terreno e cue, appena sotto i chit.
-		mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.11, 0)
-		_marker_root.add_child(mi)
+		_add_flat_marker(hx, _tex_named(tname), alpha)
+	# Marker di terreno di scenario (come in 2D): filo spinato, trincea,
+	# edificio fortificato, foxhole, rubble. Le grafiche stanno in assets/counters.
+	for key in state.map:
+		var sh: GameState.MapHex = state.map[key]
+		var cell := _key_to_cell(key)
+		if sh.wire:
+			_add_flat_marker(cell, _tex_named("GEN-Wire-Marker-f"), 0.85)
+		match sh.terrain:
+			D.Terrain.TRENCH:
+				_add_flat_marker(cell, _tex_named("GEN-Trench-Marker-f"), 0.9)
+			D.Terrain.FORTIFIED_BUILDING:
+				_add_flat_marker(cell, _tex_named("GEN-Fortified-Marker-f"), 0.9)
+			D.Terrain.FOXHOLE:
+				_add_flat_marker(cell, _tex_named("GEN-Foxhole-Marker-1-f"), 0.9)
+			D.Terrain.RUBBLE:
+				_add_flat_marker(cell, _tex_named("GEN-Rubble-Marker-1-f"), 0.9)
+	# Obiettivi di scenario (come in 2D): cannoni (GUN) e punti di ricognizione.
+	if not state.scenario_id.is_empty() and Scenario.SCENARIOS.has(state.scenario_id):
+		var sc: Dictionary = Scenario.SCENARIOS[state.scenario_id]
+		for gun in sc.get("gun_hexes", []):
+			var gp: PackedStringArray = String(gun).split(",")
+			var col := Color(0.9, 0.1, 0.1) if String(gun) in state.guns_destroyed \
+				else Color(0.22, 0.22, 0.2)
+			_add_flat_marker(Vector2i(int(gp[0]), int(gp[1])), _token_tex(col), 0.95, 1.0)
+		for obj in sc.get("objective_hexes", []):
+			var op: PackedStringArray = String(obj).split(",")
+			var oc := Color(0.2, 0.8, 0.3) if String(obj) in state.visited_objectives \
+				else Color(0.95, 0.8, 0.1)
+			_add_flat_marker(Vector2i(int(op[0]), int(op[1])), _token_tex(oc), 0.95, 0.8)
+
+
+# Quad piatto texturizzato appoggiato a un hex (marker d'area/terreno).
+func _add_flat_marker(hx: Vector2i, tex: Texture2D, alpha: float,
+		size: float = 1.55) -> void:
+	if tex == null or not state.map.has(GameState.hex_key(hx.x, hx.y)):
+		return
+	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(size, size)
+	mi.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1, 1, 1, alpha)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.09, 0)
+	_marker_root.add_child(mi)
 
 
 func _update_info(hex: Vector2i) -> void:

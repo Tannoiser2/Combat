@@ -889,6 +889,8 @@ func _replay_apply(f: Dictionary) -> void:
 	map_view.replay_units = f["units"]
 	map_view.replay_paths = f["moves"]
 	map_view.replay_progress = 0.0
+	if map3d_preview != null:
+		map3d_preview.set_replay_frame(f["units"], f["moves"])
 	if f.get("merged", false):
 		hint_label.text = "REPLAY - Turno %d   (%d/%d)" % [
 			f["turn"], replay_idx + 1, replay_frames.size()]
@@ -915,6 +917,8 @@ func _process(delta: float) -> void:
 	else:
 		move_t = REPLAY_MOVE_T if has_moves else (0.7 if has_fx else 0.2)
 	map_view.replay_progress = clampf(replay_t / move_t, 0.0, 1.0)
+	if map3d_preview != null:
+		map3d_preview.update_replay_progress(map_view.replay_progress)
 	while replay_evt_idx < replay_events.size() \
 			and replay_t >= replay_events[replay_evt_idx]["at"] * move_t:
 		var ev: Dictionary = replay_events[replay_evt_idx]
@@ -922,10 +926,14 @@ func _process(delta: float) -> void:
 		match ev["kind"]:
 			"shot":
 				map_view.add_tracer(ev["data"])
+				if map3d_preview != null:
+					map3d_preview.replay_shot(ev["data"])
 				_play_sfx(WEAPON_SFX.get(ev["data"].get("weapon", ""), "rifle"))
 				_play_sfx(OUTCOME_SFX.get(ev["data"].get("outcome", ""), ""))
 			"boom":
 				map_view.add_blast(ev["data"]["hex"])
+				if map3d_preview != null:
+					map3d_preview.replay_boom(ev["data"]["hex"], ev["data"]["type"])
 				_play_sfx(AREA_SFX.get(ev["data"]["type"], "artillery"))
 			"sfx":
 				_play_sfx(ev["data"])
@@ -943,6 +951,8 @@ func _end_replay() -> void:
 	replay_idx = -1
 	replay_frames = []
 	map_view.replay_mode = false
+	if map3d_preview != null:
+		map3d_preview.end_replay()
 	map_view.replay_units = {}
 	map_view.replay_paths = {}
 	map_view.queue_redraw()
