@@ -48,6 +48,7 @@ var _home_distance := 60.0
 var _framed := false           # true dopo la prima inquadratura: i rebuild (S, 1/2/3) non riposizionano la camera
 var _orbiting := false
 var _panning := false
+var _multitouch := false       # due dita sullo schermo: ignora il mouse emulato (pinch)
 
 # --- Picking 3D (Fase 1: base per giocare in 3D) ---
 var _picked := Vector2i(-99, -99)   # hex attualmente evidenziato
@@ -633,6 +634,34 @@ func apply_view_state(s: Dictionary) -> void:
 	_distance = s.get("distance", _distance)
 	_pivot = s.get("pivot", _pivot)
 	_framed = true
+	_update_camera()
+
+
+# --- Gesti touch (iPad/mobile), pilotati da Main._input ---
+# Mentre due dita sono sullo schermo si ignora il mouse emulato (una dita), cosi'
+# il pinch non orbita anche la camera.
+func set_multitouch(on: bool) -> void:
+	_multitouch = on
+	if on:
+		_orbiting = false
+
+
+# Pinch-zoom: ratio = distanza_nuova / distanza_vecchia (>1 = dita allargate = avvicina).
+func pinch_zoom(ratio: float) -> void:
+	if ratio <= 0.0:
+		return
+	_distance = clampf(_distance / ratio, 3.0, 2000.0)
+	_update_camera()
+
+
+# Pan a due dita (trascina il punto di mira nel piano orizzontale).
+func touch_pan(rel: Vector2) -> void:
+	if _camera == null:
+		return
+	var right := _camera.global_transform.basis.x
+	var fwd := Vector3(sin(_yaw), 0, cos(_yaw))
+	var k := _distance * 0.0016
+	_pivot += (right * rel.x + fwd * rel.y) * k
 	_update_camera()
 
 
@@ -1528,6 +1557,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 				_panning = event.pressed
 	elif event is InputEventMouseMotion:
+		if _multitouch:
+			return  # durante il pinch a due dita non orbitare col mouse emulato
 		if _los_grab >= 0:
 			# Trascinamento di un'estremita' LOS: sposta l'hex sotto il cursore.
 			var hg := _hex_under(event.position)
