@@ -219,7 +219,16 @@ porting multi-sessione. Avanzamento:
   terreno di scenario (wire/trench/fortified/foxhole/rubble in _build_markers via
   _add_flat_marker) e obiettivi (gun_hexes/objective_hexes). Il refresh avviene
   via _sync_map3d in _refresh, quindi assegnare un ordine aggiorna subito il 3D.
-- DA FARE: strumento LOS interattivo in 3D (il resto del 3D giocabile e' fatto).
+- STRUMENTO LOS IN 3D (FATTO): col pulsante LOS attivo, due clic in 3D misurano
+  la linea di vista. Map3DView.set_los(a,b,clear,blocker) disegna la linea
+  verde(libera)/rossa(bloccata) fra gli hex (a ~0.5 di quota), le estremita' a
+  sfera e l'esagono-ostacolo evidenziato in rosso; clear_los la rimuove. Main:
+  _on_map3d_hex instrada il clic a _los_place quando los_mode e' attivo (con
+  priorita' su selezione/azione); _los_update/_los_show_anchor/_on_los_toggled
+  pushano al 3D. Validato headless (COMBAT_MAP3D_LOS).
+  IL 3D GIOCABILE E' COMPLETO: picking, selezione, ordini, azione (cue+click),
+  schieramento, scelta 2D/3D nel menu, marker d'area e di terreno, obiettivi,
+  proiettili animati, replay, parita' overlay col 2D, strumento LOS.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

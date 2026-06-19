@@ -59,6 +59,7 @@ var _unit_pos := {}                 # Character -> posizione mondo del chit
 var _units_root: Node3D             # contenitore pedine (rinfrescabile)
 var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
 var _marker_root: Node3D            # contenitore marker d'area (fumo/fuoco/...)
+var _los_root: Node3D               # contenitore strumento LOS (linea + ostacolo)
 
 # --- Proiettili animati (Fase 5: traccianti/colpi/bombe/granate in 3D) ---
 var _fx_root: Node3D                 # contenitore proiettili + lampi
@@ -95,6 +96,8 @@ func _ready() -> void:
 	add_child(_marker_root)
 	_fx_root = Node3D.new()
 	add_child(_fx_root)
+	_los_root = Node3D.new()
+	add_child(_los_root)
 	_build_units()
 	_build_markers()
 	_build_camera()
@@ -143,6 +146,9 @@ func _grab_screenshot() -> void:
 			_selected.set_order(D.Order.AIMED_FIRE)
 			_build_units()
 			_update_sel_ring()
+		# Valida lo strumento LOS: linea rossa con ostacolo evidenziato.
+		if not OS.get_environment("COMBAT_MAP3D_LOS").is_empty():
+			set_los(hx, hx + Vector2i(5, -2), false, hx + Vector2i(2, -1))
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	# Validazione proiettili: COMBAT_MAP3D_FX -> spawn demo a meta' volo.
@@ -911,8 +917,51 @@ func _draw_fire_lines(src: Vector2i, targets: Array, color: Color) -> void:
 		_add_line(a, b, color)
 
 
+# Strumento LOS in 3D: linea verde (libera) / rossa (bloccata) fra due hex,
+# con l'esagono che blocca evidenziato. clear_los() la rimuove.
+func set_los(from_hex: Vector2i, to_hex: Vector2i, clear: bool,
+		blocker: Vector2i = Vector2i(-99, -99)) -> void:
+	clear_los()
+	var col := Color(0.2, 0.95, 0.3) if clear else Color(0.95, 0.2, 0.15)
+	var a := _hex_top(from_hex) + Vector3(0, 0.5, 0)
+	var b := _hex_top(to_hex) + Vector3(0, 0.5, 0)
+	_add_line(a, b, col, 0.08, _los_root)
+	for h in [from_hex, to_hex]:
+		var s := MeshInstance3D.new()
+		var sm := SphereMesh.new(); sm.radius = 0.18; sm.height = 0.36
+		s.mesh = sm
+		var mt := StandardMaterial3D.new()
+		mt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mt.albedo_color = col
+		s.material_override = mt
+		s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		s.position = _hex_top(h) + Vector3(0, 0.5, 0)
+		_los_root.add_child(s)
+	if not clear and blocker.x > -99 and state.map.has(GameState.hex_key(blocker.x, blocker.y)):
+		var blv: int = state.map[GameState.hex_key(blocker.x, blocker.y)].level
+		var mi := MeshInstance3D.new()
+		mi.mesh = _hex_fan_mesh(_world_center(blocker.x, blocker.y, blv) + Vector3(0, 0.06, 0),
+			_cell.x / 1.5 / PX_PER_UNIT * 0.95)
+		var bmat := StandardMaterial3D.new()
+		bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		bmat.albedo_color = Color(0.95, 0.2, 0.15, 0.5)
+		mi.material_override = bmat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_los_root.add_child(mi)
+
+
+func clear_los() -> void:
+	if _los_root == null:
+		return
+	for ch in _los_root.get_children():
+		ch.queue_free()
+
+
 # Un segmento 3D come BoxMesh sottile orientato da 'a' a 'b'.
-func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> void:
+func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05,
+		parent: Node3D = null) -> void:
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(width, width, a.distance_to(b))
@@ -925,7 +974,7 @@ func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> voi
 	mi.position = (a + b) * 0.5
 	if a.distance_to(b) > 0.001:
 		mi.look_at_from_position((a + b) * 0.5, b, Vector3.UP)
-	_cue_root.add_child(mi)
+	(parent if parent != null else _cue_root).add_child(mi)
 
 
 # ---- Proiettili animati (colpi, granate a parabola, bombe dall'alto) ----

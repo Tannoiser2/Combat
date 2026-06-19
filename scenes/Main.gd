@@ -220,6 +220,8 @@ func _toggle_map3d_preview() -> void:
 # Clic su una pedina amica nell'anteprima 3D (Fase 3): in fase Ordini apre il
 # pannello ordini di quella pedina (la stessa UI del 2D).
 func _on_map3d_unit(c: Character) -> void:
+	if los_mode:
+		return  # in modalita' LOS i clic misurano la linea, non selezionano
 	if c == null or c.side != Domain.Side.FRIENDLY or c.is_dead():
 		return
 	if phase != Phase.ORDERS:
@@ -227,10 +229,26 @@ func _on_map3d_unit(c: Character) -> void:
 	_open_order_panel(c)
 
 
+# Piazzamento dello strumento LOS dal 3D: primo clic = estremita' A, secondo
+# = estremita' B (calcola e disegna la linea), terzo = nuova misura.
+func _los_place(hex: Vector2i) -> void:
+	if los_hex_a.x <= -99 or los_hex_b.x > -99:
+		los_hex_a = hex
+		los_hex_b = Vector2i(-99, -99)
+		_los_show_anchor()
+		hint_label.text = "LOS: primo hex %02d.%02d — clicca il secondo" % [hex.x, hex.y]
+	else:
+		los_hex_b = hex
+		_los_update()
+
+
 # Clic su un hex nell'anteprima 3D (Fase 4): se una pedina sta agendo, l'hex e'
 # il bersaglio/destinazione dell'azione (riusa _handle_action_click del 2D).
 func _on_map3d_hex(hex: Vector2i) -> void:
 	if hex.x <= -99:
+		return
+	if los_mode:
+		_los_place(hex)  # strumento LOS dal 3D (due clic)
 		return
 	if phase == Phase.DEPLOY:
 		_handle_deploy_click(hex)  # schieramento dal 3D (hex azzurri)
@@ -1135,6 +1153,8 @@ func _on_los_toggled(on: bool) -> void:
 	next_button.disabled = on
 	los_hex_a = Vector2i(-99, -99)
 	los_hex_b = Vector2i(-99, -99)
+	if map3d_preview != null:
+		map3d_preview.clear_los()
 	if on:
 		hint_label.text = "LOS: clicca il primo hex, poi il secondo (trascina i cerchi per spostarli)"
 	else:
@@ -1196,6 +1216,8 @@ func _los_show_anchor() -> void:
 	else:
 		map_view.los_tool = {"anchor": map_view.hex_center(los_hex_a.x, los_hex_a.y)}
 	map_view.queue_redraw()
+	if map3d_preview != null:
+		map3d_preview.clear_los()  # la linea 3D compare quando ci sono 2 estremita'
 
 
 func _los_update() -> void:
@@ -1209,6 +1231,8 @@ func _los_update() -> void:
 		"to": map_view.hex_center(los_hex_b.x, los_hex_b.y),
 		"clear": free,
 	}
+	if map3d_preview != null:
+		map3d_preview.set_los(los_hex_a, los_hex_b, free, blocker)
 	var head := "LOS %02d.%02d → %02d.%02d: " % [
 		los_hex_a.x, los_hex_a.y, los_hex_b.x, los_hex_b.y]
 	if free:
