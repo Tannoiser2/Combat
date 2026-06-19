@@ -98,6 +98,21 @@ veicoli Fase 4 (archi LOS per ruolo/boccaporto, Target/Observed Target), Fase 5
 passeggeri per lato (resto Fase 6). Fuori scope: editor di scenari, OOB
 ufficiale Vol.2 (non esiste nei materiali: setup attuali sono scelte di design).
 
+IDEA UI — MAPPA A LIVELLI (richiesta utente, prossima sessione): rendere
+VISIVAMENTE le quote, dando alle parti piu' alte un aspetto "rialzato" a
+layer (effetto pseudo-3D), SOLO grafica — NESSUN cambiamento ad azioni, LOS o
+movimento. Fattibile: la quota e' gia' nel dato (hex.level 0..3), oggi usata
+solo da LOS/Move; basta intervenire in ui/MapView.gd. Approcci possibili:
+(a) RILIEVO 2D leggero (consigliato, basso rischio): ombra/contorno sul lato a
+valle degli hex piu' alti + tinta a step per livello (esiste gia' una tinta
+OPEN_LEVEL_n) per dare senso di profondita' senza spostare le pedine;
+(b) FAUX-ISOMETRICO: hex piu' alti disegnati con un offset verticale di N px
+per livello + una "parete"/cliff sui bordi in discesa. ATTENZIONE: lo sfondo
+delle board e' un'IMMAGINE PIATTA scansionata, quindi un vero 3D litiga con
+l'art; meglio l'opzione (a), oppure (b) applicato con parsimonia. Da decidere
+con l'utente quale resa preferisce prima di implementare.
+
+
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
 terreno (Rule 13: difficili=2, Move.DIFFICULT_MOVE/terrain_move_cost,
 budget in move_character); Search raccoglie i documenti (SR13:
