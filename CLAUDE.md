@@ -187,8 +187,17 @@ porting multi-sessione. Avanzamento:
   vista 3D (chiama _toggle_map3d_preview a fine setup). Lo schieramento funziona
   dal 3D: _on_map3d_hex instrada il clic a _handle_deploy_click in Phase.DEPLOY
   (i cue azzurri della deploy zone arrivano via _sync_map3d). Validato headless.
-- DA FARE: Fase 5 LOS/traccianti/replay in 3D; marker d'area (fumo/fuoco/
-  mortaio/illum) in 3D.
+- MARKER D'AREA IN 3D (FATTO): fumo/fuoco/mortaio/illuminazione/C4/ordigni
+  disegnati come quad piatti texturizzati (Map3DView._build_markers, contenitore
+  _marker_root), stesse grafiche del 2D via _tex_named("assets/counters/<n>.png");
+  ricostruiti in refresh_dynamic e _rebuild. Validato su s2 (bombardamento ->
+  fumo).
+- LINEE DI FUOCO/LOS IN 3D (FATTO): quando si mira, linee dal tiratore a ogni
+  bersaglio (Map3DView._draw_fire_lines + _add_line come BoxMesh sottile
+  orientato), passate da Main._sync_map3d via map_view.fire_lines_source a
+  refresh_dynamic. Validato headless.
+- DA FARE: replay/traccianti animati in 3D (grosso: il replay 2D usa
+  replay_frames/units/paths); strumento LOS interattivo in 3D.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

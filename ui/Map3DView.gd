@@ -15,6 +15,7 @@ class_name Map3DView
 extends Node3D
 
 const D := preload("res://engine/Domain.gd")
+const Area := preload("res://engine/Area.gd")
 
 # Riuso la calibrazione della griglia da MapView (stesse costanti): origin e
 # passo (cell) per board, cosi' 3D e 2D restano allineati pixel-per-pixel.
@@ -57,6 +58,7 @@ var _unit_pos := {}                 # Character -> posizione mondo del chit
 # --- Azione dal 3D (Fase 4) ---
 var _units_root: Node3D             # contenitore pedine (rinfrescabile)
 var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
+var _marker_root: Node3D            # contenitore marker d'area (fumo/fuoco/...)
 
 
 func _ready() -> void:
@@ -74,7 +76,10 @@ func _ready() -> void:
 	add_child(_units_root)
 	_cue_root = Node3D.new()
 	add_child(_cue_root)
+	_marker_root = Node3D.new()
+	add_child(_marker_root)
 	_build_units()
+	_build_markers()
 	_build_camera()
 	_build_hud()
 	set_process_unhandled_input(true)
@@ -111,6 +116,7 @@ func _grab_screenshot() -> void:
 			if state.map.has(GameState.hex_key(nb.x, nb.y)):
 				cues.append(nb)
 		set_cues(cues, Color(0.3, 0.9, 0.3))
+		_draw_fire_lines(hx, cues, Color(0.95, 0.55, 0.05))  # valida le linee
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	await RenderingServer.frame_post_draw
@@ -640,10 +646,103 @@ func set_cues(hexes: Array, color: Color) -> void:
 
 # Rinfresca pedine + cue + selezione dopo un'azione (Fase 4), senza ricostruire
 # il terreno. Chiamato da Main quando il preview e' attivo e lo stato cambia.
-func refresh_dynamic(cues: Array, color: Color) -> void:
+func refresh_dynamic(cues: Array, color: Color,
+		fire_src: Vector2i = Vector2i(-99, -99)) -> void:
 	_build_units()
+	_build_markers()
 	set_cues(cues, color)
+	if fire_src.x > -99:
+		_draw_fire_lines(fire_src, cues, color)
 	_update_sel_ring()
+
+
+# Linee di fuoco/LOS dal tiratore a ogni bersaglio (cue), aggiunte ai cue.
+func _draw_fire_lines(src: Vector2i, targets: Array, color: Color) -> void:
+	if _cue_root == null or not state.map.has(GameState.hex_key(src.x, src.y)):
+		return
+	var slv: int = state.map[GameState.hex_key(src.x, src.y)].level
+	var a := _world_center(src.x, src.y, slv) + Vector3(0, 0.45, 0)
+	for t in targets:
+		var tx: Vector2i = t
+		if not state.map.has(GameState.hex_key(tx.x, tx.y)):
+			continue
+		var tlv: int = state.map[GameState.hex_key(tx.x, tx.y)].level
+		var b := _world_center(tx.x, tx.y, tlv) + Vector3(0, 0.45, 0)
+		_add_line(a, b, color)
+
+
+# Un segmento 3D come BoxMesh sottile orientato da 'a' a 'b'.
+func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(width, width, a.distance_to(b))
+	mi.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(color.r, color.g, color.b, 0.9)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = (a + b) * 0.5
+	if a.distance_to(b) > 0.001:
+		mi.look_at_from_position((a + b) * 0.5, b, Vector3.UP)
+	_cue_root.add_child(mi)
+
+
+# Texture da assets/counters/<name>.png per nome esatto (come MapView._named_tex).
+func _tex_named(name: String) -> Texture2D:
+	var path := "res://assets/counters/%s.png" % name
+	return load(path) if ResourceLoader.exists(path) else null
+
+
+# Marker d'area (fumo/fuoco/mortaio/illuminazione/C4/ordigni) come quad piatti
+# texturizzati sull'hex, con le stesse grafiche del 2D (MapView).
+func _build_markers() -> void:
+	if _marker_root == null:
+		return
+	for ch in _marker_root.get_children():
+		ch.queue_free()
+	for m in state.area_markers:
+		var hx: Vector2i = m["hex"]
+		if not state.map.has(GameState.hex_key(hx.x, hx.y)):
+			continue
+		var tname := "marker-TARGET"  # ordigni in attesa di esplodere
+		var alpha := 0.9
+		match int(m["type"]):
+			Area.Type.SMOKE:
+				var full: bool = int(m.get("turns_left", 2)) >= 2
+				tname = "marker-SMOKE-f" if full else "marker-SMOKE-r"
+				alpha = 0.8 if full else 0.6
+			Area.Type.ILLUM:
+				tname = "marker-ILLUM"; alpha = 0.75
+			Area.Type.FIRE:
+				tname = "GEN-Fire-Marker-f"
+			Area.Type.RAGING_FIRE:
+				tname = "GEN-Raging-Marker-f"
+			Area.Type.MORTAR_60:
+				tname = "US-60mmMortar-Marker-1-f"
+			Area.Type.MORTAR_81:
+				tname = "US-81mmMortar-Marker-1-f"
+			Area.Type.C4:
+				tname = "marker-C4"
+		var tex := _tex_named(tname)
+		if tex == null:
+			continue
+		var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+		var mi := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(1.55, 1.55)
+		mi.mesh = pm
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(1, 1, 1, alpha)
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# Sopra terreno e cue, appena sotto i chit.
+		mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.11, 0)
+		_marker_root.add_child(mi)
 
 
 func _update_info(hex: Vector2i) -> void:
@@ -742,6 +841,7 @@ func _rebuild() -> void:
 			ch.queue_free()
 	_build_terrain()
 	_build_units()
+	_build_markers()
 	if _selected != null:
 		_update_sel_ring()  # ricrea la cornice sulla pedina ancora selezionata
 	_update_camera()

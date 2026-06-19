@@ -1,3 +1,12 @@
+v0.98 — 2026-06-19
+- Mappa 3D: quando una pedina mira, le linee di fuoco/LOS dal tiratore ai
+  bersagli sono disegnate anche in 3D.
+
+v0.97 — 2026-06-19
+- Mappa 3D: i marker d'area (fumo, fuoco, incendio furioso, mortai,
+  illuminazione, C4, ordigni in arrivo) ora compaiono anche nella vista 3D, con
+  le stesse grafiche del 2D, appoggiati sull'hex.
+
 v0.96 — 2026-06-19
 - Scelta 2D/3D a inizio partita: toggle "Gioca in 3D" nel menu missioni. Se
   attivo, la partita si apre direttamente nella vista 3D (mappa estrusa); il 2D
