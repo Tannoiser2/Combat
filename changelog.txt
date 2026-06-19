@@ -1,3 +1,11 @@
+v1.04 — 2026-06-19
+- Mappa 3D: la camera NON si riposiziona piu' premendo S o cambiando le quote
+  (1/2/3), e l'orbita/zoom/pan si conservano passando da 3D a 2D e ritorno.
+- Mappa 3D: lo strumento LOS si puo' spostare "al volo" trascinando le sue
+  estremita' (come i cerchi del 2D), non solo cliccando gli esagoni.
+- Mappa 3D: il pan (trascina dx) sull'asse X ora segue il mouse come nel 2D
+  (prima era invertito).
+
 v1.03 — 2026-06-19
 - Mappa 3D: i dislivelli ora degradano "dolci" invece che a picco (default).
   Le cime restano alla quota piena (alture evidenti) ma i bordi scendono in
