@@ -229,6 +229,12 @@ porting multi-sessione. Avanzamento:
   IL 3D GIOCABILE E' COMPLETO: picking, selezione, ordini, azione (cue+click),
   schieramento, scelta 2D/3D nel menu, marker d'area e di terreno, obiettivi,
   proiettili animati, replay, parita' overlay col 2D, strumento LOS.
+- SCALINI DOLCI (FATTO, default): in _build_terrain il CENTRO dell'hex resta
+  alla quota piena (cime evidenti) ma i VERTICI di bordo sono mediati coi vicini
+  (_corner_level) -> i bordi degradano in pendio e la superficie e' continua
+  (niente pareti a picco interne; skirt solo al bordo mappa). _smooth default ON
+  (env COMBAT_MAP3D_SMOOTH=0 per spegnerlo, tasto S per alternare). _world_center
+  resta alla quota piena (pedine/marker sul centro-cima).
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

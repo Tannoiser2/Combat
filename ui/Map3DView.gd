@@ -87,7 +87,7 @@ func _ready() -> void:
 	_cell = info.get("cell", MapView.CELL)
 	if ResourceLoader.exists(info["file"]):
 		_board_tex = load(info["file"])
-	_smooth = not OS.get_environment("COMBAT_MAP3D_SMOOTH").is_empty()
+	_smooth = OS.get_environment("COMBAT_MAP3D_SMOOTH") != "0"  # dolce di default (S = a picco)
 	_build_environment()
 	_build_terrain()
 	_units_root = Node3D.new()
@@ -195,17 +195,11 @@ func _hex_center_px(col: int, row: int) -> Vector2:
 	return Vector2(x, y)
 
 
-# Posizione mondo del centro di un hex alla sua quota (in modalita' "dolce"
-# usa la quota media dei vertici, cosi' pedine/marker stanno sulla superficie).
+# Posizione mondo del centro di un hex alla sua quota (piena): il centro resta
+# alla quota dell'hex anche in modalita' dolce, cosi' pedine/cime restano alte.
 func _world_center(col: int, row: int, level: int) -> Vector3:
 	var px := _hex_center_px(col, row)
-	var lv := float(level)
-	if _smooth:
-		var s := 0.0
-		for i in range(6):
-			s += _corner_level(col, row, i)
-		lv = s / 6.0
-	return Vector3(px.x / PX_PER_UNIT, lv * LEVEL_HEIGHT * _height_scale,
+	return Vector3(px.x / PX_PER_UNIT, level * LEVEL_HEIGHT * _height_scale,
 		px.y / PX_PER_UNIT)
 
 
@@ -272,17 +266,13 @@ func _build_terrain() -> void:
 		var row: int = cell.y
 		var center := _world_center(col, row, hex.level)
 		var nb := _neighbors(col, row)
-		# 6 altezze ai vertici: a picco = quota dell'hex; dolce = media coi vicini
-		# che condividono il vertice (superficie continua e ondulata).
+		# Dolce (via di mezzo): il CENTRO resta alla quota piena dell'hex (cime
+		# evidenti), i VERTICI di bordo sono mediati coi vicini -> i bordi
+		# degradano dolci e la superficie resta continua, senza pareti a picco.
 		var corner_y: Array[float] = []
 		for i in range(6):
 			corner_y.append(_corner_level(col, row, i) * LEVEL_HEIGHT * _height_scale
 				if _smooth else center.y)
-		if _smooth:
-			var cy := 0.0
-			for y in corner_y:
-				cy += y
-			center.y = cy / 6.0
 		bb_min.x = minf(bb_min.x, center.x); bb_max.x = maxf(bb_max.x, center.x)
 		bb_min.y = minf(bb_min.y, center.y); bb_max.y = maxf(bb_max.y, center.y)
 		bb_min.z = minf(bb_min.z, center.z); bb_max.z = maxf(bb_max.z, center.z)
