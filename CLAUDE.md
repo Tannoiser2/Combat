@@ -235,8 +235,13 @@ porting multi-sessione. Avanzamento:
   (niente pareti a picco interne; skirt solo al bordo mappa). _smooth default ON
   (env COMBAT_MAP3D_SMOOTH=0 per spegnerlo, tasto S per alternare). _world_center
   resta alla quota piena (pedine/marker sul centro-cima).
-- Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
-  aggiunti come le pedine quando si vorra'.
+- Marker d'area in 3D: icone piatte (Map3DView._build_markers) + EFFETTI
+  PARTICELLARI volumetrici per fumo e fuoco (v1.06): _add_smoke_fx (denso/rado)
+  e _add_fire_fx (fiamme additive + pennacchio). Usano CPUParticles3D (NON GPU:
+  i compute shader non sono affidabili nell'export Web/WebGL e sotto llvmpipe);
+  la texture "puff" e' generata a codice (_puff_texture, gradiente radiale =
+  CC0, niente asset esterni). Validati headless sotto xvfb (le particelle CPU
+  si vedono, a differenza dei GPUParticles).
 
 
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per

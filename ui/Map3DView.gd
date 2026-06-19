@@ -449,6 +449,12 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 	tmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	top.material_override = tmat
 	top.position = base + Vector3(0, t + 0.03, 0)
+	# Veicoli: ruota l'art (silhouette dall'alto col fronte verso l'alto) nella
+	# direzione di marcia, cosi' il mezzo "punta" dove va invece di sempre in su.
+	# Di default il fronte dell'art (alto immagine) guarda -Z; lo allineo a _facing_dir.
+	if facing >= 1:
+		var fang := deg_to_rad(30.0 + 60.0 * ((facing - 1) % 6))
+		top.rotation.y = atan2(-cos(fang), -sin(fang))
 	# Niente ombra dalla faccia piatta: l'ombra la getta il corpo.
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_units_root.add_child(top)
@@ -927,6 +933,10 @@ func _make_ghost(u: Dictionary) -> Node3D:
 	top.material_override = tmat
 	top.position = Vector3(0, t + 0.03, 0)
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var gf: int = int(u.get("facing", 0))  # veicoli: orienta l'art come le pedine vive
+	if gf >= 1:
+		var gang := deg_to_rad(30.0 + 60.0 * ((gf - 1) % 6))
+		top.rotation.y = atan2(-cos(gang), -sin(gang))
 	node.add_child(top)
 	# Segnalino-ordine sul fantasma (come in 2D durante il replay).
 	var ordv: int = int(u.get("order", -1))
@@ -1242,13 +1252,16 @@ func _build_markers() -> void:
 			Area.Type.SMOKE:
 				var full: bool = int(m.get("turns_left", 2)) >= 2
 				tname = "marker-SMOKE-f" if full else "marker-SMOKE-r"
-				alpha = 0.8 if full else 0.6
+				alpha = 0.45 if full else 0.35  # icona piu' tenue: il volume lo da' il particellare
+				_add_smoke_fx(hx, full)         # fumo denso (pieno) / rado (in dissolvenza)
 			Area.Type.ILLUM:
 				tname = "marker-ILLUM"; alpha = 0.75
 			Area.Type.FIRE:
-				tname = "GEN-Fire-Marker-f"
+				tname = "GEN-Fire-Marker-f"; alpha = 0.55
+				_add_fire_fx(hx, false)
 			Area.Type.RAGING_FIRE:
-				tname = "GEN-Raging-Marker-f"
+				tname = "GEN-Raging-Marker-f"; alpha = 0.55
+				_add_fire_fx(hx, true)
 			Area.Type.MORTAR_60:
 				tname = "US-60mmMortar-Marker-1-f"
 			Area.Type.MORTAR_81:
@@ -1307,6 +1320,133 @@ func _add_flat_marker(hx: Vector2i, tex: Texture2D, alpha: float,
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.09, 0)
 	_marker_root.add_child(mi)
+
+
+# --- Effetti particellari volumetrici (fumo/fuoco) sugli esagoni ---
+# Si usano CPUParticles3D (non GPU): girano anche nell'export Web/WebGL e sotto
+# software-rendering, dove i GPUParticles (compute shader) non sono affidabili.
+# La texture "puff" e' generata a codice (gradiente radiale morbido): CC0 per
+# costruzione, niente asset esterni.
+
+var _puff_tex: Texture2D = null
+
+func _puff_texture() -> Texture2D:
+	if _puff_tex != null:
+		return _puff_tex
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) / 2.0
+	for y in n:
+		for x in n:
+			var d: float = Vector2(x - c, y - c).length() / c
+			var a: float = clampf(1.0 - d, 0.0, 1.0)
+			a = a * a  # bordo soffice
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	_puff_tex = ImageTexture.create_from_image(img)
+	return _puff_tex
+
+
+# Materiale billboard per i quad delle particelle (colore per-particella dal ramp).
+func _particle_material(additive: bool) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.billboard_keep_scale = true
+	mat.albedo_texture = _puff_texture()
+	mat.vertex_color_use_as_albedo = true
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD if additive else BaseMaterial3D.BLEND_MODE_MIX
+	mat.disable_receive_shadows = true
+	return mat
+
+
+func _grow_curve(a: float, b: float) -> Curve:
+	var cv := Curve.new()
+	cv.add_point(Vector2(0.0, a))
+	cv.add_point(Vector2(1.0, b))
+	return cv
+
+
+# Particellare comune (CPUParticles3D gia' configurato e aggiunto a _marker_root).
+func _make_particles(base: Vector3, amount: int, life: float, radius: float,
+		vmin: float, vmax: float, rise: float, smin: float, smax: float,
+		ramp: Gradient, additive: bool, quad: float) -> void:
+	var p := CPUParticles3D.new()
+	p.amount = amount
+	p.lifetime = life
+	p.preprocess = life            # gia' "a regime" quando appare
+	p.randomness = 0.5
+	p.position = base
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	p.emission_sphere_radius = radius
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 18.0
+	p.gravity = Vector3(0, rise, 0)   # spinta verso l'alto (galleggiamento)
+	p.initial_velocity_min = vmin
+	p.initial_velocity_max = vmax
+	p.angular_velocity_min = -40.0
+	p.angular_velocity_max = 40.0
+	p.scale_amount_min = smin
+	p.scale_amount_max = smax
+	p.scale_amount_curve = _grow_curve(0.5, 1.25)  # cresce salendo
+	p.color_ramp = ramp
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(quad, quad)
+	mesh.material = _particle_material(additive)
+	p.mesh = mesh
+	_marker_root.add_child(p)
+
+
+func _smoke_gradient(dense: bool) -> Gradient:
+	var g := Gradient.new()
+	var tone := 0.35 if dense else 0.6      # denso = piu' scuro
+	var peak := 0.75 if dense else 0.4      # denso = piu' opaco
+	g.offsets = PackedFloat32Array([0.0, 0.18, 1.0])
+	g.colors = PackedColorArray([
+		Color(tone, tone, tone, 0.0),
+		Color(tone, tone, tone, peak),
+		Color(tone * 0.85, tone * 0.85, tone * 0.85, 0.0)])
+	return g
+
+
+func _fire_gradient() -> Gradient:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.4, 0.75, 1.0])
+	g.colors = PackedColorArray([
+		Color(1.0, 0.95, 0.5, 0.9),    # giallo caldo
+		Color(1.0, 0.55, 0.1, 0.85),   # arancio
+		Color(0.65, 0.13, 0.05, 0.4),  # rosso cupo
+		Color(0.2, 0.2, 0.2, 0.0)])    # si spegne
+	return g
+
+
+# Fumo (denso o rado) che sale dall'esagono.
+func _add_smoke_fx(hx: Vector2i, dense: bool) -> void:
+	if not state.map.has(GameState.hex_key(hx.x, hx.y)):
+		return
+	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+	var base := _world_center(hx.x, hx.y, lv) + Vector3(0, 0.2, 0)
+	if dense:
+		_make_particles(base, 22, 4.5, 0.45, 0.25, 0.55, 0.22,
+			0.6, 1.1, _smoke_gradient(true), false, 1.2)
+	else:
+		_make_particles(base, 12, 3.2, 0.4, 0.2, 0.45, 0.18,
+			0.45, 0.85, _smoke_gradient(false), false, 1.0)
+
+
+# Fiamme (additive) + pennacchio di fumo sopra; raging = piu' grande/denso.
+func _add_fire_fx(hx: Vector2i, raging: bool) -> void:
+	if not state.map.has(GameState.hex_key(hx.x, hx.y)):
+		return
+	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+	var base := _world_center(hx.x, hx.y, lv) + Vector3(0, 0.15, 0)
+	var amt := 32 if raging else 18
+	var sc := 0.85 if raging else 0.6
+	_make_particles(base, amt, 1.1 if raging else 0.9, 0.32, 0.7, 1.4, 0.5,
+		sc * 0.5, sc, _fire_gradient(), true, sc)
+	# Pennacchio di fumo che sale sopra le fiamme.
+	_add_smoke_fx(hx, raging)
 
 
 func _update_info(hex: Vector2i) -> void:

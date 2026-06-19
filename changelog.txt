@@ -1,3 +1,13 @@
+v1.06 — 2026-06-19
+- Mappa 3D: fumo e fuoco ora sono effetti particellari volumetrici sugli
+  esagoni (fumo denso/rado che sale, fiamme con pennacchio per gli incendi),
+  oltre all'icona del marker. Particellari su CPU (compatibili col Web).
+
+v1.05 — 2026-06-19
+- Mappa 3D: i segnalini dei veicoli ora ruotano nella direzione di marcia
+  (il mezzo "punta" dove va, invece di sembrare sempre rivolto in alto). Vale
+  anche per i fantasmi del replay; la fanteria resta dritta.
+
 v1.04 — 2026-06-19
 - Mappa 3D: la camera NON si riposiziona piu' premendo S o cambiando le quote
   (1/2/3), e l'orbita/zoom/pan si conservano passando da 3D a 2D e ritorno.
