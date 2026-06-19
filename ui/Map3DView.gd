@@ -68,6 +68,13 @@ var _seen_shots3d := 0               # shots gia' animati
 var _seen_arcs3d := 0                # granate gia' animate
 var _seen_marks3d := 0               # marker gia' visti (per le bombe dall'alto)
 
+# --- Replay in 3D (Fase 5) ---
+var _replay_active := false
+var _replay_units := {}              # idx -> snapshot (vedi Replay.gd)
+var _replay_paths := {}              # idx -> Array di Vector2i
+var replay_progress := 0.0
+var _ghosts := {}                    # idx -> Node3D (chit fantasma)
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -146,6 +153,22 @@ func _grab_screenshot() -> void:
 			p["t"] = 0.5
 			p["delay"] = 0.0
 		_advance_projectiles(0.0)
+	# Validazione replay: frame sintetico con un percorso, fantasmi a meta' corsa.
+	if not OS.get_environment("COMBAT_MAP3D_REPLAY").is_empty():
+		var units := {}
+		var paths := {}
+		for i in state.characters.size():
+			var c: Character = state.characters[i]
+			if c.is_dead():
+				continue
+			units[i] = {"pos": c.position, "counter": c.counter, "side": c.side,
+				"team": c.team, "morale": c.morale, "name": c.display_name,
+				"hidden": c.side == D.Side.ENEMY and not c.known}
+			if paths.is_empty() and c.side == D.Side.FRIENDLY:
+				paths[i] = [c.position, c.position + Vector2i(1, 0),
+					c.position + Vector2i(2, 1)]
+		set_replay_frame(units, paths)
+		update_replay_progress(0.5)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(_shot_path)
@@ -673,8 +696,109 @@ func set_cues(hexes: Array, color: Color) -> void:
 
 # Rinfresca pedine + cue + selezione dopo un'azione (Fase 4), senza ricostruire
 # il terreno. Chiamato da Main quando il preview e' attivo e lo stato cambia.
+# ---- Replay in 3D: fantasmi lungo i percorsi + traccianti/bombe ----
+
+func set_replay_frame(units: Dictionary, paths: Dictionary) -> void:
+	_replay_active = true
+	_replay_units = units
+	_replay_paths = paths
+	replay_progress = 0.0
+	for ch in _units_root.get_children():
+		ch.queue_free()
+	_ghosts = {}
+	for idx in units:
+		var g := _make_ghost(units[idx])
+		_units_root.add_child(g)
+		_ghosts[idx] = g
+	if _cue_root != null:
+		for ch in _cue_root.get_children():
+			ch.queue_free()
+	if _sel_ring != null and is_instance_valid(_sel_ring):
+		_sel_ring.visible = false
+	_position_ghosts()
+
+
+func update_replay_progress(p: float) -> void:
+	replay_progress = p
+	_position_ghosts()
+
+
+func end_replay() -> void:
+	_replay_active = false
+	_ghosts = {}
+	_replay_units = {}
+	_replay_paths = {}
+	_build_units()
+
+
+func replay_shot(s: Dictionary) -> void:
+	_spawn_gunfire(s)
+
+
+func replay_boom(hex: Vector2i, type: int) -> void:
+	if type in [Area.Type.MORTAR_60, Area.Type.MORTAR_81, Area.Type.ARTILLERY_105]:
+		_spawn_bomb(hex)
+	else:
+		_spawn_flash(_hex_top(hex) + Vector3(0, 0.2, 0), 1.4)
+
+
+func _position_ghosts() -> void:
+	for idx in _ghosts:
+		_ghosts[idx].position = _replay_world(idx)
+
+
+# Posizione mondo del fantasma idx: interpolata lungo il percorso (replay_progress).
+func _replay_world(idx) -> Vector3:
+	if _replay_paths.has(idx):
+		var path: Array = _replay_paths[idx]
+		if path.size() >= 2:
+			var s: float = replay_progress * (path.size() - 1)
+			var i: int = mini(int(s), path.size() - 2)
+			var frac: float = s - i
+			return _hex_top(path[i]).lerp(_hex_top(path[i + 1]), frac)
+	return _hex_top(_replay_units[idx]["pos"])
+
+
+# Chit fantasma (corpo + faccia) a origine locale: lo si sposta col replay.
+func _make_ghost(u: Dictionary) -> Node3D:
+	var w := 1.35
+	var t := 0.10
+	var node := Node3D.new()
+	var body := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(w, t, w)
+	body.mesh = bm
+	var bmat := StandardMaterial3D.new()
+	bmat.albedo_color = Color(0.34, 0.31, 0.27)
+	bmat.roughness = 0.95
+	body.material_override = bmat
+	body.position = Vector3(0, t * 0.5 + 0.02, 0)
+	node.add_child(body)
+	var hidden := bool(u.get("hidden", false))
+	var tex: Texture2D = _counter_tex(MapView.DUMMY_BY_TEAM.get(u.get("team", ""),
+		"GE-RedTeam-Dummy-1")) if hidden else _counter_tex(u.get("counter", ""))
+	var fb := Color(0.25, 0.50, 0.95) if int(u["side"]) == D.Side.FRIENDLY \
+		else Color(0.70, 0.32, 0.28)
+	var top := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(w * 0.98, w * 0.98)
+	top.mesh = pm
+	var tmat := StandardMaterial3D.new()
+	tmat.albedo_texture = tex if tex != null else _token_tex(fb)
+	tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	top.material_override = tmat
+	top.position = Vector3(0, t + 0.03, 0)
+	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(top)
+	return node
+
+
 func refresh_dynamic(cues: Array, color: Color,
 		fire_src: Vector2i = Vector2i(-99, -99)) -> void:
+	if _replay_active:
+		return  # durante il replay i fantasmi gestiscono le pedine
 	_build_units()
 	_build_markers()
 	set_cues(cues, color)

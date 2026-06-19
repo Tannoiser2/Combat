@@ -1,3 +1,9 @@
+v1.00 — 2026-06-19
+- Mappa 3D: il replay (pulsante Replay) ora si vede anche in 3D: le pedine
+  scorrono lungo i percorsi del turno e i colpi/granate/bombe sono animati.
+  Completa il set 3D (mappa estrusa, pedine, ordini, azione, schieramento,
+  scelta 2D/3D, marker, proiettili, replay).
+
 v0.99 — 2026-06-19
 - Mappa 3D: colpi animati. I traccianti volano da chi spara a chi e' colpito,
   con pochi colpi per i fucili e raffiche per mitra/mitragliatrici; i carri e i
