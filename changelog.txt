@@ -1,3 +1,8 @@
+v1.08 — 2026-06-19
+- Mappa 3D su iPad/touch: il pinch a due dita ora zooma la vista 3D (prima
+  agiva sulla mappa 2D nascosta); con due dita si fa anche pan, con una dita
+  si orbita.
+
 v1.07 — 2026-06-19
 - Mappa 3D: fumo (denso e rado) e fuoco piu' visibili e intensi.
 - Mappa 3D: traccianti piu' spessi e luminosi; raffiche piu' fitte (la

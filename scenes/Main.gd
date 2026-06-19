@@ -1026,9 +1026,31 @@ func _input(event: InputEvent) -> void:
 			_touch_points[event.index] = event.position
 		else:
 			_touch_points.erase(event.index)
+		if map3d_preview != null:
+			# Due dita -> pinch (no orbita col mouse emulato); una dita -> orbita/clic.
+			map3d_preview.set_multitouch(_touch_points.size() >= 2)
 		# NON marcare come handled: il rilascio del tocco deve generare il clic sulla mappa
 		# tramite l'emulazione MouseButton che Godot inietta per i Control.
 	elif event is InputEventScreenDrag:
+		# In anteprima 3D i gesti pilotano la camera 3D, non la 2D nascosta.
+		if map3d_preview != null:
+			if _touch_points.size() >= 2:
+				# Pinch-zoom (+ pan a due dita) sulla camera 3D.
+				var o3 := Vector2.ZERO
+				for k: int in _touch_points:
+					if k != event.index:
+						o3 = _touch_points[k]
+						break
+				var op: Vector2 = event.position - event.relative
+				var od: float = op.distance_to(o3)
+				var nd: float = event.position.distance_to(o3)
+				if od > 1.0:
+					map3d_preview.pinch_zoom(nd / od)
+				map3d_preview.touch_pan(event.relative * 0.5)
+				get_viewport().set_input_as_handled()
+			# una sola dita: lascia che il mouse emulato orbiti il 3D.
+			_touch_points[event.index] = event.position
+			return
 		if _touch_points.size() >= 2:
 			# Pinch-zoom: prende qualunque altra dita nel dict (indipendente dall'indice).
 			var other_pos := Vector2.ZERO
