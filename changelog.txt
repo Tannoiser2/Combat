@@ -1,3 +1,12 @@
+v1.07 — 2026-06-19
+- Mappa 3D: fumo (denso e rado) e fuoco piu' visibili e intensi.
+- Mappa 3D: traccianti piu' spessi e luminosi; raffiche piu' fitte (la
+  mitragliatrice spara di piu', il fucile alcuni colpi invece di uno).
+- Mappa 3D: dislivelli "via di mezzo" tra i declivi dolci e le pareti a picco
+  (dome poco arrotondato + cliff parziale). Tasto S = pareti a picco.
+- Mappa 3D: le pedine impilate ora ciclano cliccando l'hex anche in fase Ordini
+  (il pannello ordini non copre piu' l'esagiono al centro).
+
 v1.06 — 2026-06-19
 - Mappa 3D: fumo e fuoco ora sono effetti particellari volumetrici sugli
   esagoni (fumo denso/rado che sale, fiamme con pennacchio per gli incendi),

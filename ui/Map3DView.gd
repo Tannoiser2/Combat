@@ -21,6 +21,8 @@ const Area := preload("res://engine/Area.gd")
 # passo (cell) per board, cosi' 3D e 2D restano allineati pixel-per-pixel.
 const PX_PER_UNIT := 100.0     # scala scansione->mondo (1 unita' = 100 px)
 const LEVEL_HEIGHT := 0.9      # altezza per livello (quote piu' marcate: alture evidenti)
+const SLOPE_BIAS := 0.5        # 0 = bordi tutti mediati (molto dolce), 1 = pareti a picco;
+                               # via di mezzo: dome + cliff parziale (default _smooth)
 
 signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
 signal hex_clicked(hex: Vector2i)    # emesso al clic su un hex (Fase 4: azione)
@@ -272,13 +274,18 @@ func _build_terrain() -> void:
 		var row: int = cell.y
 		var center := _world_center(col, row, hex.level)
 		var nb := _neighbors(col, row)
-		# Dolce (via di mezzo): il CENTRO resta alla quota piena dell'hex (cime
-		# evidenti), i VERTICI di bordo sono mediati coi vicini -> i bordi
-		# degradano dolci e la superficie resta continua, senza pareti a picco.
+		# Via di mezzo (default): il CENTRO resta alla quota piena dell'hex (cime
+		# evidenti); i VERTICI di bordo sono interpolati fra la media coi vicini
+		# (SLOPE_BIAS=0, molto dolce) e la quota piena dell'hex (SLOPE_BIAS=1, a
+		# picco) -> dome poco arrotondato + cliff PARZIALE colmato dalle pareti.
+		var own_lv := float(maxi(hex.level, 0))
 		var corner_y: Array[float] = []
 		for i in range(6):
-			corner_y.append(_corner_level(col, row, i) * LEVEL_HEIGHT * _height_scale
-				if _smooth else center.y)
+			if _smooth:
+				var lv: float = lerpf(_corner_level(col, row, i), own_lv, SLOPE_BIAS)
+				corner_y.append(lv * LEVEL_HEIGHT * _height_scale)
+			else:
+				corner_y.append(center.y)
 		bb_min.x = minf(bb_min.x, center.x); bb_max.x = maxf(bb_max.x, center.x)
 		bb_min.y = minf(bb_min.y, center.y); bb_max.y = maxf(bb_max.y, center.y)
 		bb_min.z = minf(bb_min.z, center.z); bb_max.z = maxf(bb_max.z, center.z)
@@ -303,19 +310,18 @@ func _build_terrain() -> void:
 			tops.set_uv(uvs[i]); tops.add_vertex(verts[i])
 			tops.set_uv(uvs[j]); tops.add_vertex(verts[j])
 
-		# Pareti: a picco -> dove il vicino e' piu' basso, cala alla sua quota;
-		# dolce -> solo skirt al bordo mappa (i vertici interni gia' combaciano).
+		# Pareti: dove il vicino e' piu' basso si cala alla sua quota. In via di
+		# mezzo i bordi sono solo PARZIALMENTE mediati, quindi resta un cliff
+		# (piu' corto che a picco) da colmare; a picco e' il salto pieno.
 		for i in range(6):
 			var nlv := _level_at(nb[i].x, nb[i].y)
 			var by: float
-			if _smooth:
-				if nlv != -1:
-					continue  # interno: superficie continua, nessuna parete
-				by = 0.0
+			if nlv == -1:
+				by = 0.0                       # bordo mappa: skirt fino a terra
 			else:
 				var base_lv: int = maxi(nlv, 0)
 				if base_lv >= hex.level:
-					continue
+					continue                    # vicino pari/piu' alto: lo disegna lui
 				by = base_lv * LEVEL_HEIGHT * _height_scale
 			var j := (i + 1) % 6
 			var top_a := verts[i]
@@ -1117,13 +1123,13 @@ func _spawn_gunfire(s: Dictionary) -> void:
 	var col := Color(0.65, 0.85, 1.0) if side == D.Side.FRIENDLY else Color(1.0, 0.7, 0.3)
 	match _weapon_class(String(s.get("weapon", ""))):
 		"shell":
-			_add_projectile("shell", a, b, 0.0, 0.55, Color(1.0, 0.9, 0.5), 0.15, hit, true)
+			_add_projectile("shell", a, b, 0.0, 0.5, Color(1.0, 0.9, 0.5), 0.24, hit, true)
 		"auto":
-			for i in range(8):  # raffica: molti colpi sfalsati
-				_add_projectile("bullet", a, b, i * 0.05, 0.22, col, 0.05, hit and i == 7, false)
+			for i in range(16):  # mitragliatrice: raffica fitta e veloce
+				_add_projectile("bullet", a, b, i * 0.03, 0.18, col, 0.10, hit and i == 15, false)
 		_:
-			for i in range(2):  # fucile/pistola: pochi colpi
-				_add_projectile("bullet", a, b, i * 0.13, 0.24, col, 0.06, hit and i == 1, false)
+			for i in range(5):  # fucile/pistola: alcuni colpi
+				_add_projectile("bullet", a, b, i * 0.09, 0.20, col, 0.11, hit and i == 4, false)
 
 
 func _spawn_grenade(fromh: Vector2i, toh: Vector2i) -> void:
@@ -1150,7 +1156,7 @@ func _add_projectile(kind: String, a: Vector3, b: Vector3, delay: float,
 	mat.albedo_color = color
 	mat.emission_enabled = true
 	mat.emission = color
-	mat.emission_energy_multiplier = 2.0
+	mat.emission_energy_multiplier = 3.2  # traccianti piu' luminosi/visibili
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.visible = false
@@ -1400,8 +1406,8 @@ func _make_particles(base: Vector3, amount: int, life: float, radius: float,
 
 func _smoke_gradient(dense: bool) -> Gradient:
 	var g := Gradient.new()
-	var tone := 0.35 if dense else 0.6      # denso = piu' scuro
-	var peak := 0.75 if dense else 0.4      # denso = piu' opaco
+	var tone := 0.32 if dense else 0.58     # denso = piu' scuro
+	var peak := 0.95 if dense else 0.65     # denso = piu' opaco (fumo piu' visibile)
 	g.offsets = PackedFloat32Array([0.0, 0.18, 1.0])
 	g.colors = PackedColorArray([
 		Color(tone, tone, tone, 0.0),
@@ -1414,9 +1420,9 @@ func _fire_gradient() -> Gradient:
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 0.4, 0.75, 1.0])
 	g.colors = PackedColorArray([
-		Color(1.0, 0.95, 0.5, 0.9),    # giallo caldo
-		Color(1.0, 0.55, 0.1, 0.85),   # arancio
-		Color(0.65, 0.13, 0.05, 0.4),  # rosso cupo
+		Color(1.0, 0.97, 0.6, 1.0),    # giallo caldo
+		Color(1.0, 0.55, 0.1, 0.95),   # arancio
+		Color(0.7, 0.15, 0.05, 0.55),  # rosso cupo
 		Color(0.2, 0.2, 0.2, 0.0)])    # si spegne
 	return g
 
@@ -1428,11 +1434,11 @@ func _add_smoke_fx(hx: Vector2i, dense: bool) -> void:
 	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
 	var base := _world_center(hx.x, hx.y, lv) + Vector3(0, 0.2, 0)
 	if dense:
-		_make_particles(base, 22, 4.5, 0.45, 0.25, 0.55, 0.22,
-			0.6, 1.1, _smoke_gradient(true), false, 1.2)
+		_make_particles(base, 38, 5.0, 0.5, 0.25, 0.6, 0.24,
+			0.75, 1.4, _smoke_gradient(true), false, 1.7)
 	else:
-		_make_particles(base, 12, 3.2, 0.4, 0.2, 0.45, 0.18,
-			0.45, 0.85, _smoke_gradient(false), false, 1.0)
+		_make_particles(base, 22, 3.8, 0.45, 0.2, 0.5, 0.2,
+			0.6, 1.1, _smoke_gradient(false), false, 1.4)
 
 
 # Fiamme (additive) + pennacchio di fumo sopra; raging = piu' grande/denso.
@@ -1441,9 +1447,9 @@ func _add_fire_fx(hx: Vector2i, raging: bool) -> void:
 		return
 	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
 	var base := _world_center(hx.x, hx.y, lv) + Vector3(0, 0.15, 0)
-	var amt := 32 if raging else 18
-	var sc := 0.85 if raging else 0.6
-	_make_particles(base, amt, 1.1 if raging else 0.9, 0.32, 0.7, 1.4, 0.5,
+	var amt := 50 if raging else 30
+	var sc := 1.1 if raging else 0.82
+	_make_particles(base, amt, 1.25 if raging else 1.0, 0.38, 0.85, 1.7, 0.6,
 		sc * 0.5, sc, _fire_gradient(), true, sc)
 	# Pennacchio di fumo che sale sopra le fiamme.
 	_add_smoke_fx(hx, raging)

@@ -1400,6 +1400,14 @@ func _open_order_panel(c: Character) -> void:
 	cancel.pressed.connect(func(): order_panel.hide())
 	order_list.add_child(cancel)
 	order_desc.text = "[i]Passa il mouse su un ordine per la spiegazione.[/i]"
+	# In 3D il pannello centrato coprirebbe l'hex impilato e mangerebbe i clic
+	# successivi (niente ciclo pile). Lo sposto sul lato sinistro: il centro/destra
+	# della mappa restano cliccabili per ciclare le pedine (Rule 8).
+	if map3d_preview != null:
+		order_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
+		order_panel.position.x = 24
+	else:
+		order_panel.set_anchors_preset(Control.PRESET_CENTER)
 	order_panel.show()
 
 
