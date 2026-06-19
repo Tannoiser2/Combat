@@ -323,17 +323,21 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(top)
 
-	# Cornice del morale attorno al chit (convenzione 2D), se nota.
+	# Cornice del morale attorno al chit (convenzione 2D), se nota: sottile,
+	# arrotondata e "soft" (semitrasparente).
 	if border_color != null:
 		var fr := MeshInstance3D.new()
 		var fm := StandardMaterial3D.new()
 		fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		fm.cull_mode = BaseMaterial3D.CULL_DISABLED
-		fm.albedo_color = border_color
+		fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var sc: Color = border_color
+		sc.a = 0.7
+		fm.albedo_color = sc
 		fr.material_override = fm
 		fr.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		fr.mesh = _square_frame_mesh(base + Vector3(0, t + 0.05, 0),
-			w * 0.54, w * 0.46)
+		fr.mesh = _rounded_frame_mesh(base + Vector3(0, t + 0.05, 0),
+			w * 0.52, w * 0.49, 0.12)
 		add_child(fr)
 
 
@@ -496,21 +500,40 @@ func _update_sel_ring() -> void:
 		return
 	var base: Vector3 = _unit_pos[_selected]
 	# Cornice di selezione (ciano) PIU' ESTERNA della cornice morale del chit.
-	_sel_ring.mesh = _square_frame_mesh(base + Vector3(0, 0.20, 0), 0.82, 0.72)
+	_sel_ring.mesh = _rounded_frame_mesh(base + Vector3(0, 0.20, 0), 0.84, 0.78, 0.16)
 	_sel_ring.visible = true
 
 
-# Riquadro cavo (annulus quadrato) orizzontale centrato in 'center'.
-func _square_frame_mesh(center: Vector3, outer: float, inner: float) -> ArrayMesh:
+# Loop di punti (XZ) di un rettangolo arrotondato: semi-lato 'h', raggio
+# angolo 'r', 'seg' segmenti per angolo. Usato per le cornici soft.
+func _rounded_rect_loop(h: float, r: float, seg: int = 6) -> Array:
+	var pts: Array = []
+	var corners := [Vector2(h - r, h - r), Vector2(-(h - r), h - r),
+		Vector2(-(h - r), -(h - r)), Vector2(h - r, -(h - r))]
+	var start := [0.0, PI * 0.5, PI, PI * 1.5]
+	for ci in range(4):
+		for s in range(seg + 1):
+			var a: float = start[ci] + (PI * 0.5) * (float(s) / seg)
+			pts.append(corners[ci] + Vector2(cos(a), sin(a)) * r)
+	return pts
+
+
+# Cornice cava ARROTONDATA orizzontale (banda sottile fra due rettangoli
+# arrotondati), centrata in 'center'. Per i tracciati morale/selezione "soft".
+func _rounded_frame_mesh(center: Vector3, outer: float, inner: float,
+		corner: float = 0.14) -> ArrayMesh:
+	var o := _rounded_rect_loop(outer, corner)
+	var ii := _rounded_rect_loop(inner, maxf(corner - (outer - inner), 0.02))
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var o := [Vector3(-outer, 0, -outer), Vector3(outer, 0, -outer),
-		Vector3(outer, 0, outer), Vector3(-outer, 0, outer)]
-	var ii := [Vector3(-inner, 0, -inner), Vector3(inner, 0, -inner),
-		Vector3(inner, 0, inner), Vector3(-inner, 0, inner)]
-	for k in range(4):
-		var k2 := (k + 1) % 4
-		for v in [o[k], o[k2], ii[k2], o[k], ii[k2], ii[k]]:
+	var n: int = o.size()
+	for k in range(n):
+		var k2 := (k + 1) % n
+		var oa := Vector3(o[k].x, 0, o[k].y)
+		var ob := Vector3(o[k2].x, 0, o[k2].y)
+		var ia := Vector3(ii[k].x, 0, ii[k].y)
+		var ib := Vector3(ii[k2].x, 0, ii[k2].y)
+		for v in [oa, ob, ib, oa, ib, ia]:
 			st.set_normal(Vector3.UP); st.add_vertex(center + v)
 	return st.commit()
 
