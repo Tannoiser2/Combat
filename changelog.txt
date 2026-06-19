@@ -1,3 +1,9 @@
+v0.99 — 2026-06-19
+- Mappa 3D: colpi animati. I traccianti volano da chi spara a chi e' colpito,
+  con pochi colpi per i fucili e raffiche per mitra/mitragliatrici; i carri e i
+  bazooka sparano un proiettile. Le granate volano a parabola e le bombe di
+  mortaio/artiglieria cadono dall'alto, con lampo d'esplosione all'impatto.
+
 v0.98 — 2026-06-19
 - Mappa 3D: quando una pedina mira, le linee di fuoco/LOS dal tiratore ai
   bersagli sono disegnate anche in 3D.

@@ -196,8 +196,16 @@ porting multi-sessione. Avanzamento:
   bersaglio (Map3DView._draw_fire_lines + _add_line come BoxMesh sottile
   orientato), passate da Main._sync_map3d via map_view.fire_lines_source a
   refresh_dynamic. Validato headless.
-- DA FARE: replay/traccianti animati in 3D (grosso: il replay 2D usa
-  replay_frames/units/paths); strumento LOS interattivo in 3D.
+- PROIETTILI ANIMATI IN 3D (FATTO): Map3DView._process osserva state.shots /
+  throw_arcs / area_markers e anima i colpi (Fase 5). Classi d'arma
+  (_weapon_class): shell (tank/bazooka/panzerfaust, 1 proiettile), auto (mitra/
+  MG/BAR, raffica di ~8 sfalsati), rifle (fucile/pistola, 2 colpi). Granate a
+  PARABOLA (throw_arcs), bombe mortaio/artiglieria che CADONO dall'alto
+  (_spawn_bomb), lampi d'esplosione (_spawn_flash). Proiettili/lampi in _fx_root,
+  avanzati in _advance_projectiles/_advance_flashes. Animano DAL VIVO quando si
+  spara nella vista 3D. Validato headless (COMBAT_MAP3D_FX demo a meta' volo).
+- DA FARE: collegare il PULSANTE Replay (riproduzione del turno con i fantasmi
+  lungo replay_frames/units/paths) alla vista 3D; strumento LOS interattivo in 3D.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

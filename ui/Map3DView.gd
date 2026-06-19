@@ -60,6 +60,14 @@ var _units_root: Node3D             # contenitore pedine (rinfrescabile)
 var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
 var _marker_root: Node3D            # contenitore marker d'area (fumo/fuoco/...)
 
+# --- Proiettili animati (Fase 5: traccianti/colpi/bombe/granate in 3D) ---
+var _fx_root: Node3D                 # contenitore proiettili + lampi
+var _projectiles: Array = []         # colpi/bombe/granate in volo
+var _flashes: Array = []             # lampi d'esplosione
+var _seen_shots3d := 0               # shots gia' animati
+var _seen_arcs3d := 0                # granate gia' animate
+var _seen_marks3d := 0               # marker gia' visti (per le bombe dall'alto)
+
 
 func _ready() -> void:
 	if not MapView.BOARDS.has(board_name):
@@ -78,11 +86,17 @@ func _ready() -> void:
 	add_child(_cue_root)
 	_marker_root = Node3D.new()
 	add_child(_marker_root)
+	_fx_root = Node3D.new()
+	add_child(_fx_root)
 	_build_units()
 	_build_markers()
 	_build_camera()
 	_build_hud()
 	set_process_unhandled_input(true)
+	set_process(true)
+	_seen_shots3d = state.shots.size()
+	_seen_arcs3d = state.throw_arcs.size()
+	_seen_marks3d = state.area_markers.size()
 	# Screenshot di validazione: COMBAT_MAP3D_SHOT=path -> salva e esce.
 	var shot := OS.get_environment("COMBAT_MAP3D_SHOT")
 	if not shot.is_empty():
@@ -119,6 +133,19 @@ func _grab_screenshot() -> void:
 		_draw_fire_lines(hx, cues, Color(0.95, 0.55, 0.05))  # valida le linee
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
+	# Validazione proiettili: COMBAT_MAP3D_FX -> spawn demo a meta' volo.
+	if not OS.get_environment("COMBAT_MAP3D_FX").is_empty():
+		var c := _picked if _picked.x > -99 else Vector2i(18, 9)
+		var nb := _neighbors(c.x, c.y)
+		_spawn_gunfire({"from": c, "to": nb[0], "side": D.Side.ENEMY, "hit": true, "weapon": "MG42"})
+		_spawn_gunfire({"from": c, "to": nb[2], "side": D.Side.FRIENDLY, "hit": false, "weapon": "M1 Garand"})
+		_spawn_gunfire({"from": nb[4], "to": c, "side": D.Side.ENEMY, "hit": true, "weapon": "75mm L40 AP"})
+		_spawn_grenade(c, nb[1])
+		_spawn_bomb(nb[3])
+		for p in _projectiles:
+			p["t"] = 0.5
+			p["delay"] = 0.0
+		_advance_projectiles(0.0)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(_shot_path)
@@ -686,6 +713,176 @@ func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> voi
 	if a.distance_to(b) > 0.001:
 		mi.look_at_from_position((a + b) * 0.5, b, Vector3.UP)
 	_cue_root.add_child(mi)
+
+
+# ---- Proiettili animati (colpi, granate a parabola, bombe dall'alto) ----
+
+func _process(delta: float) -> void:
+	if state == null:
+		return
+	# Nuovi colpi -> traccianti (variano per arma).
+	if state.shots.size() < _seen_shots3d:
+		_seen_shots3d = 0  # azzerati a inizio impulse
+	while _seen_shots3d < state.shots.size():
+		_spawn_gunfire(state.shots[_seen_shots3d])
+		_seen_shots3d += 1
+	# Nuove granate -> parabola.
+	if state.throw_arcs.size() < _seen_arcs3d:
+		_seen_arcs3d = 0
+	while _seen_arcs3d < state.throw_arcs.size():
+		var ar: Dictionary = state.throw_arcs[_seen_arcs3d]
+		_spawn_grenade(ar["from"], ar["to"])
+		_seen_arcs3d += 1
+	# Nuovi marker mortaio/artiglieria -> bomba che cade dall'alto.
+	if state.area_markers.size() < _seen_marks3d:
+		_seen_marks3d = state.area_markers.size()
+	while _seen_marks3d < state.area_markers.size():
+		var mk: Dictionary = state.area_markers[_seen_marks3d]
+		if int(mk["type"]) in [Area.Type.MORTAR_60, Area.Type.MORTAR_81, Area.Type.ARTILLERY_105]:
+			_spawn_bomb(mk["hex"])
+		_seen_marks3d += 1
+	_advance_projectiles(delta)
+	_advance_flashes(delta)
+
+
+func _hex_top(hex: Vector2i) -> Vector3:
+	var lv := 0
+	if state.map.has(GameState.hex_key(hex.x, hex.y)):
+		lv = state.map[GameState.hex_key(hex.x, hex.y)].level
+	return _world_center(hex.x, hex.y, lv)
+
+
+# Classe d'arma per la resa del colpo: shell (tank/bazooka), auto (mitra/MG),
+# rifle (fucile/pistola).
+func _weapon_class(weapon: String) -> String:
+	var w := weapon.to_lower()
+	for k in ["mm", "kwk", "bazooka", "panzerfaust"]:
+		if k in w:
+			return "shell"
+	for k in ["mg", "thompson", "grease", "stg", "mp40", "bar", "m1919", "m1918", ".50"]:
+		if k in w:
+			return "auto"
+	return "rifle"
+
+
+func _spawn_gunfire(s: Dictionary) -> void:
+	var a := _hex_top(s["from"]) + Vector3(0, 0.5, 0)
+	var b := _hex_top(s["to"]) + Vector3(0, 0.5, 0)
+	var side := int(s.get("side", D.Side.FRIENDLY))
+	var hit := bool(s.get("hit", false))
+	var col := Color(0.65, 0.85, 1.0) if side == D.Side.FRIENDLY else Color(1.0, 0.7, 0.3)
+	match _weapon_class(String(s.get("weapon", ""))):
+		"shell":
+			_add_projectile("shell", a, b, 0.0, 0.55, Color(1.0, 0.9, 0.5), 0.15, hit, true)
+		"auto":
+			for i in range(8):  # raffica: molti colpi sfalsati
+				_add_projectile("bullet", a, b, i * 0.05, 0.22, col, 0.05, hit and i == 7, false)
+		_:
+			for i in range(2):  # fucile/pistola: pochi colpi
+				_add_projectile("bullet", a, b, i * 0.13, 0.24, col, 0.06, hit and i == 1, false)
+
+
+func _spawn_grenade(fromh: Vector2i, toh: Vector2i) -> void:
+	var a := _hex_top(fromh) + Vector3(0, 0.4, 0)
+	var b := _hex_top(toh) + Vector3(0, 0.15, 0)
+	_add_projectile("grenade", a, b, 0.0, 0.75, Color(0.35, 0.45, 0.3), 0.09, true, true)
+
+
+func _spawn_bomb(hex: Vector2i) -> void:
+	var b := _hex_top(hex) + Vector3(0, 0.1, 0)
+	var a := b + Vector3(0, 9.0, 0)  # cade verticalmente dall'alto
+	_add_projectile("bomb", a, b, 0.0, 0.6, Color(0.18, 0.18, 0.18), 0.16, true, true)
+
+
+func _add_projectile(kind: String, a: Vector3, b: Vector3, delay: float,
+		dur: float, color: Color, radius: float, hit: bool, explosive: bool) -> void:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = radius
+	sm.height = radius * 2.0
+	mi.mesh = sm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = color
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 2.0
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visible = false
+	_fx_root.add_child(mi)
+	_projectiles.append({"node": mi, "kind": kind, "a": a, "b": b, "t": 0.0,
+		"dur": dur, "delay": delay, "hit": hit, "explosive": explosive})
+
+
+func _advance_projectiles(delta: float) -> void:
+	if _projectiles.is_empty():
+		return
+	var keep: Array = []
+	for p in _projectiles:
+		if p["delay"] > 0.0:
+			p["delay"] -= delta
+			keep.append(p)
+			continue
+		p["node"].visible = true
+		p["t"] += delta / p["dur"]
+		var t: float = clampf(p["t"], 0.0, 1.0)
+		var pos: Vector3
+		match p["kind"]:
+			"grenade":
+				pos = p["a"].lerp(p["b"], t)
+				pos.y += 2.4 * t * (1.0 - t)  # arco a parabola
+			"bomb":
+				pos = p["a"].lerp(p["b"], t * t)  # accelera in caduta
+			_:
+				pos = p["a"].lerp(p["b"], t)
+		p["node"].position = pos
+		if p["t"] >= 1.0:
+			p["node"].queue_free()
+			if p["explosive"]:
+				_spawn_flash(p["b"], 1.6 if p["kind"] != "shell" else 1.3)
+			elif p["hit"]:
+				_spawn_flash(p["b"], 0.6)
+		else:
+			keep.append(p)
+	_projectiles = keep
+
+
+func _spawn_flash(pos: Vector3, max_r: float) -> void:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.2
+	sm.height = 0.4
+	mi.mesh = sm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1.0, 0.8, 0.3, 0.9)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.6, 0.2)
+	mat.emission_energy_multiplier = 3.0
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos + Vector3(0, 0.2, 0)
+	_fx_root.add_child(mi)
+	_flashes.append({"node": mi, "t": 0.0, "dur": 0.45, "max_r": max_r})
+
+
+func _advance_flashes(delta: float) -> void:
+	if _flashes.is_empty():
+		return
+	var keep: Array = []
+	for f in _flashes:
+		f["t"] += delta / f["dur"]
+		if f["t"] >= 1.0:
+			f["node"].queue_free()
+			continue
+		var s: float = lerpf(0.3, f["max_r"], f["t"])
+		f["node"].scale = Vector3(s, s, s)
+		var m: StandardMaterial3D = f["node"].material_override
+		m.albedo_color.a = (1.0 - f["t"]) * 0.9
+		keep.append(f)
+	_flashes = keep
 
 
 # Texture da assets/counters/<name>.png per nome esatto (come MapView._named_tex).
