@@ -945,6 +945,17 @@ func _end_replay() -> void:
 # Gestione touch (iPad/mobile): intercetta i gesti PRIMA dei nodi figli.
 # _input ha priorita' massima: i Control della HUD non possono consumare questi eventi.
 func _input(event: InputEvent) -> void:
+	# Hotkey F3 (priorita' massima, prima dei Control): apre/chiude l'anteprima
+	# 3D. ESC chiude il preview se aperto.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F3 and state != null:
+			_toggle_map3d_preview()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_ESCAPE and map3d_preview != null:
+			_toggle_map3d_preview()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_touch_points[event.index] = event.position
@@ -973,18 +984,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Tasto F3: anteprima 3D della situazione corrente (apre/chiude). E' un
-	# VISUALIZZATORE: il gioco resta in 2D, qui si guarda solo il rilievo.
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F3 \
-			and state != null:
-		_toggle_map3d_preview()
-		get_viewport().set_input_as_handled()
-		return
-	# Se l'anteprima 3D e' aperta, ESC la chiude e basta.
+	# Anteprima 3D attiva: i tasti/click di gioco 2D sono sospesi (F3/ESC sono
+	# gestiti in _input). Il 3D ha i suoi controlli (orbita/zoom/pan/clic).
 	if map3d_preview != null:
-		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-			_toggle_map3d_preview()
-			get_viewport().set_input_as_handled()
 		return
 	# Tasto F: adatta la vista all'intera mappa.
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F \
