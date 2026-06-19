@@ -138,6 +138,11 @@ func _grab_screenshot() -> void:
 				cues.append(nb)
 		set_cues(cues, Color(0.3, 0.9, 0.3))
 		_draw_fire_lines(hx, cues, Color(0.95, 0.55, 0.05))  # valida le linee
+		# Valida il segnalino-ordine: assegna un ordine al selezionato e ricostruisce.
+		if _selected != null:
+			_selected.set_order(D.Order.AIMED_FIRE)
+			_build_units()
+			_update_sel_ring()
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	# Validazione proiettili: COMBAT_MAP3D_FX -> spawn demo a meta' volo.
@@ -364,13 +369,22 @@ func _build_units() -> void:
 		# Cornice del MORALE come in 2D (MapView.MORALE_COLORS); i nemici non
 		# identificati non hanno morale noto -> nessuna cornice (come la 2D).
 		var morale_col = null if hidden else MapView.MORALE_COLORS.get(c.morale, Color.WHITE)
-		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex, morale_col)
+		# Segnalino-ordine sopra la pedina (come in 2D), se ha un ordine e non e' nascosta.
+		var order_tex: Texture2D = null
+		if c.has_order and not hidden:
+			var pref := "US" if c.side == D.Side.FRIENDLY else "GE"
+			order_tex = _tex_named("ord-%s-%s" % [pref, D.Order.keys()[c.order]])
+		var spotted: bool = c.side == D.Side.FRIENDLY and c.spotted
+		var facing: int = c.facing if (c.is_vehicle and not hidden) else 0
+		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex, morale_col,
+			order_tex, spotted, facing)
 
 
 # Un segnalino fisico: corpo con spessore (bordi cartoncino, proietta ombra)
 # + faccia superiore con l'art della pedina. Appoggiato a 'base' (superficie hex).
 func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
-		border_color = null) -> void:
+		border_color = null, order_tex: Texture2D = null,
+		spotted: bool = false, facing: int = 0) -> void:
 	var body := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(w, t, w)
@@ -413,6 +427,62 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 		fr.mesh = _rounded_frame_mesh(base + Vector3(0, t + 0.05, 0),
 			w * 0.52, w * 0.49, 0.12)
 		_units_root.add_child(fr)
+
+	# Segnalino-ordine (come in 2D): quad piatto nell'angolo basso-destra, sopra l'art.
+	if order_tex != null:
+		var ob := MeshInstance3D.new()
+		var opm := PlaneMesh.new()
+		opm.size = Vector2(w * 0.52, w * 0.52)
+		ob.mesh = opm
+		var omat := StandardMaterial3D.new()
+		omat.albedo_texture = order_tex
+		omat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		omat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		ob.material_override = omat
+		ob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ob.position = base + Vector3(w * 0.28, t + 0.07, w * 0.28)
+		_units_root.add_child(ob)
+
+	# Pallino "spotted" (rosso) come in 2D, angolo alto-destra.
+	if spotted:
+		var sd := MeshInstance3D.new()
+		var ssm := SphereMesh.new()
+		ssm.radius = 0.09
+		ssm.height = 0.18
+		sd.mesh = ssm
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.albedo_color = Color(0.9, 0.15, 0.15)
+		sd.material_override = smat
+		sd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		sd.position = base + Vector3(w * 0.34, t + 0.12, -w * 0.34)
+		_units_root.add_child(sd)
+
+	# Freccia di facing del veicolo (verso il vicino nella direzione di marcia).
+	if facing >= 1:
+		var dir := _facing_dir(facing)
+		var ar := MeshInstance3D.new()
+		var prism := BoxMesh.new()
+		prism.size = Vector3(0.12, 0.06, w * 0.5)
+		ar.mesh = prism
+		var amat := StandardMaterial3D.new()
+		amat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		amat.albedo_color = Color(1.0, 0.95, 0.3)
+		ar.material_override = amat
+		ar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var c := base + Vector3(0, t + 0.08, 0)
+		ar.position = c + dir * (w * 0.32)
+		if dir.length() > 0.001:
+			ar.look_at_from_position(ar.position, ar.position + dir, Vector3.UP)
+		_units_root.add_child(ar)
+
+
+# Direzione mondo (XZ) del facing 1..6 verso il vicino corrispondente.
+func _facing_dir(facing: int) -> Vector3:
+	# I 6 vicini in ordine di EDGE (30,90,...330 gradi). facing 1..6 -> indice.
+	var ang := deg_to_rad(30.0 + 60.0 * ((facing - 1) % 6))
+	return Vector3(cos(ang), 0, sin(ang)).normalized()
 
 
 func _counter_tex(counter_id: String) -> Texture2D:
@@ -792,6 +862,25 @@ func _make_ghost(u: Dictionary) -> Node3D:
 	top.position = Vector3(0, t + 0.03, 0)
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(top)
+	# Segnalino-ordine sul fantasma (come in 2D durante il replay).
+	var ordv: int = int(u.get("order", -1))
+	if ordv >= 0 and not hidden:
+		var pref := "US" if int(u["side"]) == D.Side.FRIENDLY else "GE"
+		var otex := _tex_named("ord-%s-%s" % [pref, D.Order.keys()[ordv]])
+		if otex != null:
+			var ob := MeshInstance3D.new()
+			var opm := PlaneMesh.new()
+			opm.size = Vector2(w * 0.52, w * 0.52)
+			ob.mesh = opm
+			var omat := StandardMaterial3D.new()
+			omat.albedo_texture = otex
+			omat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			omat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			ob.material_override = omat
+			ob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			ob.position = Vector3(w * 0.28, t + 0.07, w * 0.28)
+			node.add_child(ob)
 	return node
 
 
@@ -1045,25 +1134,58 @@ func _build_markers() -> void:
 				tname = "US-81mmMortar-Marker-1-f"
 			Area.Type.C4:
 				tname = "marker-C4"
-		var tex := _tex_named(tname)
-		if tex == null:
-			continue
-		var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
-		var mi := MeshInstance3D.new()
-		var pm := PlaneMesh.new()
-		pm.size = Vector2(1.55, 1.55)
-		mi.mesh = pm
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = tex
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(1, 1, 1, alpha)
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		# Sopra terreno e cue, appena sotto i chit.
-		mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.11, 0)
-		_marker_root.add_child(mi)
+		_add_flat_marker(hx, _tex_named(tname), alpha)
+	# Marker di terreno di scenario (come in 2D): filo spinato, trincea,
+	# edificio fortificato, foxhole, rubble. Le grafiche stanno in assets/counters.
+	for key in state.map:
+		var sh: GameState.MapHex = state.map[key]
+		var cell := _key_to_cell(key)
+		if sh.wire:
+			_add_flat_marker(cell, _tex_named("GEN-Wire-Marker-f"), 0.85)
+		match sh.terrain:
+			D.Terrain.TRENCH:
+				_add_flat_marker(cell, _tex_named("GEN-Trench-Marker-f"), 0.9)
+			D.Terrain.FORTIFIED_BUILDING:
+				_add_flat_marker(cell, _tex_named("GEN-Fortified-Marker-f"), 0.9)
+			D.Terrain.FOXHOLE:
+				_add_flat_marker(cell, _tex_named("GEN-Foxhole-Marker-1-f"), 0.9)
+			D.Terrain.RUBBLE:
+				_add_flat_marker(cell, _tex_named("GEN-Rubble-Marker-1-f"), 0.9)
+	# Obiettivi di scenario (come in 2D): cannoni (GUN) e punti di ricognizione.
+	if not state.scenario_id.is_empty() and Scenario.SCENARIOS.has(state.scenario_id):
+		var sc: Dictionary = Scenario.SCENARIOS[state.scenario_id]
+		for gun in sc.get("gun_hexes", []):
+			var gp: PackedStringArray = String(gun).split(",")
+			var col := Color(0.9, 0.1, 0.1) if String(gun) in state.guns_destroyed \
+				else Color(0.22, 0.22, 0.2)
+			_add_flat_marker(Vector2i(int(gp[0]), int(gp[1])), _token_tex(col), 0.95, 1.0)
+		for obj in sc.get("objective_hexes", []):
+			var op: PackedStringArray = String(obj).split(",")
+			var oc := Color(0.2, 0.8, 0.3) if String(obj) in state.visited_objectives \
+				else Color(0.95, 0.8, 0.1)
+			_add_flat_marker(Vector2i(int(op[0]), int(op[1])), _token_tex(oc), 0.95, 0.8)
+
+
+# Quad piatto texturizzato appoggiato a un hex (marker d'area/terreno).
+func _add_flat_marker(hx: Vector2i, tex: Texture2D, alpha: float,
+		size: float = 1.55) -> void:
+	if tex == null or not state.map.has(GameState.hex_key(hx.x, hx.y)):
+		return
+	var lv: int = state.map[GameState.hex_key(hx.x, hx.y)].level
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(size, size)
+	mi.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1, 1, 1, alpha)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = _world_center(hx.x, hx.y, lv) + Vector3(0, 0.09, 0)
+	_marker_root.add_child(mi)
 
 
 func _update_info(hex: Vector2i) -> void:

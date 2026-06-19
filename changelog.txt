@@ -1,3 +1,10 @@
+v1.01 — 2026-06-19
+- Mappa 3D, parità col 2D: ora compaiono anche i SEGNALINI-ORDINE sopra le
+  pedine (anche durante il replay), il pallino "spotted", la freccia di
+  direzione dei veicoli, i marker di terreno di scenario (filo spinato,
+  trincea, edificio fortificato, foxhole, rubble) e gli obiettivi
+  (cannoni e punti di ricognizione).
+
 v1.00 — 2026-06-19
 - Mappa 3D: il replay (pulsante Replay) ora si vede anche in 3D: le pedine
   scorrono lungo i percorsi del turno e i colpi/granate/bombe sono animati.

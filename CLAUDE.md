@@ -212,6 +212,13 @@ porting multi-sessione. Avanzamento:
   proiettili/bombe 3D. Main li invoca in _replay_apply/_process/_end_replay se
   map3d_preview attivo. refresh_dynamic e' inibito durante il replay. Validato
   headless (fantasmi posizionati a meta' percorso) + smoke auto+replay 2D.
+- PARITA' 2D->3D OVERLAY (FATTO): audit di MapView._draw replicato in 3D.
+  Aggiunti in Map3DView: SEGNALINO-ORDINE sul chit (ord-US/GE-<ORDER> via
+  _tex_named; _add_counter param order_tex; anche sui fantasmi replay in
+  _make_ghost), pallino spotted, freccia facing veicolo (_facing_dir), marker di
+  terreno di scenario (wire/trench/fortified/foxhole/rubble in _build_markers via
+  _add_flat_marker) e obiettivi (gun_hexes/objective_hexes). Il refresh avviene
+  via _sync_map3d in _refresh, quindi assegnare un ordine aggiorna subito il 3D.
 - DA FARE: strumento LOS interattivo in 3D (il resto del 3D giocabile e' fatto).
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
