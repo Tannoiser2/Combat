@@ -233,7 +233,8 @@ func _key_to_cell(key: String) -> Vector2i:
 func _build_units() -> void:
 	if state == null:
 		return
-	const TOKEN_W := 1.35    # larghezza segnalino in unita'-mondo (~ un hex)
+	const TOKEN_W := 1.35    # lato segnalino in unita'-mondo (~ un hex)
+	const TOKEN_T := 0.14    # spessore del cartoncino
 	var seen := {}           # conteggio per hex (stacking)
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
@@ -243,20 +244,43 @@ func _build_units() -> void:
 		var key := GameState.hex_key(c.position.x, c.position.y)
 		var idx: int = seen.get(key, 0)
 		seen[key] = idx + 1
-		var spr := Sprite3D.new()
-		spr.shaded = false
-		spr.double_sided = true
 		var tex := _counter_tex(c.counter)
 		var fb := Color(0.25, 0.50, 0.95) if c.side == D.Side.FRIENDLY \
 			else Color(0.70, 0.32, 0.28)  # blu vivo (amico) / rosso-terra (nemico)
-		spr.texture = tex if tex != null else _token_tex(fb)
-		# Segnalino DISTESO sull'esagono (faccia in su), come un counter fisico.
-		spr.pixel_size = TOKEN_W / maxf(8.0, float(spr.texture.get_width()))
-		spr.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
-		# Scostamento a cascata per le pile (Rule 8) + micro-quota anti z-fight.
-		var off := Vector3(0.26 * idx, 0.05 + 0.02 * idx, 0.16 * idx)
-		spr.position = surface + off
-		add_child(spr)
+		var top_tex: Texture2D = tex if tex != null else _token_tex(fb)
+		# Scostamento a cascata per le pile (Rule 8): si impilano in altezza.
+		var off := Vector3(0.22 * idx, idx * TOKEN_T, 0.14 * idx)
+		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex)
+
+
+# Un segnalino fisico: corpo con spessore (bordi cartoncino, proietta ombra)
+# + faccia superiore con l'art della pedina. Appoggiato a 'base' (superficie hex).
+func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D) -> void:
+	var body := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(w, t, w)
+	body.mesh = bm
+	var bmat := StandardMaterial3D.new()
+	bmat.albedo_color = Color(0.88, 0.85, 0.78)  # taglio del cartoncino
+	bmat.roughness = 0.95
+	body.material_override = bmat
+	body.position = base + Vector3(0, t * 0.5 + 0.02, 0)
+	add_child(body)
+
+	var top := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(w * 0.98, w * 0.98)  # faccia in su (PlaneMesh -> +Y)
+	top.mesh = pm
+	var tmat := StandardMaterial3D.new()
+	tmat.albedo_texture = top_tex
+	tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	top.material_override = tmat
+	top.position = base + Vector3(0, t + 0.03, 0)
+	# Niente ombra dalla faccia piatta: l'ombra la getta il corpo.
+	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(top)
 
 
 func _counter_tex(counter_id: String) -> Texture2D:
@@ -312,9 +336,12 @@ func _build_environment() -> void:
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation = Vector3(deg_to_rad(-55.0), deg_to_rad(-40.0), 0.0)
+	sun.rotation = Vector3(deg_to_rad(-52.0), deg_to_rad(-40.0), 0.0)
 	sun.light_energy = 1.1
 	sun.shadow_enabled = true
+	sun.shadow_bias = 0.05
+	sun.shadow_normal_bias = 1.5
+	sun.directional_shadow_max_distance = 300.0
 	add_child(sun)
 
 
