@@ -1,3 +1,13 @@
+v1.03 — 2026-06-19
+- Mappa 3D: i dislivelli ora degradano "dolci" invece che a picco (default).
+  Le cime restano alla quota piena (alture evidenti) ma i bordi scendono in
+  pendio. Tasto S per alternare con il vecchio aspetto a scalini.
+
+v1.02 — 2026-06-19
+- Mappa 3D: strumento LOS anche in 3D. Col pulsante LOS attivo, clicca due hex
+  nella vista 3D: appare la linea verde (libera) o rossa (bloccata) con
+  l'esagono che blocca evidenziato. Completa il 3D giocabile.
+
 v1.01 — 2026-06-19
 - Mappa 3D, parità col 2D: ora compaiono anche i SEGNALINI-ORDINE sopra le
   pedine (anche durante il replay), il pallino "spotted", la freccia di

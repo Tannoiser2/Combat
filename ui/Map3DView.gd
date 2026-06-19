@@ -20,7 +20,7 @@ const Area := preload("res://engine/Area.gd")
 # Riuso la calibrazione della griglia da MapView (stesse costanti): origin e
 # passo (cell) per board, cosi' 3D e 2D restano allineati pixel-per-pixel.
 const PX_PER_UNIT := 100.0     # scala scansione->mondo (1 unita' = 100 px)
-const LEVEL_HEIGHT := 0.55     # altezza in unita'-mondo per livello di quota
+const LEVEL_HEIGHT := 0.9      # altezza per livello (quote piu' marcate: alture evidenti)
 
 signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
 signal hex_clicked(hex: Vector2i)    # emesso al clic su un hex (Fase 4: azione)
@@ -33,6 +33,7 @@ var _origin := Vector2.ZERO
 var _cell := Vector2.ZERO
 var _first_col := 1
 var _height_scale := 1.0       # moltiplicatore quote (tasti 1/2/3)
+var _smooth := false           # scalini "dolci" (vertici mediati) vs a picco (tasto S)
 
 # --- Camera rig orbitale ---
 var _camera: Camera3D
@@ -59,6 +60,7 @@ var _unit_pos := {}                 # Character -> posizione mondo del chit
 var _units_root: Node3D             # contenitore pedine (rinfrescabile)
 var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
 var _marker_root: Node3D            # contenitore marker d'area (fumo/fuoco/...)
+var _los_root: Node3D               # contenitore strumento LOS (linea + ostacolo)
 
 # --- Proiettili animati (Fase 5: traccianti/colpi/bombe/granate in 3D) ---
 var _fx_root: Node3D                 # contenitore proiettili + lampi
@@ -85,6 +87,7 @@ func _ready() -> void:
 	_cell = info.get("cell", MapView.CELL)
 	if ResourceLoader.exists(info["file"]):
 		_board_tex = load(info["file"])
+	_smooth = OS.get_environment("COMBAT_MAP3D_SMOOTH") != "0"  # dolce di default (S = a picco)
 	_build_environment()
 	_build_terrain()
 	_units_root = Node3D.new()
@@ -95,6 +98,8 @@ func _ready() -> void:
 	add_child(_marker_root)
 	_fx_root = Node3D.new()
 	add_child(_fx_root)
+	_los_root = Node3D.new()
+	add_child(_los_root)
 	_build_units()
 	_build_markers()
 	_build_camera()
@@ -143,6 +148,9 @@ func _grab_screenshot() -> void:
 			_selected.set_order(D.Order.AIMED_FIRE)
 			_build_units()
 			_update_sel_ring()
+		# Valida lo strumento LOS: linea rossa con ostacolo evidenziato.
+		if not OS.get_environment("COMBAT_MAP3D_LOS").is_empty():
+			set_los(hx, hx + Vector2i(5, -2), false, hx + Vector2i(2, -1))
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	# Validazione proiettili: COMBAT_MAP3D_FX -> spawn demo a meta' volo.
@@ -187,11 +195,26 @@ func _hex_center_px(col: int, row: int) -> Vector2:
 	return Vector2(x, y)
 
 
-# Posizione mondo del centro di un hex alla sua quota.
+# Posizione mondo del centro di un hex alla sua quota (piena): il centro resta
+# alla quota dell'hex anche in modalita' dolce, cosi' pedine/cime restano alte.
 func _world_center(col: int, row: int, level: int) -> Vector3:
 	var px := _hex_center_px(col, row)
 	return Vector3(px.x / PX_PER_UNIT, level * LEVEL_HEIGHT * _height_scale,
 		px.y / PX_PER_UNIT)
+
+
+# Quota (float) di un vertice dell'hex: media tra l'hex e i 2 vicini che
+# condividono quel vertice (esistenti). Vertice i e' fra gli edge i-1 e i.
+func _corner_level(col: int, row: int, i: int) -> float:
+	var nb := _neighbors(col, row)
+	var sum := float(maxi(_level_at(col, row), 0))
+	var cnt := 1.0
+	for k in [(i + 5) % 6, i]:
+		var nl := _level_at(nb[k].x, nb[k].y)
+		if nl >= 0:
+			sum += nl
+			cnt += 1.0
+	return sum / cnt
 
 
 # I 6 vicini di (col,row) in ordine di EDGE (i=0..5 = lati a 30,90,...,330 gradi).
@@ -242,6 +265,14 @@ func _build_terrain() -> void:
 		var col: int = cell.x
 		var row: int = cell.y
 		var center := _world_center(col, row, hex.level)
+		var nb := _neighbors(col, row)
+		# Dolce (via di mezzo): il CENTRO resta alla quota piena dell'hex (cime
+		# evidenti), i VERTICI di bordo sono mediati coi vicini -> i bordi
+		# degradano dolci e la superficie resta continua, senza pareti a picco.
+		var corner_y: Array[float] = []
+		for i in range(6):
+			corner_y.append(_corner_level(col, row, i) * LEVEL_HEIGHT * _height_scale
+				if _smooth else center.y)
 		bb_min.x = minf(bb_min.x, center.x); bb_max.x = maxf(bb_max.x, center.x)
 		bb_min.y = minf(bb_min.y, center.y); bb_max.y = maxf(bb_max.y, center.y)
 		bb_min.z = minf(bb_min.z, center.z); bb_max.z = maxf(bb_max.z, center.z)
@@ -253,7 +284,7 @@ func _build_terrain() -> void:
 		for i in range(6):
 			var ang := PI / 3.0 * i
 			var off := Vector2(cos(ang), sin(ang)) * radius
-			verts.append(Vector3(center.x + off.x, center.y, center.z + off.y))
+			verts.append(Vector3(center.x + off.x, corner_y[i], center.z + off.y))
 			var px := center_px + Vector2(cos(ang), sin(ang)) * (_cell.x / 1.5)
 			uvs.append(Vector2(px.x / img_w, px.y / img_h))
 		var center_uv := Vector2(center_px.x / img_w, center_px.y / img_h)
@@ -266,25 +297,27 @@ func _build_terrain() -> void:
 			tops.set_uv(uvs[i]); tops.add_vertex(verts[i])
 			tops.set_uv(uvs[j]); tops.add_vertex(verts[j])
 
-		# Pareti: per ogni lato, se il vicino e' piu' basso (o assente) cala
-		# un muro dal bordo superiore fino alla quota del vicino.
-		var nb := _neighbors(col, row)
+		# Pareti: a picco -> dove il vicino e' piu' basso, cala alla sua quota;
+		# dolce -> solo skirt al bordo mappa (i vertici interni gia' combaciano).
 		for i in range(6):
 			var nlv := _level_at(nb[i].x, nb[i].y)
-			var base_lv: int = maxi(nlv, 0)
-			if base_lv >= hex.level:
-				continue  # vicino alla stessa quota o piu' alto: niente parete
+			var by: float
+			if _smooth:
+				if nlv != -1:
+					continue  # interno: superficie continua, nessuna parete
+				by = 0.0
+			else:
+				var base_lv: int = maxi(nlv, 0)
+				if base_lv >= hex.level:
+					continue
+				by = base_lv * LEVEL_HEIGHT * _height_scale
 			var j := (i + 1) % 6
 			var top_a := verts[i]
 			var top_b := verts[j]
-			var by := base_lv * LEVEL_HEIGHT * _height_scale
 			var bot_a := Vector3(top_a.x, by, top_a.z)
 			var bot_b := Vector3(top_b.x, by, top_b.z)
-			# Normale orizzontale uscente (verso l'esterno dell'hex).
 			var mid := (top_a + top_b) * 0.5
 			var n := Vector3(mid.x - center.x, 0, mid.z - center.z).normalized()
-			# UV "colate": basso e alto condividono il pixel di bordo -> la
-			# scansione si stira verticalmente lungo la parete (no blocco piatto).
 			var ua := uvs[i]
 			var ub := uvs[j]
 			var quad := [top_a, top_b, bot_b, top_a, bot_b, bot_a]
@@ -911,8 +944,51 @@ func _draw_fire_lines(src: Vector2i, targets: Array, color: Color) -> void:
 		_add_line(a, b, color)
 
 
+# Strumento LOS in 3D: linea verde (libera) / rossa (bloccata) fra due hex,
+# con l'esagono che blocca evidenziato. clear_los() la rimuove.
+func set_los(from_hex: Vector2i, to_hex: Vector2i, clear: bool,
+		blocker: Vector2i = Vector2i(-99, -99)) -> void:
+	clear_los()
+	var col := Color(0.2, 0.95, 0.3) if clear else Color(0.95, 0.2, 0.15)
+	var a := _hex_top(from_hex) + Vector3(0, 0.5, 0)
+	var b := _hex_top(to_hex) + Vector3(0, 0.5, 0)
+	_add_line(a, b, col, 0.08, _los_root)
+	for h in [from_hex, to_hex]:
+		var s := MeshInstance3D.new()
+		var sm := SphereMesh.new(); sm.radius = 0.18; sm.height = 0.36
+		s.mesh = sm
+		var mt := StandardMaterial3D.new()
+		mt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mt.albedo_color = col
+		s.material_override = mt
+		s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		s.position = _hex_top(h) + Vector3(0, 0.5, 0)
+		_los_root.add_child(s)
+	if not clear and blocker.x > -99 and state.map.has(GameState.hex_key(blocker.x, blocker.y)):
+		var blv: int = state.map[GameState.hex_key(blocker.x, blocker.y)].level
+		var mi := MeshInstance3D.new()
+		mi.mesh = _hex_fan_mesh(_world_center(blocker.x, blocker.y, blv) + Vector3(0, 0.06, 0),
+			_cell.x / 1.5 / PX_PER_UNIT * 0.95)
+		var bmat := StandardMaterial3D.new()
+		bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		bmat.albedo_color = Color(0.95, 0.2, 0.15, 0.5)
+		mi.material_override = bmat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_los_root.add_child(mi)
+
+
+func clear_los() -> void:
+	if _los_root == null:
+		return
+	for ch in _los_root.get_children():
+		ch.queue_free()
+
+
 # Un segmento 3D come BoxMesh sottile orientato da 'a' a 'b'.
-func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> void:
+func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05,
+		parent: Node3D = null) -> void:
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(width, width, a.distance_to(b))
@@ -925,7 +1001,7 @@ func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> voi
 	mi.position = (a + b) * 0.5
 	if a.distance_to(b) > 0.001:
 		mi.look_at_from_position((a + b) * 0.5, b, Vector3.UP)
-	_cue_root.add_child(mi)
+	(parent if parent != null else _cue_root).add_child(mi)
 
 
 # ---- Proiettili animati (colpi, granate a parabola, bombe dall'alto) ----
@@ -1211,7 +1287,7 @@ func _build_hud() -> void:
 	var label := Label.new()
 	label.text = "MAPPA 3D (prototipo) — board: %s\n" % board_name \
 		+ "trascina sx = orbita  •  rotella = zoom  •  trascina dx = pan\n" \
-		+ "R = reset vista  •  1/2/3 = quote x1 / x2 / x3"
+		+ "R = reset vista  •  1/2/3 = quote x1 / x2 / x3  •  S = scalini dolci/a picco"
 	label.position = Vector2(12, 10)
 	label.add_theme_color_override("font_color", Color.WHITE)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -1268,6 +1344,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_update_camera()
 			KEY_1, KEY_2, KEY_3:
 				_height_scale = float(event.keycode - KEY_0)
+				_rebuild()
+			KEY_S:
+				_smooth = not _smooth  # scalini dolci <-> a picco
 				_rebuild()
 
 
