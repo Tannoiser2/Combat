@@ -192,7 +192,12 @@ porting multi-sessione. Avanzamento:
   _marker_root), stesse grafiche del 2D via _tex_named("assets/counters/<n>.png");
   ricostruiti in refresh_dynamic e _rebuild. Validato su s2 (bombardamento ->
   fumo).
-- DA FARE: Fase 5 LOS/traccianti/replay in 3D.
+- LINEE DI FUOCO/LOS IN 3D (FATTO): quando si mira, linee dal tiratore a ogni
+  bersaglio (Map3DView._draw_fire_lines + _add_line come BoxMesh sottile
+  orientato), passate da Main._sync_map3d via map_view.fire_lines_source a
+  refresh_dynamic. Validato headless.
+- DA FARE: replay/traccianti animati in 3D (grosso: il replay 2D usa
+  replay_frames/units/paths); strumento LOS interattivo in 3D.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

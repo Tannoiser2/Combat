@@ -245,7 +245,8 @@ func _on_map3d_hex(hex: Vector2i) -> void:
 func _sync_map3d() -> void:
 	if map3d_preview == null or map_view == null:
 		return
-	map3d_preview.refresh_dynamic(map_view.cue_hexes, map_view.cue_color)
+	map3d_preview.refresh_dynamic(map_view.cue_hexes, map_view.cue_color,
+		map_view.fire_lines_source)
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.

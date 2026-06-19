@@ -116,6 +116,7 @@ func _grab_screenshot() -> void:
 			if state.map.has(GameState.hex_key(nb.x, nb.y)):
 				cues.append(nb)
 		set_cues(cues, Color(0.3, 0.9, 0.3))
+		_draw_fire_lines(hx, cues, Color(0.95, 0.55, 0.05))  # valida le linee
 	else:
 		_pick_at(get_viewport().get_visible_rect().size * 0.5, true)
 	await RenderingServer.frame_post_draw
@@ -645,11 +646,46 @@ func set_cues(hexes: Array, color: Color) -> void:
 
 # Rinfresca pedine + cue + selezione dopo un'azione (Fase 4), senza ricostruire
 # il terreno. Chiamato da Main quando il preview e' attivo e lo stato cambia.
-func refresh_dynamic(cues: Array, color: Color) -> void:
+func refresh_dynamic(cues: Array, color: Color,
+		fire_src: Vector2i = Vector2i(-99, -99)) -> void:
 	_build_units()
 	_build_markers()
 	set_cues(cues, color)
+	if fire_src.x > -99:
+		_draw_fire_lines(fire_src, cues, color)
 	_update_sel_ring()
+
+
+# Linee di fuoco/LOS dal tiratore a ogni bersaglio (cue), aggiunte ai cue.
+func _draw_fire_lines(src: Vector2i, targets: Array, color: Color) -> void:
+	if _cue_root == null or not state.map.has(GameState.hex_key(src.x, src.y)):
+		return
+	var slv: int = state.map[GameState.hex_key(src.x, src.y)].level
+	var a := _world_center(src.x, src.y, slv) + Vector3(0, 0.45, 0)
+	for t in targets:
+		var tx: Vector2i = t
+		if not state.map.has(GameState.hex_key(tx.x, tx.y)):
+			continue
+		var tlv: int = state.map[GameState.hex_key(tx.x, tx.y)].level
+		var b := _world_center(tx.x, tx.y, tlv) + Vector3(0, 0.45, 0)
+		_add_line(a, b, color)
+
+
+# Un segmento 3D come BoxMesh sottile orientato da 'a' a 'b'.
+func _add_line(a: Vector3, b: Vector3, color: Color, width: float = 0.05) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(width, width, a.distance_to(b))
+	mi.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(color.r, color.g, color.b, 0.9)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = (a + b) * 0.5
+	if a.distance_to(b) > 0.001:
+		mi.look_at_from_position((a + b) * 0.5, b, Vector3.UP)
+	_cue_root.add_child(mi)
 
 
 # Texture da assets/counters/<name>.png per nome esatto (come MapView._named_tex).
