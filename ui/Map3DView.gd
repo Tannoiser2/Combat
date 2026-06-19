@@ -20,7 +20,7 @@ const Area := preload("res://engine/Area.gd")
 # Riuso la calibrazione della griglia da MapView (stesse costanti): origin e
 # passo (cell) per board, cosi' 3D e 2D restano allineati pixel-per-pixel.
 const PX_PER_UNIT := 100.0     # scala scansione->mondo (1 unita' = 100 px)
-const LEVEL_HEIGHT := 0.55     # altezza in unita'-mondo per livello di quota
+const LEVEL_HEIGHT := 0.9      # altezza per livello (quote piu' marcate: alture evidenti)
 
 signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
 signal hex_clicked(hex: Vector2i)    # emesso al clic su un hex (Fase 4: azione)
