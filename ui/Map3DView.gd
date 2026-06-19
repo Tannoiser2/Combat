@@ -234,7 +234,7 @@ func _build_units() -> void:
 	if state == null:
 		return
 	const TOKEN_W := 1.35    # lato segnalino in unita'-mondo (~ un hex)
-	const TOKEN_T := 0.14    # spessore del cartoncino
+	const TOKEN_T := 0.10    # spessore del cartoncino
 	var seen := {}           # conteggio per hex (stacking)
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
@@ -244,7 +244,13 @@ func _build_units() -> void:
 		var key := GameState.hex_key(c.position.x, c.position.y)
 		var idx: int = seen.get(key, 0)
 		seen[key] = idx + 1
-		var tex := _counter_tex(c.counter)
+		# Segnalino vero; per i nemici non rivelati e le esche uso il token-esca
+		# del team (come la MapView 2D, la grafica esiste). Disco colorato solo
+		# come ultimo ripiego se mancasse perfino quello.
+		var hidden := c.side == D.Side.ENEMY and (not c.known or c.is_dummy)
+		var cid: String = MapView.DUMMY_BY_TEAM.get(c.team, "GE-RedTeam-Dummy-1") \
+			if hidden else c.counter
+		var tex := _counter_tex(cid)
 		var fb := Color(0.25, 0.50, 0.95) if c.side == D.Side.FRIENDLY \
 			else Color(0.70, 0.32, 0.28)  # blu vivo (amico) / rosso-terra (nemico)
 		var top_tex: Texture2D = tex if tex != null else _token_tex(fb)
@@ -261,7 +267,7 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D) -> void
 	bm.size = Vector3(w, t, w)
 	body.mesh = bm
 	var bmat := StandardMaterial3D.new()
-	bmat.albedo_color = Color(0.88, 0.85, 0.78)  # taglio del cartoncino
+	bmat.albedo_color = Color(0.34, 0.31, 0.27)  # taglio del cartoncino (scuro, sottile)
 	bmat.roughness = 0.95
 	body.material_override = bmat
 	body.position = base + Vector3(0, t * 0.5 + 0.02, 0)
@@ -331,7 +337,7 @@ func _build_environment() -> void:
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.6
+	env.ambient_light_energy = 0.42  # piu' bassa -> le ombre staccano di piu'
 	we.environment = env
 	add_child(we)
 
