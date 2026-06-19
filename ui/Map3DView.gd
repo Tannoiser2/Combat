@@ -449,6 +449,12 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
 	tmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	top.material_override = tmat
 	top.position = base + Vector3(0, t + 0.03, 0)
+	# Veicoli: ruota l'art (silhouette dall'alto col fronte verso l'alto) nella
+	# direzione di marcia, cosi' il mezzo "punta" dove va invece di sempre in su.
+	# Di default il fronte dell'art (alto immagine) guarda -Z; lo allineo a _facing_dir.
+	if facing >= 1:
+		var fang := deg_to_rad(30.0 + 60.0 * ((facing - 1) % 6))
+		top.rotation.y = atan2(-cos(fang), -sin(fang))
 	# Niente ombra dalla faccia piatta: l'ombra la getta il corpo.
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_units_root.add_child(top)
@@ -927,6 +933,10 @@ func _make_ghost(u: Dictionary) -> Node3D:
 	top.material_override = tmat
 	top.position = Vector3(0, t + 0.03, 0)
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var gf: int = int(u.get("facing", 0))  # veicoli: orienta l'art come le pedine vive
+	if gf >= 1:
+		var gang := deg_to_rad(30.0 + 60.0 * ((gf - 1) % 6))
+		top.rotation.y = atan2(-cos(gang), -sin(gang))
 	node.add_child(top)
 	# Segnalino-ordine sul fantasma (come in 2D durante il replay).
 	var ordv: int = int(u.get("order", -1))
