@@ -233,7 +233,7 @@ func _key_to_cell(key: String) -> Vector2i:
 func _build_units() -> void:
 	if state == null:
 		return
-	const STANDEE_H := 1.4   # altezza pedina in unita'-mondo
+	const TOKEN_W := 1.35    # larghezza segnalino in unita'-mondo (~ un hex)
 	var seen := {}           # conteggio per hex (stacking)
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
@@ -244,16 +244,18 @@ func _build_units() -> void:
 		var idx: int = seen.get(key, 0)
 		seen[key] = idx + 1
 		var spr := Sprite3D.new()
-		spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		spr.shaded = false
+		spr.double_sided = true
 		var tex := _counter_tex(c.counter)
-		spr.texture = tex if tex != null \
-			else _solid_tex(MapView.SIDE_COLORS.get(c.side, Color.WHITE))
-		# Dimensiona ad altezza fissa e appoggia la BASE alla superficie.
-		spr.pixel_size = STANDEE_H / maxf(8.0, float(spr.texture.get_height()))
-		# Scostamento a cascata per le pile (Rule 8): non si sovrappongono.
-		var off := Vector3(0.28 * idx, 0, 0.18 * idx)
-		spr.position = surface + off + Vector3(0, STANDEE_H * 0.5 + 0.04, 0)
+		var fb := Color(0.25, 0.50, 0.95) if c.side == D.Side.FRIENDLY \
+			else Color(0.70, 0.32, 0.28)  # blu vivo (amico) / rosso-terra (nemico)
+		spr.texture = tex if tex != null else _token_tex(fb)
+		# Segnalino DISTESO sull'esagono (faccia in su), come un counter fisico.
+		spr.pixel_size = TOKEN_W / maxf(8.0, float(spr.texture.get_width()))
+		spr.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		# Scostamento a cascata per le pile (Rule 8) + micro-quota anti z-fight.
+		var off := Vector3(0.26 * idx, 0.05 + 0.02 * idx, 0.16 * idx)
+		spr.position = surface + off
 		add_child(spr)
 
 
@@ -264,10 +266,32 @@ func _counter_tex(counter_id: String) -> Texture2D:
 	return load(path) if ResourceLoader.exists(path) else null
 
 
-func _solid_tex(col: Color) -> Texture2D:
-	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
-	img.fill(col)
-	return ImageTexture.create_from_image(img)
+# Segnalino di ripiego (counter mancante / esca / nemico non rivelato):
+# disco tondo del colore del lato con anello scuro, cosi' si legge come una
+# pedina e non come un quadrato vuoto. Una texture per colore (cache).
+var _token_cache := {}
+
+func _token_tex(col: Color) -> Texture2D:
+	var ckey := col.to_rgba32()
+	if _token_cache.has(ckey):
+		return _token_cache[ckey]
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := Vector2(n - 1, n - 1) * 0.5
+	var r := n * 0.46
+	var ring := Color(0.10, 0.10, 0.10)
+	for y in range(n):
+		for x in range(n):
+			var d := Vector2(x, y).distance_to(c)
+			if d > r:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+			elif d > r - 4.0:
+				img.set_pixel(x, y, ring)
+			else:
+				img.set_pixel(x, y, col)
+	var tex := ImageTexture.create_from_image(img)
+	_token_cache[ckey] = tex
+	return tex
 
 
 func _build_environment() -> void:
