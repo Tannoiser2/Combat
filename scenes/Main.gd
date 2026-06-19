@@ -21,6 +21,7 @@ var map_view: MapView
 var camera: Camera2D
 var game_hud: CanvasLayer = null        # HUD di gioco (nascosto nell'anteprima 3D)
 var map3d_preview: Map3DView = null     # anteprima 3D attiva (F3), o null
+var _play_in_3d := false                # scelta "Gioca in 3D" dal menu
 var phase: int = Phase.CARD
 var impulse_next := 1
 var auto_play := false
@@ -229,10 +230,15 @@ func _on_map3d_unit(c: Character) -> void:
 # Clic su un hex nell'anteprima 3D (Fase 4): se una pedina sta agendo, l'hex e'
 # il bersaglio/destinazione dell'azione (riusa _handle_action_click del 2D).
 func _on_map3d_hex(hex: Vector2i) -> void:
-	if acting == null or hex.x <= -99:
+	if hex.x <= -99:
 		return
-	_handle_action_click(hex)
-	_sync_map3d()
+	if phase == Phase.DEPLOY:
+		_handle_deploy_click(hex)  # schieramento dal 3D (hex azzurri)
+		_sync_map3d()
+		return
+	if acting != null:
+		_handle_action_click(hex)
+		_sync_map3d()
 
 
 # Rinfresca pedine + cue nel 3D dallo stato corrente (se il preview e' attivo).
@@ -246,6 +252,7 @@ func _sync_map3d() -> void:
 func _start_scenario(scenario_id: String) -> void:
 	for child in get_children():
 		child.queue_free()
+	map3d_preview = null  # eventuale anteprima 3D di una partita precedente
 	log_history.clear()
 	state = GameState.new()
 	# Seed fisso per partite riproducibili; COMBAT_SEED per variarlo
@@ -290,6 +297,9 @@ func _start_scenario(scenario_id: String) -> void:
 		_start_deploy()
 	else:
 		_start_turn()
+	# Scelta "Gioca in 3D" dal menu: apre subito la vista 3D sullo stato vivo.
+	if _play_in_3d and not auto_play:
+		_toggle_map3d_preview()
 
 
 # --------------------------------------------------------- audio
@@ -441,11 +451,21 @@ func _show_scenario_menu() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 8)
 	split.add_child(right)
+	var head_row := HBoxContainer.new()
+	right.add_child(head_row)
 	var head := Label.new()
 	head.text = "SCEGLI LA MISSIONE"
 	head.add_theme_font_size_override("font_size", 22)
 	head.add_theme_color_override("font_color", Color(0.95, 0.88, 0.55))
-	right.add_child(head)
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_row.add_child(head)
+	# Toggle globale: gioca in 2D (classico) o in 3D (mappa estrusa).
+	var d3 := CheckButton.new()
+	d3.text = "Gioca in 3D"
+	d3.tooltip_text = "Apre la partita nella vista 3D (mappa estrusa).\nIl 2D resta sempre disponibile col pulsante."
+	d3.button_pressed = _play_in_3d
+	d3.toggled.connect(func(v: bool) -> void: _play_in_3d = v)
+	head_row.add_child(d3)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

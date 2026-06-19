@@ -1,3 +1,9 @@
+v0.96 — 2026-06-19
+- Scelta 2D/3D a inizio partita: toggle "Gioca in 3D" nel menu missioni. Se
+  attivo, la partita si apre direttamente nella vista 3D (mappa estrusa); il 2D
+  resta disponibile col pulsante. Lo schieramento si fa anche in 3D (clic sugli
+  hex azzurri della zona di schieramento).
+
 v0.95 — 2026-06-19
 - Mappa 3D (nuovo): visualizzatore con la board estrusa a quote reali e le
   facce superiori texturizzate dalla scansione vera; pareti/cliff dove il
