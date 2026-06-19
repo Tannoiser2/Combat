@@ -180,8 +180,14 @@ func _build_terrain() -> void:
 			# Normale orizzontale uscente (verso l'esterno dell'hex).
 			var mid := (top_a + top_b) * 0.5
 			var n := Vector3(mid.x - center.x, 0, mid.z - center.z).normalized()
-			for v in [top_a, top_b, bot_b, top_a, bot_b, bot_a]:
-				walls.set_normal(n); walls.add_vertex(v)
+			# UV "colate": basso e alto condividono il pixel di bordo -> la
+			# scansione si stira verticalmente lungo la parete (no blocco piatto).
+			var ua := uvs[i]
+			var ub := uvs[j]
+			var quad := [top_a, top_b, bot_b, top_a, bot_b, bot_a]
+			var quad_uv := [ua, ub, ub, ua, ub, ua]
+			for k in range(6):
+				walls.set_normal(n); walls.set_uv(quad_uv[k]); walls.add_vertex(quad[k])
 
 	# Mesh facce superiori (texture scansione).
 	var top_mesh := MeshInstance3D.new()
@@ -201,8 +207,13 @@ func _build_terrain() -> void:
 	wall_mesh.mesh = walls.commit()
 	var wall_mat := StandardMaterial3D.new()
 	wall_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	wall_mat.albedo_color = Color(0.42, 0.34, 0.26)
 	wall_mat.roughness = 1.0
+	if _board_tex != null:
+		# Scansione colata sui fianchi, leggermente scurita (terra/roccia).
+		wall_mat.albedo_texture = _board_tex
+		wall_mat.albedo_color = Color(0.72, 0.66, 0.58)
+	else:
+		wall_mat.albedo_color = Color(0.42, 0.34, 0.26)
 	wall_mesh.material_override = wall_mat
 	add_child(wall_mesh)
 
@@ -222,23 +233,27 @@ func _key_to_cell(key: String) -> Vector2i:
 func _build_units() -> void:
 	if state == null:
 		return
+	const STANDEE_H := 1.4   # altezza pedina in unita'-mondo
+	var seen := {}           # conteggio per hex (stacking)
 	for c in state.characters:
 		if c == null or c.is_dead() or c.embarked:
 			continue
 		var lv := _level_at(c.position.x, c.position.y)
-		var center := _world_center(c.position.x, c.position.y, maxi(lv, 0))
+		var surface := _world_center(c.position.x, c.position.y, maxi(lv, 0))
+		var key := GameState.hex_key(c.position.x, c.position.y)
+		var idx: int = seen.get(key, 0)
+		seen[key] = idx + 1
 		var spr := Sprite3D.new()
 		spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		spr.shaded = false
-		spr.no_depth_test = false
-		spr.pixel_size = 0.012
 		var tex := _counter_tex(c.counter)
-		if tex != null:
-			spr.texture = tex
-		else:
-			spr.texture = _solid_tex(MapView.SIDE_COLORS.get(c.side, Color.WHITE))
-			spr.pixel_size = 0.6
-		spr.position = center + Vector3(0, 0.6, 0)
+		spr.texture = tex if tex != null \
+			else _solid_tex(MapView.SIDE_COLORS.get(c.side, Color.WHITE))
+		# Dimensiona ad altezza fissa e appoggia la BASE alla superficie.
+		spr.pixel_size = STANDEE_H / maxf(8.0, float(spr.texture.get_height()))
+		# Scostamento a cascata per le pile (Rule 8): non si sovrappongono.
+		var off := Vector3(0.28 * idx, 0, 0.18 * idx)
+		spr.position = surface + off + Vector3(0, STANDEE_H * 0.5 + 0.04, 0)
 		add_child(spr)
 
 
