@@ -161,9 +161,17 @@ porting multi-sessione. Avanzamento:
   Cornice ciano attorno al chit (_update_sel_ring, riquadro cavo), info unita'
   (nome/morale/ordine) in _info_label. _unit_pos mappa Character->posizione del
   chit. Validato headless con COMBAT_MAP3D_PICK="col,row" (inquadra+seleziona).
-- DA FARE: pannello ordini agganciato alla pedina selezionata (Fase 3, riusa la
-  UI esistente), cue hexes (mosse/bersagli) come overlay 3D, LOS/traccianti/
-  replay, scelta 2D/3D nel menu.
+- FASE 3 PANNELLO ORDINI (FATTO, in fase Ordini): Map3DView emette
+  unit_activated(c) al clic su una pedina amica; Main._on_map3d_unit svela l'HUD
+  e apre _open_order_panel(c) (LA STESSA UI del 2D). Il peek F3 resta pulito
+  (HUD nascosto) finche' non clicchi una pedina. Chiudendo il preview: order_panel
+  nascosto, acting=null, 2D ripristinato. Funziona per ASSEGNARE l'ordine (in
+  Order Phase non serve click sulla mappa). NB: gli ordini con bersaglio/
+  destinazione si risolvono in Action Phase via click sulla mappa, che in 3D
+  arrivera' con la Fase 4 (cue/target picking). Validato headless: selftest +
+  smoke; il pannello sopra il 3D va provato dal vivo (non screenshot-abile qui).
+- DA FARE: Fase 4 cue hexes (mosse/bersagli) come overlay 3D + risoluzione
+  azione dal 3D; LOS/traccianti/replay; scelta 2D/3D nel menu.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 

@@ -188,6 +188,9 @@ func _toggle_map3d_preview() -> void:
 	if map3d_preview != null:
 		map3d_preview.queue_free()
 		map3d_preview = null
+		acting = null
+		if order_panel != null:
+			order_panel.hide()
 		if map_view != null:
 			map_view.visible = true
 		if game_hud != null:
@@ -202,12 +205,25 @@ func _toggle_map3d_preview() -> void:
 	var view := Map3DView.new()
 	view.board_name = Scenario.SCENARIOS[state.scenario_id]["map"]
 	view.state = state
+	view.unit_activated.connect(_on_map3d_unit)
 	map3d_preview = view
 	add_child(view)
 	if map_view != null:
 		map_view.visible = false
 	if game_hud != null:
-		game_hud.visible = false
+		game_hud.visible = false  # peek pulito: l'HUD compare al clic su una pedina
+
+
+# Clic su una pedina amica nell'anteprima 3D (Fase 3): in fase Ordini svela
+# l'HUD e apre il pannello ordini di quella pedina (la stessa UI del 2D).
+func _on_map3d_unit(c: Character) -> void:
+	if c == null or c.side != Domain.Side.FRIENDLY or c.is_dead():
+		return
+	if phase != Phase.ORDERS:
+		return
+	if game_hud != null:
+		game_hud.visible = true
+	_open_order_panel(c)
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.

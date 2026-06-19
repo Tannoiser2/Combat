@@ -21,6 +21,8 @@ const D := preload("res://engine/Domain.gd")
 const PX_PER_UNIT := 100.0     # scala scansione->mondo (1 unita' = 100 px)
 const LEVEL_HEIGHT := 0.55     # altezza in unita'-mondo per livello di quota
 
+signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
+
 var board_name := "hill"
 var state: GameState = null    # opzionale: per disegnare le pedine
 
@@ -285,12 +287,16 @@ func _build_units() -> void:
 		# Scostamento a cascata per le pile (Rule 8): si impilano in altezza.
 		var off := Vector3(0.22 * idx, idx * TOKEN_T, 0.14 * idx)
 		_unit_pos[c] = surface + off
-		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex)
+		# Cornice del MORALE come in 2D (MapView.MORALE_COLORS); i nemici non
+		# identificati non hanno morale noto -> nessuna cornice (come la 2D).
+		var morale_col = null if hidden else MapView.MORALE_COLORS.get(c.morale, Color.WHITE)
+		_add_counter(surface + off, TOKEN_W, TOKEN_T, top_tex, morale_col)
 
 
 # Un segnalino fisico: corpo con spessore (bordi cartoncino, proietta ombra)
 # + faccia superiore con l'art della pedina. Appoggiato a 'base' (superficie hex).
-func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D) -> void:
+func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D,
+		border_color = null) -> void:
 	var body := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(w, t, w)
@@ -316,6 +322,19 @@ func _add_counter(base: Vector3, w: float, t: float, top_tex: Texture2D) -> void
 	# Niente ombra dalla faccia piatta: l'ombra la getta il corpo.
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(top)
+
+	# Cornice del morale attorno al chit (convenzione 2D), se nota.
+	if border_color != null:
+		var fr := MeshInstance3D.new()
+		var fm := StandardMaterial3D.new()
+		fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		fm.cull_mode = BaseMaterial3D.CULL_DISABLED
+		fm.albedo_color = border_color
+		fr.material_override = fm
+		fr.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		fr.mesh = _square_frame_mesh(base + Vector3(0, t + 0.05, 0),
+			w * 0.54, w * 0.46)
+		add_child(fr)
 
 
 func _counter_tex(counter_id: String) -> Texture2D:
@@ -457,6 +476,7 @@ func _select_in_hex(hex: Vector2i) -> void:
 	if units.size() > 1:
 		txt += "  (%d/%d nell'hex, ri-clicca per ciclare)" % [i + 1, units.size()]
 	_info_label.text = txt
+	unit_activated.emit(_selected)  # Fase 3: apre il pannello ordini (in Main)
 
 
 # Cornice di selezione: un riquadro luminoso attorno al chit selezionato.
@@ -475,10 +495,13 @@ func _update_sel_ring() -> void:
 		_sel_ring.visible = false
 		return
 	var base: Vector3 = _unit_pos[_selected]
-	var c := base + Vector3(0, 0.20, 0)  # appena sopra il chit
-	# Riquadro cavo (annulus quadrato) attorno al segnalino.
-	var outer := 0.82
-	var inner := 0.70
+	# Cornice di selezione (ciano) PIU' ESTERNA della cornice morale del chit.
+	_sel_ring.mesh = _square_frame_mesh(base + Vector3(0, 0.20, 0), 0.82, 0.72)
+	_sel_ring.visible = true
+
+
+# Riquadro cavo (annulus quadrato) orizzontale centrato in 'center'.
+func _square_frame_mesh(center: Vector3, outer: float, inner: float) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var o := [Vector3(-outer, 0, -outer), Vector3(outer, 0, -outer),
@@ -488,9 +511,8 @@ func _update_sel_ring() -> void:
 	for k in range(4):
 		var k2 := (k + 1) % 4
 		for v in [o[k], o[k2], ii[k2], o[k], ii[k2], ii[k]]:
-			st.set_normal(Vector3.UP); st.add_vertex(c + v)
-	_sel_ring.mesh = st.commit()
-	_sel_ring.visible = true
+			st.set_normal(Vector3.UP); st.add_vertex(center + v)
+	return st.commit()
 
 
 # Inverso di _hex_center_px: il pixel piu' vicino a un centro di hex valido.
