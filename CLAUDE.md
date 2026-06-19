@@ -182,8 +182,13 @@ porting multi-sessione. Avanzamento:
   (screenshot), selftest+smoke; il loop d'azione completo va provato dal vivo.
   NB: cambia il peek F3 (ora l'HUD resta sopra il 3D). Se si vuole un peek
   pulito separato dal "gioca in 3D", si puo' splittare in seguito.
-- DA FARE: Fase 5 LOS/traccianti/replay in 3D; scelta 2D/3D nel menu a inizio
-  partita; marker d'area (fumo/fuoco/mortaio/illum) in 3D.
+- SCELTA 2D/3D NEL MENU (FATTO): toggle "Gioca in 3D" nell'intestazione del
+  menu missioni (Main._play_in_3d). Se attivo, _start_scenario apre subito la
+  vista 3D (chiama _toggle_map3d_preview a fine setup). Lo schieramento funziona
+  dal 3D: _on_map3d_hex instrada il clic a _handle_deploy_click in Phase.DEPLOY
+  (i cue azzurri della deploy zone arrivano via _sync_map3d). Validato headless.
+- DA FARE: Fase 5 LOS/traccianti/replay in 3D; marker d'area (fumo/fuoco/
+  mortaio/illum) in 3D.
 - Marker d'area (fumo/fuoco/mortaio/illum) non ancora disegnati in 3D: vanno
   aggiunti come le pedine quando si vorra'.
 
