@@ -112,6 +112,28 @@ delle board e' un'IMMAGINE PIATTA scansionata, quindi un vero 3D litiga con
 l'art; meglio l'opzione (a), oppure (b) applicato con parsimonia. Da decidere
 con l'utente quale resa preferisce prima di implementare.
 
+SCELTA UTENTE (giugno 2026): NON (a) ne' (b) ma MAPPA 3D VERA — mappare il PNG
+della board sulla geometria ed ESTRUDERE gli esagoni a quote diverse
+(hex.level 0..3). PROTOTIPO FATTO (ui/Map3DView.gd, class_name Map3DView,
+Node3D): costruisce una mesh di prismi esagonali; le FACCE SUPERIORI sono
+texturizzate con la scansione vera (UV = pixel/dimensione_immagine, riusando la
+calibrazione origin/cell di MapView -> art piatta intatta in cima, anche i
+numeri degli hex), le PARETI/cliff (colore terra) scendono solo dove il vicino
+e' piu' basso. Camera orbitale (trascina sx = orbita, rotella = zoom, trascina
+dx = pan, R = reset, 1/2/3 = scala quote x1/x2/x3). SOLO grafica/camera: nessuna
+logica di gioco toccata, niente input di gioco (e' un VISUALIZZATORE separato).
+Lancio: COMBAT_MAP3D=1 (board da COMBAT_BOARD, default "hill"); con
+COMBAT_SCENARIO=<id> carica anche le pedine come billboard. Agganciato in
+Main._show_map3d (ramo COMBAT_MAP3D in _ready). I 6 vicini per parita' di
+colonna sono in Map3DView._neighbors (flat-top, colonne PARI shiftate giu' di
+mezzo passo). Screenshot di validazione headless: COMBAT_MAP3D_SHOT=path (+
+COMBAT_MAP3D_ZOOM/_YAW/_PITCH per inquadrare), reso sotto xvfb con Mesa llvmpipe
+(il container non ha GPU: il 3D NON si vede in headless puro, serve xvfb).
+DA FARE (prossimi passi, se la resa piace): unita'/marker piazzati meglio
+(ora billboard grezzi), pareti texturizzate campionando i pixel di bordo invece
+del colore piatto, e — se si vuole giocare in 3D — il porting di input/overlay/
+LOS/editor/replay da MapView 2D (grande, multi-sessione: vedi discussione).
+
 
 AUDIT REGOLE FATTO (v0.87, chiusura backlog): costi di movimento per
 terreno (Rule 13: difficili=2, Move.DIFFICULT_MOVE/terrain_move_cost,

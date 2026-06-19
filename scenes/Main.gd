@@ -143,6 +143,9 @@ func _ready() -> void:
 	if not OS.get_environment("COMBAT_BALANCE").is_empty():
 		_balance_test()
 		return
+	if not OS.get_environment("COMBAT_MAP3D").is_empty():
+		_show_map3d()
+		return
 	auto_play = not OS.get_environment("COMBAT_AUTO").is_empty()
 	if auto_play:
 		# Modalita' test: parte subito (scenario da env, default intro1).
@@ -155,6 +158,25 @@ func _ready() -> void:
 		timer.start()
 	else:
 		_show_scenario_menu()
+
+
+# Prototipo MAPPA 3D (COMBAT_MAP3D=1): mostra una board estrusa in 3D, fuori
+# dal gioco. Board da COMBAT_BOARD (default "hill"); se c'e' COMBAT_SCENARIO
+# carica anche le pedine di quello scenario sopra il terreno.
+func _show_map3d() -> void:
+	var board_name := OS.get_environment("COMBAT_BOARD")
+	var sid := OS.get_environment("COMBAT_SCENARIO")
+	var view := Map3DView.new()
+	if board_name.is_empty() and not sid.is_empty() and Scenario.SCENARIOS.has(sid):
+		board_name = Scenario.SCENARIOS[sid]["map"]
+	view.board_name = board_name if not board_name.is_empty() else "hill"
+	if not sid.is_empty() and Scenario.SCENARIOS.has(sid):
+		state = GameState.new()
+		state.rng.seed = hash("map3d")
+		Scenario.build(state, sid)
+		view.state = state
+		view.board_name = Scenario.SCENARIOS[sid]["map"]
+	add_child(view)
 
 
 # Avvia (o riavvia) uno scenario: stato nuovo, mappa, camera, HUD.
