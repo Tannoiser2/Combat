@@ -21,6 +21,7 @@ var map_view: MapView
 var camera: Camera2D
 var game_hud: CanvasLayer = null        # HUD di gioco (nascosto nell'anteprima 3D)
 var map3d_preview: Map3DView = null     # anteprima 3D attiva (F3), o null
+var map3d_view_state := {}               # camera 3D (orbita/zoom/pan) preservata fra i toggle
 var _play_in_3d := false                # scelta "Gioca in 3D" dal menu
 var phase: int = Phase.CARD
 var impulse_next := 1
@@ -187,6 +188,7 @@ func _show_map3d() -> void:
 # viene toccato: e' solo un visualizzatore del rilievo (orbita/zoom/pan).
 func _toggle_map3d_preview() -> void:
 	if map3d_preview != null:
+		map3d_view_state = map3d_preview.get_view_state()  # ricorda la vista per il prossimo apri
 		map3d_preview.queue_free()
 		map3d_preview = null
 		acting = null
@@ -208,8 +210,11 @@ func _toggle_map3d_preview() -> void:
 	view.state = state
 	view.unit_activated.connect(_on_map3d_unit)
 	view.hex_clicked.connect(_on_map3d_hex)
+	view.los_dragged.connect(_on_map3d_los_drag)
 	map3d_preview = view
 	add_child(view)
+	view.apply_view_state(map3d_view_state)  # ripristina orbita/zoom/pan precedenti
+	view.set_los_mode(los_mode)              # eredita lo stato dello strumento LOS
 	if map_view != null:
 		map_view.visible = false
 	# L'HUD resta visibile sopra il 3D: serve a giocare (Avanti/Passa, pannello
@@ -240,6 +245,17 @@ func _los_place(hex: Vector2i) -> void:
 	else:
 		los_hex_b = hex
 		_los_update()
+
+
+# Trascinamento di un'estremita' LOS dal 3D (come i cerchi del 2D): idx 0=A, 1=B.
+func _on_map3d_los_drag(idx: int, hex: Vector2i) -> void:
+	if not los_mode or hex.x <= -99:
+		return
+	if idx == 0:
+		los_hex_a = hex
+	else:
+		los_hex_b = hex
+	_los_update()
 
 
 # Clic su un hex nell'anteprima 3D (Fase 4): se una pedina sta agendo, l'hex e'
@@ -1154,6 +1170,7 @@ func _on_los_toggled(on: bool) -> void:
 	los_hex_a = Vector2i(-99, -99)
 	los_hex_b = Vector2i(-99, -99)
 	if map3d_preview != null:
+		map3d_preview.set_los_mode(on)
 		map3d_preview.clear_los()
 	if on:
 		hint_label.text = "LOS: clicca il primo hex, poi il secondo (trascina i cerchi per spostarli)"

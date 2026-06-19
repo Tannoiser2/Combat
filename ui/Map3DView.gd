@@ -24,6 +24,7 @@ const LEVEL_HEIGHT := 0.9      # altezza per livello (quote piu' marcate: alture
 
 signal unit_activated(c: Character)  # emesso al clic su una pedina amica (Fase 3)
 signal hex_clicked(hex: Vector2i)    # emesso al clic su un hex (Fase 4: azione)
+signal los_dragged(idx: int, hex: Vector2i)  # estremita' LOS trascinata (0=A, 1=B)
 
 var board_name := "hill"
 var state: GameState = null    # opzionale: per disegnare le pedine
@@ -42,6 +43,7 @@ var _yaw := 0.0                # rotazione attorno all'asse verticale
 var _pitch := deg_to_rad(52.0) # elevazione (0 = orizzonte, ~90 = a piombo)
 var _distance := 60.0
 var _home_distance := 60.0
+var _framed := false           # true dopo la prima inquadratura: i rebuild (S, 1/2/3) non riposizionano la camera
 var _orbiting := false
 var _panning := false
 
@@ -61,6 +63,10 @@ var _units_root: Node3D             # contenitore pedine (rinfrescabile)
 var _cue_root: Node3D               # contenitore cue hexes (mosse/bersagli)
 var _marker_root: Node3D            # contenitore marker d'area (fumo/fuoco/...)
 var _los_root: Node3D               # contenitore strumento LOS (linea + ostacolo)
+var _los_mode := false              # strumento LOS attivo (abilita il grab delle estremita')
+var _los_a := Vector2i(-99, -99)    # estremita' A correntemente disegnata
+var _los_b := Vector2i(-99, -99)    # estremita' B correntemente disegnata
+var _los_grab := -1                 # estremita' in trascinamento: -1 nessuna, 0 = A, 1 = B
 
 # --- Proiettili animati (Fase 5: traccianti/colpi/bombe/granate in 3D) ---
 var _fx_root: Node3D                 # contenitore proiettili + lampi
@@ -355,11 +361,14 @@ func _build_terrain() -> void:
 	wall_mesh.material_override = wall_mat
 	add_child(wall_mesh)
 
-	# Pivot e distanza camera dal bounding box reale.
-	_pivot = (bb_min + bb_max) * 0.5
+	# Pivot e distanza camera dal bounding box reale: SOLO alla prima inquadratura.
+	# Cosi' i rebuild (tasto S, scala quote 1/2/3) NON riposizionano la camera.
 	var span := maxf(bb_max.x - bb_min.x, bb_max.z - bb_min.z)
-	_distance = maxf(span * 0.9, 10.0)
-	_home_distance = _distance
+	_home_distance = maxf(span * 0.9, 10.0)
+	if not _framed:
+		_pivot = (bb_min + bb_max) * 0.5
+		_distance = _home_distance
+		_framed = true
 
 
 func _key_to_cell(key: String) -> Vector2i:
@@ -598,6 +607,23 @@ func _build_camera() -> void:
 	_update_camera()
 
 
+# Stato camera (orbita/zoom/pan) da preservare quando si chiude e riapre il
+# preview 3D, cosi' il toggle 2D<->3D non riporta la vista all'inquadratura iniziale.
+func get_view_state() -> Dictionary:
+	return {"yaw": _yaw, "pitch": _pitch, "distance": _distance, "pivot": _pivot}
+
+
+func apply_view_state(s: Dictionary) -> void:
+	if s.is_empty():
+		return
+	_yaw = s.get("yaw", _yaw)
+	_pitch = s.get("pitch", _pitch)
+	_distance = s.get("distance", _distance)
+	_pivot = s.get("pivot", _pivot)
+	_framed = true
+	_update_camera()
+
+
 func _update_camera() -> void:
 	if _camera == null:
 		return
@@ -611,20 +637,27 @@ func _update_camera() -> void:
 
 # Raycast dal mouse sul terreno -> hex (col,row), come pick_hex in 3D.
 # select=true (clic): seleziona la pedina amica nell'hex (cicla sulle pile).
-func _pick_at(screen_pos: Vector2, select: bool = false) -> void:
+# Raycast dal mouse -> hex (col,row) sotto il cursore, o (-99,-99) se a vuoto.
+func _hex_under(screen_pos: Vector2) -> Vector2i:
 	if _camera == null:
-		return
+		return Vector2i(-99, -99)
 	var space := get_world_3d().direct_space_state
 	if space == null:
-		return
+		return Vector2i(-99, -99)
 	var from := _camera.project_ray_origin(screen_pos)
 	var dir := _camera.project_ray_normal(screen_pos)
 	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 10000.0)
 	var hit := space.intersect_ray(q)
 	if hit.is_empty():
-		return
+		return Vector2i(-99, -99)
 	var p: Vector3 = hit["position"]
-	var hex := _pick_hex_from_px(Vector2(p.x * PX_PER_UNIT, p.z * PX_PER_UNIT))
+	return _pick_hex_from_px(Vector2(p.x * PX_PER_UNIT, p.z * PX_PER_UNIT))
+
+
+func _pick_at(screen_pos: Vector2, select: bool = false) -> void:
+	var hex := _hex_under(screen_pos)
+	if hex.x <= -99:
+		return
 	if not select and hex == _picked:
 		return
 	_picked = hex
@@ -946,9 +979,18 @@ func _draw_fire_lines(src: Vector2i, targets: Array, color: Color) -> void:
 
 # Strumento LOS in 3D: linea verde (libera) / rossa (bloccata) fra due hex,
 # con l'esagono che blocca evidenziato. clear_los() la rimuove.
+# Lo strumento LOS e' attivo: abilita il grab-and-drag delle estremita'.
+func set_los_mode(on: bool) -> void:
+	_los_mode = on
+	if not on:
+		_los_grab = -1
+
+
 func set_los(from_hex: Vector2i, to_hex: Vector2i, clear: bool,
 		blocker: Vector2i = Vector2i(-99, -99)) -> void:
 	clear_los()
+	_los_a = from_hex   # memorizzate per il grab-and-drag delle estremita'
+	_los_b = to_hex
 	var col := Color(0.2, 0.95, 0.3) if clear else Color(0.95, 0.2, 0.15)
 	var a := _hex_top(from_hex) + Vector3(0, 0.5, 0)
 	var b := _hex_top(to_hex) + Vector3(0, 0.5, 0)
@@ -980,6 +1022,9 @@ func set_los(from_hex: Vector2i, to_hex: Vector2i, clear: bool,
 
 
 func clear_los() -> void:
+	_los_a = Vector2i(-99, -99)
+	_los_b = Vector2i(-99, -99)
+	_los_grab = -1
 	if _los_root == null:
 		return
 	for ch in _los_root.get_children():
@@ -1315,12 +1360,34 @@ func _unhandled_input(event: InputEvent) -> void:
 					_distance = minf(_distance * 1.1, 2000.0)
 					_update_camera()
 			MOUSE_BUTTON_LEFT:
-				_orbiting = event.pressed
 				if event.pressed:
-					_pick_at(event.position, true)  # clic = seleziona
+					# In modalita' LOS, premere su un'estremita' gia' piazzata la
+					# "afferra" per trascinarla (come i cerchi del 2D): niente
+					# orbita ne' selezione finche' non si rilascia.
+					_los_grab = -1
+					if _los_mode and _los_a.x > -99 and _los_b.x > -99:
+						var h := _hex_under(event.position)
+						if h == _los_a:
+							_los_grab = 0
+						elif h == _los_b:
+							_los_grab = 1
+					if _los_grab >= 0:
+						_orbiting = false
+					else:
+						_orbiting = true
+						_pick_at(event.position, true)  # clic = seleziona / piazza
+				else:
+					_orbiting = false
+					_los_grab = -1
 			MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 				_panning = event.pressed
 	elif event is InputEventMouseMotion:
+		if _los_grab >= 0:
+			# Trascinamento di un'estremita' LOS: sposta l'hex sotto il cursore.
+			var hg := _hex_under(event.position)
+			if hg.x > -99:
+				los_dragged.emit(_los_grab, hg)
+			return
 		if _orbiting:
 			_yaw -= event.relative.x * 0.008
 			_pitch = clampf(_pitch + event.relative.y * 0.008,
@@ -1333,7 +1400,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			var right := _camera.global_transform.basis.x
 			var fwd := Vector3(sin(_yaw), 0, cos(_yaw))
 			var k := _distance * 0.0016
-			_pivot += (-right * event.relative.x + fwd * event.relative.y) * k
+			# X come nel 2D (trascina = la mappa segue il mouse); Y invariata.
+			_pivot += (right * event.relative.x + fwd * event.relative.y) * k
 			_update_camera()
 	elif event is InputEventKey and event.pressed:
 		match event.keycode:
