@@ -538,7 +538,10 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    dell'operatore un compagno nell'hex prende l'MG e diventa il nuovo
    operatore). Scenario._make imposta c.mg_role da entry. (Pvt Nolan,
    personaggio inventato per fare l'assistente, rimosso.)
-
+11. FATTO (v0.30): Carte Initiative (14/18) giocabili manualmente dal
+   popup "Carte (N)". Il pulsante "Usa" scarta la carta e attende che il
+   giocatore clicchi un uomo; apre il pannello ordini per quel personaggio.
+   Funziona in Order Phase e Action Phase. FriendlyCards.INITIATIVE = [14, 18].
 12. FATTO (v0.36): Stacking (Rule 8). Piu' uomini dello stesso lato possono
    condividere un hex. Move.can_enter/compass_step permettono l'ingresso in
    un hex con un compagno vivo (Move._stack_ok: vietato solo se uno dei due
@@ -546,10 +549,6 @@ Roadmap concordata con l'utente (Volume 3 Arnhem: accantonato):
    UI: MapView._stack_offset sfalsa a cascata le pedine sovrapposte; il click
    sull'hex cicla tra gli uomini della pila (Main._stack_cycle_*), e in fase
    ordini il roster a sinistra apre il pannello ordini sull'uomo scelto.
-11. FATTO (v0.30): Carte Initiative (14/18) giocabili manualmente dal
-   popup "Carte (N)". Il pulsante "Usa" scarta la carta e attende che il
-   giocatore clicchi un uomo; apre il pannello ordini per quel personaggio.
-   Funziona in Order Phase e Action Phase. FriendlyCards.INITIATIVE = [14, 18].
 
 ## Granate (Rule 14.2)
 
